@@ -19,7 +19,7 @@ load_config() {
   CALLBACK_HANDLER="${CALLBACK_HANDLER:-${_run_dir:+$_run_dir/fusion-callback-handler.sh}}"
   FUSION_OVERLAY_KILLER="${FUSION_OVERLAY_KILLER:-${_run_dir:+$_run_dir/fusion-gray-overlay-event-killer.sh}}"
   FUSION_WINE_RESTART_SCRIPT="${FUSION_WINE_RESTART_SCRIPT:-${_run_dir:+$_run_dir/kill-wine-proton-fusion-nuclear.sh}}"
-  FUSION_TOOLWINDOW_FIXER="${FUSION_TOOLWINDOW_FIXER:-${_run_dir:+$_run_dir/fusion-toolwindow-fixer.exe}}"
+  FUSION_TOOLWINDOW_FIXER="${FUSION_TOOLWINDOW_FIXER:-${STEAM_COMPAT_DATA_PATH:-$HOME/.fusion360-proton2}/pfx/drive_c/fusion-toolwindow-fixer.exe}"
 
   FUSION_WINE_DPI="${FUSION_WINE_DPI:-auto}"
   FUSION_WINE_SCALE_PERCENT="${FUSION_WINE_SCALE_PERCENT:-auto}"
@@ -465,10 +465,16 @@ start_toolwindow_fixer() {
     return 0
   fi
 
-  # Must run through the Wine prefix to access Win32 API
-  STEAM_COMPAT_DATA_PATH="${STEAM_COMPAT_DATA_PATH:-$PFX_DIR}" \
-  STEAM_COMPAT_CLIENT_INSTALL_PATH="${STEAM_COMPAT_CLIENT_INSTALL_PATH:-$HOME/.local/share/Steam}" \
-  "$FUSION_TOOLWINDOW_FIXER" &
+  # Find the Wine binary from the GE-Proton installation
+  local wine_bin
+  wine_bin="$(dirname "$(dirname "${PROTON:-$HOME/.local/share/Steam/compatibilitytools.d/GE-Proton11-3/proton}")")/files/bin/wine"
+  if [[ ! -x "$wine_bin" ]]; then
+    echo "launch-fusion.sh warning: wine binary not found at $wine_bin" >&2
+    return 0
+  fi
+
+  WINEPREFIX="${STEAM_COMPAT_DATA_PATH:-${PFX_DIR:-$HOME/.fusion360-proton2}}/pfx" \
+  "$wine_bin" "$FUSION_TOOLWINDOW_FIXER" &
   TOOLWINDOW_FIXER_PID="$!"
 
   echo "launch-fusion.sh: toolwindow fixer started with PID $TOOLWINDOW_FIXER_PID"

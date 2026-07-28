@@ -32,7 +32,7 @@ declare -a CONFIG_VALS=(
   "${BROWSER:-/usr/bin/firefox}"
   "$F360_DATA_DIR/runtime-scripts/fusion-gray-overlay-event-killer.sh"
   "$F360_DATA_DIR/runtime-scripts/kill-wine-proton-fusion-nuclear.sh"
-  "$F360_DATA_DIR/runtime-scripts/fusion-toolwindow-fixer.exe"
+  "$PFX_DIR/pfx/drive_c/fusion-toolwindow-fixer.exe"
   "auto" "auto" "144" "150"
   "0" "0" "1" "1" "1" "1" "0" "1" "1" "1" "1" "1" "1" "25" "1"
 )

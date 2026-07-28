@@ -15,6 +15,11 @@ cp "$SCRIPT_DIR/src/bin/launch-fusion.sh" "$F360_DATA_DIR/"
 cp "$SCRIPT_DIR/src/doctor/doctor.sh" "$F360_DATA_DIR/"
 cp "$SCRIPT_DIR/Makefile" "$F360_DATA_DIR/" 2>/dev/null || true
 chmod +x "$F360_DATA_DIR/launch-fusion.sh" "$F360_DATA_DIR/doctor.sh" "$F360_DATA_DIR/runtime-scripts/"*.sh "$F360_DATA_DIR/runtime-scripts/"*.py 2>/dev/null || true
+# Copy toolwindow fixer into the Wine prefix (Windows exe runs inside Wine)
+if [[ -f "$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.exe" ]]; then
+  cp "$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.exe" \
+     "$PFX_DIR/pfx/drive_c/fusion-toolwindow-fixer.exe"
+fi
 
 # Create CLI symlinks
 ln -sf "$F360_DATA_DIR/launch-fusion.sh" "$F360_BIN_DIR/launch-fusion"

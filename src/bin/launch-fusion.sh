@@ -47,7 +47,7 @@ done
 CHROME="${CHROME:-$_detected_chrome}"
 unset _detected_chrome _c
 FUSION_OVERLAY_KILLER="${FUSION_OVERLAY_KILLER:-$RUNTIME_DIR/fusion-gray-overlay-event-killer.sh}"
-FUSION_TOOLWINDOW_FIXER="${FUSION_TOOLWINDOW_FIXER:-$RUNTIME_DIR/fusion-toolwindow-fixer.exe}"
+FUSION_TOOLWINDOW_FIXER="${FUSION_TOOLWINDOW_FIXER:-${STEAM_COMPAT_DATA_PATH:-$HOME/.fusion360-proton2}/pfx/drive_c/fusion-toolwindow-fixer.exe}"
 FUSION_WINE_RESTART_SCRIPT="${FUSION_WINE_RESTART_SCRIPT:-$RUNTIME_DIR/kill-wine-proton-fusion-nuclear.sh}"
 
 FUSION_WINE_DPI="${FUSION_WINE_DPI:-auto}"
