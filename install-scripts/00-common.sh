@@ -82,7 +82,7 @@ kill_installer() {
     Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
     steam.exe node.exe fusion-gray-overlay; do
     while IFS= read -r pid; do
-      ((count++))
+      count=$((count + 1))
     done < <(pgrep -u "$user" -f "$pattern" 2>/dev/null || true)
   done
 
@@ -116,7 +116,7 @@ kill_installer() {
     steam.exe node.exe fusion-gray-overlay; do
     for pid in $(pgrep -u "$user" -f "$pattern" 2>/dev/null || true); do
       echo "  [lifecycle]   SURVIVED: $(ps -p "$pid" -o comm= 2>/dev/null || echo "PID $pid")"
-      ((survivors++))
+      survivors=$((survivors + 1))
     done
   done
 
