@@ -129,5 +129,3 @@ echo ""
 clear_traps
 
 log_pass "Fusion 360 installation complete."
-echo ""
-printf "${_C_DIM}Run:  ./launch-fusion.sh${_C_RESET}\n"
