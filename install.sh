@@ -59,7 +59,7 @@ case "$MODE" in
     ;;
   --uninstall)
     clear_traps
-    run_step 99-uninstall.sh
+    source "$SCRIPT_DIR/uninstall-select.sh"
     exit 0
     ;;
   --run-installer)
