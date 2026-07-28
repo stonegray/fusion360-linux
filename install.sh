@@ -4,14 +4,13 @@
 # but everything else is automated.
 #
 # Usage:
-#   ./install.sh                        # full install
-#   ./install.sh --deps-only           # system packages only
-#   ./install.sh --ge-proton-only      # download/extract GE-Proton only
-#   ./install.sh --run-installer       # launch Fusion installer only
+#   ./install.sh                                         # full install
+#   ./install.sh --deps-only                             # system packages only
+#   ./install.sh --ge-proton-only                        # download/extract GE-Proton only
+#   ./install.sh --run-installer                         # launch Fusion installer only
+#   ./install.sh --installer-path /path/to/downloader.exe  # use manually-downloaded installer
 
 set -euo pipefail
-
-# ── Root guard ─────────────────────────────────────────────────────────
 if [[ $EUID -eq 0 ]]; then
   cat >&2 <<EOF
 ERROR: Do not run install.sh as root.
@@ -21,7 +20,17 @@ EOF
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MODE="${1:-full}"
+MODE="${1:-}"
+INSTALLER_PATH_OVERRIDE=""
+
+if [[ "${1:-}" == "--installer-path" ]]; then
+  INSTALLER_PATH_OVERRIDE="${2:-}"
+  if [[ -z "$INSTALLER_PATH_OVERRIDE" ]]; then
+    echo "Usage: ./install.sh --installer-path /path/to/FusionClientDownloader.exe"
+    exit 1
+  fi
+  MODE="--run-installer"
+fi
 
 # ── Config ────────────────────────────────────────────────────────────
 GE_PROTON_VERSION="GE-Proton11-3"
@@ -126,7 +135,7 @@ install_ge_proton() {
   echo "  [ge-proton] Done: $COMPAT_DIR/$GE_PROTON_VERSION/proton"
 }
 
-# ── Step 3: run Fusion installer ──────────────────────────────────────
+:# ── Step 3: run Fusion installer ──────────────────────────────────────
 run_fusion_installer() {
   local proton
   proton=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
@@ -135,45 +144,47 @@ run_fusion_installer() {
     exit 1
   fi
 
-  mkdir -p "$HOME/Downloads/fusion360-linux-install"
-  find_installer || true
-
-  if [[ -z "$INSTALLER_PATH" ]]; then
-    echo "  [installer] Downloading Fusion installer..."
-    wget -O "$HOME/Downloads/fusion360-linux-install/FusionClientDownloader.exe" \
-      "https://dl.appstreaming.autodesk.com/production/installers/Fusion%20Client%20Downloader.exe"
-    find_installer || true
-    if [[ -z "$INSTALLER_PATH" ]]; then
-      echo "  [installer] Download failed. Try manually:"
-      echo "    https://dl.appstreaming.autodesk.com/production/installers/Fusion%20Client%20Downloader.exe"
+  # Use --installer-path if provided
+  if [[ -n "${INSTALLER_PATH_OVERRIDE:-}" ]]; then
+    if [[ -f "$INSTALLER_PATH_OVERRIDE" ]]; then
+      INSTALLER_PATH="$INSTALLER_PATH_OVERRIDE"
+    else
+      echo "  [installer] Specified path not found: $INSTALLER_PATH_OVERRIDE"
       exit 1
     fi
   fi
-  local proton
-  proton=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
-  if [[ -z "$proton" ]]; then
-    echo "  [installer] GE-Proton not found. Run install.sh (without flags) first."
-    exit 1
+
+  # Auto-download if not found
+  if [[ -z "${INSTALLER_PATH:-}" ]]; then
+    mkdir -p "$HOME/Downloads/fusion360-linux-install"
+    find_installer || true
   fi
 
-  find_installer || true
-  if [[ -z "$INSTALLER_PATH" ]]; then
-    cat >&2 <<EOF
+  if [[ -z "${INSTALLER_PATH:-}" ]]; then
+    echo "  [installer] Downloading Fusion installer..."
+    wget -O "$HOME/Downloads/fusion360-linux-install/FusionClientDownloader.exe" \
+      "https://dl.appstreaming.autodesk.com/production/installers/Fusion%20Client%20Downloader.exe" || {
+      echo "  [installer] Download failed."
+      cat >&2 <<EOF
 
-  ┌─ Fusion installer not found ──────────────────────────────────┐
+  ┌─ Manual download ────────────────────────────────────────────┐
   │                                                                │
-  │  1. Go to:  https://www.autodesk.com/products/fusion-360/     │
-  │             personal                                          │
-  │  2. Sign up for a free Autodesk account (or log in)           │
-  │  3. Download the Fusion 360 installer (FusionClientDownloader) │
-  │  4. Save it to:                                                │
-  │       $HOME/Downloads/fusion360-linux-install/                 │
+  │  Download FusionClientDownloader.exe manually from:             │
+  │    https://dl.appstreaming.autodesk.com/production/installers/  │
+  │      Fusion%20Client%20Downloader.exe                          │
   │                                                                │
-  │  Then re-run:  ./install.sh --run-installer                    │
+  │  Then run the installer with:                                  │
+  │    ./install.sh --installer-path /path/to/FusionClientDownloader.exe
   │                                                                │
   └────────────────────────────────────────────────────────────────┘
 EOF
-    exit 1
+      exit 1
+    }
+    find_installer || true
+    if [[ -z "$INSTALLER_PATH" ]]; then
+      echo "  [installer] Download failed. Try manually with --installer-path."
+      exit 1
+    fi
   fi
 
   echo "  [installer] Found: $INSTALLER_PATH"
