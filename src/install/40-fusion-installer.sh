@@ -123,20 +123,24 @@ echo "  [installer] Complete the installer in the window that appeared."
 echo "  [installer] The script will detect when it's done automatically."
 F360_LOG="$PFX_DIR/pfx/drive_c/users/steamuser/AppData/Local/Autodesk/autodesk.webdeploy.streamer.log"
 FUSION_PID=""
+F360_EXE=""
 for i in $(seq 1 30); do
   sleep 10
-  # Check both conditions: Fusion360.exe running AND installer log says complete
   FUSION_PID=$(pgrep -u "$(id -u)" -f "Fusion360\.exe" 2>/dev/null | head -1 || true)
+  F360_EXE=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1 || true)
   LOG_DONE=0
   [[ -f "$F360_LOG" ]] && grep -q "Configure app complete" "$F360_LOG" 2>/dev/null && LOG_DONE=1
-  if [[ -n "$FUSION_PID" && $LOG_DONE -eq 1 ]]; then
-    echo "  [installer] Install complete and Fusion360.exe running (PID $FUSION_PID)."
-    echo "  [installer] Letting it initialize for 5 seconds..."
-    sleep 5
+  if [[ $LOG_DONE -eq 1 && ( -n "$FUSION_PID" || -n "$F360_EXE" ) ]]; then
+    if [[ -n "$FUSION_PID" ]]; then
+      echo "  [installer] Install complete and Fusion360.exe running (PID $FUSION_PID)."
+      echo "  [installer] Letting it initialize for 5 seconds..."
+      sleep 5
+    else
+      echo "  [installer] Install complete — Fusion360.exe found on disk."
+    fi
     break
   fi
   if [[ -n "$FUSION_PID" ]]; then
-    # Fusion is running but log isn't complete yet — keep waiting
     echo "  [installer] Fusion360.exe started, waiting for install to finalize..."
   fi
   if [[ $i -eq 15 ]]; then
@@ -144,15 +148,19 @@ for i in $(seq 1 30); do
   fi
 done
 
-
-if [[ -n "$FUSION_PID" && $LOG_DONE -eq 1 ]]; then
-  echo "  [installer] Killing Fusion360 after first-run setup..."
-  source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
-  kill_fusion_processes
-  kill "$FUSION_PID" 2>/dev/null || true
-  sleep 1
-  kill -9 "$FUSION_PID" 2>/dev/null || true
-  echo "  [installer] Fusion360 terminated. Auth will complete on next launch."
+if [[ $LOG_DONE -eq 1 && ( -n "$FUSION_PID" || -n "$F360_EXE" ) ]]; then
+  if [[ -n "$FUSION_PID" ]]; then
+    echo "  [installer] Killing Fusion360 after first-run setup..."
+    source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
+    kill_fusion_processes
+    kill "$FUSION_PID" 2>/dev/null || true
+    sleep 1
+    kill -9 "$FUSION_PID" 2>/dev/null || true
+  else
+    echo "  [installer] Fusion360 already exited — cleaning up remaining processes..."
+    kill_installer
+  fi
+  echo "  [installer] Done. Auth will complete on next launch."
 else
   echo "  [installer] Install did not complete within 5 minutes."
   echo "  [installer] Complete the installer manually, then run: ./launch-fusion.sh"
@@ -161,11 +169,11 @@ fi
 
 # ── Check result ──────────────────────────────────────────────────────
 echo ""
-echo "  [5/5] Checking for Fusion360.exe..."
+echo "  [10/12] Checking for Fusion360.exe..."
 fusion_exe=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1 || true)
 if [[ -n "$fusion_exe" ]]; then
-  echo "  [5/5] Fusion360.exe found — install succeeded."
-  echo "  [5/5] Installing desktop entry..."
+  echo "  [10/12] Fusion360.exe found — install succeeded."
+  echo "  [10/12] Installing desktop entry..."
   mkdir -p "$F360_APPS_DIR"
   cat > "$F360_APPS_DIR/autodesk-fusion360.desktop" <<EOF
 [Desktop Entry]
@@ -182,8 +190,8 @@ EOF
   command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$F360_APPS_DIR" 2>/dev/null || true
   command -v kbuildsycoca6 &>/dev/null && kbuildsycoca6 2>/dev/null || true
   command -v kbuildsycoca5 &>/dev/null && kbuildsycoca5 2>/dev/null || true
-  echo "  [5/5] Desktop entry installed."
+  echo "  [10/12] Desktop entry installed."
 else
-  echo "  [5/5] Fusion360.exe not found yet. Install may still be in progress."
-  echo "  [5/5] Run ./setup-fusion.sh once Fusion360.exe exists."
+  echo "  [10/12] Fusion360.exe not found yet. Install may still be in progress."
+  echo "  [10/12] Run ./setup-fusion.sh once Fusion360.exe exists."
 fi
