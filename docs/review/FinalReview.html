@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Final Review: Fusion360 Linux Installer — Consolidated Findings</title>
+<style>
+body { font-family: system-ui, sans-serif; max-width: 1000px; margin: 2em auto; padding: 0 1em; line-height: 1.6; color: #1a1a1a; }
+h1 { border-bottom: 3px solid #da3633; padding-bottom: .3em; }
+h2 { margin-top: 1.5em; border-bottom: 2px solid #eee; padding-bottom: .2em; }
+h3 { margin-top: 1.2em; }
+.crit { border-left: 4px solid #da3633; padding: .5em 1em; background: #fdecea; margin: .5em 0; }
+.high { border-left: 4px solid #d4920b; padding: .5em 1em; background: #fff8e1; margin: .5em 0; }
+.med { border-left: 4px solid #0969da; padding: .5em 1em; background: #e8f0fe; margin: .5em 0; }
+.low { border-left: 4px solid #656d76; padding: .5em 1em; background: #f6f8fa; margin: .5em 0; }
+pre { background: #f6f8fa; padding: .8em; border-radius: 6px; overflow-x: auto; font-size: .9em; }
+code { background: #f6f8fa; padding: .15em .3em; border-radius: 3px; font-size: .9em; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+th, td { border: 1px solid #ddd; padding: .5em; text-align: left; }
+th { background: #f6f8fa; }
+.tag { display: inline-block; padding: .1em .5em; border-radius: 3px; font-size: .8em; font-weight: 600; }
+.tag-crit { background: #fdecea; color: #da3633; }
+.tag-high { background: #fff8e1; color: #9a6700; }
+.tag-med { background: #e8f0fe; color: #0969da; }
+.tag-low { background: #f6f8fa; color: #656d76; }
+</style>
+</head>
+<body>
+
+<h1>Final Review — Fusion360 Linux Installer</h1>
+<p><strong>8 review agents, ~80+ findings, consolidated.</strong></p>
+
+<table>
+<tr><th>Agent</th><th>Focus</th><th>Findings</th></tr>
+<tr><td>SafetyReview</td><td>Command injection, path traversal, unsafe ops</td><td>12 (3H, 5M, 4L)</td></tr>
+<tr><td>UninstallSafetyReview</td><td>Uninstall code paths</td><td>10 (1C, 3H, 6M)</td></tr>
+<tr><td>EnvVarCheck</td><td>Env var + config key audit</td><td>16 (3C, 5H, 8M)</td></tr>
+<tr><td>InstallFlowReview</td><td>Install orchestration logic</td><td>20 (5C, 4H, 11M)</td></tr>
+<tr><td>LogicalReview</td><td>Architecture + design quality</td><td>14 (3H, 7M, 4L)</td></tr>
+<tr><td>BashExpertShellcheck</td><td>ShellCheck violations + bashisms</td><td>42 (8E, 11W, 6S)</td></tr>
+<tr><td>BashExpertEdgeCases</td><td>Failure modes + edge cases</td><td>16 (5H, 8M, 3L)</td></tr>
+<tr><td>BashExpertConfigReview</td><td>Config data flow round-trip</td><td>6 (2H, 4M)</td></tr>
+</table>
+
+<h2>Critical — Will Crash or Corrupt Data</h2>
+
+<div class="crit">
+<strong>1. install.sh broken paths</strong> <span class="tag tag-crit">CRIT</span>
+<p><code>install.sh:63</code> sources <code>runtime-scripts/uninstall-select.sh</code> — file is at <code>src/runtime/</code>. <code>install.sh:101</code> executes same stale path for protocol registration. <strong>Both <code>--uninstall</code> and protocol registration <code>source</code> a non-existent file → crash.</strong></p>
+<p><strong>Fix:</strong> <code>s/runtime-scripts/src\/runtime/g</code> on both lines.</p>
+</div>
+
+<div class="crit">
+<strong>2. 37-config.sh undefined variables</strong> <span class="tag tag-crit">CRIT</span>
+<p><code>$GE_PROTON</code> and <code>$fusion_root</code> at lines 20, 24, 28 are <strong>never defined</strong> in the file or its parent scope. Config will contain <code>PROTON=</code> and <code>FUSION_ROOT=</code> (empty). With <code>set -u</code>, the shell aborts. Also: missing <code>printf %q</code> bash-version fallback that save_config() has.</p>
+<p><strong>Fix:</strong> Use <code>$COMPAT_DIR</code> + <code>find</code> for GE_PROTON, compute <code>fusion_root</code> from <code>$PFX_DIR</code>.</p>
+</div>
+
+<div class="crit">
+<strong>3. Distro package resolution broken</strong> <span class="tag tag-crit">CRIT</span>
+<p><code>00-common.sh detect_distro()</code> groups aliases (<code>ubuntu|neon|pop|...</code>) under one case, but the file lookup uses literal <code>$ID</code>. <strong>Pop!_OS, Neon, Mint, Manjaro, Endeavour, SUSE all silently get zero packages.</strong> <code>generic.txt</code> is empty.</p>
+<p><strong>Fix:</strong> Map aliases to canonical distro names for file lookup, or add <code>$ID.txt</code> for every alias.</p>
+</div>
+
+<div class="crit">
+<strong>4. Python UI silently drops 2 config keys</strong> <span class="tag tag-crit">CRIT</span>
+<p><code>launcher-config-user-interface.py</code> CONFIG_KEYS missing <code>FUSION_STAGING_WRITECOPY</code> and <code>FUSION_HEAP_DELAY_FREE</code>. Every save via Python UI silently deletes these keys from the config.</p>
+<p><strong>Fix:</strong> Add both keys to CONFIG_KEYS list.</p>
+</div>
+
+<div class="crit">
+<strong>5. parse_args rejects no-arg invocation</strong> <span class="tag tag-crit">CRIT</span>
+<p><code>doctor/00-common.sh parse_args</code> has a <code>*)</code> default case that prints "Unknown option" and exits. But when <code>$1</code> is empty (<code>./doctor.sh</code> with no args), it falls into <code>*)</code> and exits with error. <strong>Running doctor.sh with no arguments is the intended default mode — it's broken.</strong></p>
+<p><strong>Fix:</strong> Add <code>""|--save|--quick)</code> or move the <code>*)</code> after a check for empty <code>$SAVE</code>.</p>
+</div>
+
+<h2>High — Causes Incorrect Behavior</h2>
+
+<div class="high">
+<strong>6. echo -e in Wine registry writes</strong> <span class="tag tag-high">HIGH</span>
+<p><code>launcher-functions.sh:324,331,383</code> use <code>echo -e</code> to write to <code>user.reg</code>. POSIX shells that don't support <code>-e</code> will write literal <code>-e</code> into the registry file, corrupting it. Affects both DPI and browser bridge sections.</p>
+<p><strong>Fix:</strong> Replace with <code>printf '%b\n'</code> or heredoc.</p>
+</div>
+
+<div class="high">
+<strong>7. uninstall.sh incomplete</strong> <span class="tag tag-high">HIGH</span>
+<p>Leaves <code>~/.local/share/fusion360-linux/</code> (runtime scripts), <code>~/.local/bin/launch-fusion</code>, <code>~/.local/bin/fusion-doctor</code>, and <code>/tmp/fusion360-dpi.log</code>. Also uses <code>echo -e</code> bashism on line 23.</p>
+</div>
+
+<div class="high">
+<strong>8. register-protocols.sh stale Exec= path</strong> <span class="tag tag-high">HIGH</span>
+<p>Desktop entry <code>Exec=$SCRIPT_DIR/runtime-scripts/fusion-callback-handler.sh</code> but <code>$SCRIPT_DIR</code> resolves to repo root → path becomes <code>src/runtime-scripts/...</code> instead of <code>src/runtime/...</code>. Also: script not reachable during install due to critical bug #1.</p>
+</div>
+
+<div class="high">
+<strong>9. kill-wine-proton-nuclear.sh stale source path</strong> <span class="tag tag-high">HIGH</span>
+<p><code>SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)</code> → resolves to repo root. Then <code>source "$SCRIPT_DIR/runtime/launcher-functions.sh"</code> — file is at <code>$SCRIPT_DIR/src/runtime/</code>. Path is missing <code>src/</code> prefix.</p>
+</div>
+
+<div class="high">
+<strong>10. uninstall-select.sh icon removal partial</strong> <span class="tag tag-high">HIGH</span>
+<p><code>compgen -G "$path" | head -1</code> in add_comp() stores only the first matching icon path. All but one fusion360.png under <code>hicolor/*/apps/</code> are left behind.</p>
+</div>
+
+<div class="high">
+<strong>11. 10-deps.sh unquoted package install</strong> <span class="tag tag-high">HIGH</span>
+<p><code>$INSTALL_CMD $PKGS</code> unquoted — word splitting AND glob expansion. If a package name matches a file in CWD (<code>icoutils</code>? unlikely but <code>wget</code>? possible), wrong arguments are passed. Also no guard for empty PKGS.</p>
+</div>
+
+<div class="high">
+<strong>12. installer_is_running missing PFX_DIR guard</strong> <span class="tag tag-high">HIGH</span>
+<p><code>00-common.sh:114</code> uses <code>$PFX_DIR</code> without <code>:-</code> fallback. With <code>set -u</code>, crashes if PFX_DIR somehow unset.</p>
+</div>
+
+<div class="high">
+<strong>13. No download verification for GE-Proton</strong> <span class="tag tag-high">HIGH</span>
+<p>500MB tarball downloaded with no checksum verification. Partial/corrupted download persists and silently blocks re-download — extraction fails with cryptic tar error.</p>
+</div>
+
+<div class="high">
+<strong>14. load_config cd without error guard</strong> <span class="tag tag-high">HIGH</span>
+<p><code>${VAR:-$(cd "$SCRIPT_DIR/../runtime" 2>/dev/null && pwd)}</code> — if <code>cd</code> fails, default becomes empty string silently, producing broken paths downstream.</p>
+</div>
+
+<h2>Medium — Correctness & Robustness</h2>
+
+<div class="med">
+<strong>15. sed -i on user.reg not atomic</strong> — SIGINT during sed can leave corrupted Wine registry. Add backup: <code>sed -i.bak</code>.
+</div>
+<div class="med">
+<strong>16. No concurrency guard</strong> — Multiple simultaneous <code>install.sh</code> invocations can corrupt the prefix. Add PID file / flock.
+</div>
+<div class="med">
+<strong>17. Predictable /tmp paths</strong> — Browser bridge uses hardcoded <code>/tmp/fusion360-*</code> dirs with no <code>mktemp</code>. Symlink attack surface.
+</div>
+<div class="med">
+<strong>18. kill_fusion_processes inverted return</strong> — returns 1 on success, 1 on failure. Callers can't distinguish.
+</div>
+<div class="med">
+<strong>19. pre_flight() crashes if df fails</strong> — <code>$(( avail_kb / 1024 / 1024 ))</code> with empty avail_kb causes arithmetic syntax error.
+</div>
+<div class="med">
+<strong>20. wget without --timeout</strong> — 20-ge-proton.sh and 40-fusion-installer.sh call wget with no timeout. Network hang = script hangs forever.
+</div>
+<div class="med">
+<strong>21. echo -n bashisms</strong> — uninstall-select.sh (lines 66, 98) and 40-fusion-installer.sh (line 51). Replace with <code>printf '%s'</code>.
+</div>
+<div class="med">
+<strong>22. exit 0 in pipe-to-while subshell</strong> — overlay killer line 172-175: <code>exit 0</code> inside a pipe-to-while subshell only exits the subshell, not the main script.
+</div>
+<div class="med">
+<strong>23. read without timeout (5 scripts)</strong> — install.sh, uninstall.sh, uninstall-select.sh, 40-fusion-installer.sh all block forever on user input in non-interactive contexts.
+</div>
+<div class="med">
+<strong>24. doctor + health-check wrong desktop-file paths</strong> — Check parent dir instead of <code>fusion360-linux/</code> subdirectory.
+</div>
+<div class="med">
+<strong>25. F360_ICONS_DIR dead code</strong> — Defined in 00-defaults.sh but never referenced anywhere.
+</div>
+<div class="med">
+<strong>26. declare -a bashism in 37-config.sh</strong> — Fine under bash, breaks if ever sourced by /bin/sh.
+</div>
+
+<h2>Low — Style & Cleanup</h2>
+<div class="low">
+<strong>27.</strong> Useless <code>cat</code> in pipes (SC2002) — 00-common.sh:57, 80-logs.sh:39<br/>
+<strong>28.</strong> <code>kill -0</code> → <code>kill</code> TOCTOU race in cleanup() — small window, low risk<br/>
+<strong>29.</strong> Config injection via <code>source</code> — inherent design constraint, mitigated by printf %q<br/>
+<strong>30.</strong> <code>set -f</code> missing in 10-deps.sh around $PKGS expansion<br/>
+</div>
+
+<h2>Remediation Plan</h2>
+<p>10 fix agents dispatched in parallel to address all critical and high findings:</p>
+<ol>
+<li><strong>install.sh</strong> — fix stale paths + concurrency guard</li>
+<li><strong>37-config.sh</strong> — fix undefined vars + printf %q fallback + missing alias distro files</li>
+<li><strong>00-common.sh + distro/</strong> — fix distro file lookup logic, add alias files, fix PFX_DIR guard, fix df crash</li>
+<li><strong>launcher-functions.sh</strong> — echo-e→printf, cd error guard, stale paths, return code</li>
+<li><strong>Python UI</strong> — add missing 2 config keys</li>
+<li><strong>uninstall.sh</strong> — add missing cleanup paths, fix echo-e</li>
+<li><strong>uninstall-select.sh</strong> — fix icon removal, echo-n, selection validation</li>
+<li><strong>register-protocols.sh + kill-wine-proton-nuclear.sh</strong> — fix stale paths</li>
+<li><strong>doctor.sh + doctor modules</strong> — fix parse_args, fix desktop file paths</li>
+<li><strong>10-deps.sh + 20-ge-proton.sh + safety</strong> — quoting, download guards, wget timeout, /tmp mktemp</li>
+</ol>
+
+</body>
+</html>
