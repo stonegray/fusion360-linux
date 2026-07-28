@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
+# setup-fusion.sh — Post-install configuration for Fusion360 on Linux.
+# Re-runnable: fixes whatever is missing. Pass --force to re-do everything.
 set -euo pipefail
-
-# setup-fusion.sh — Phase 3: Post-install configuration for Fusion360 on Linux
-# Re-runnable: safe to run any time to fix a broken configuration.
-# Pass --force to re-do all steps even if already configured.
 
 # ── Root guard ─────────────────────────────────────────────────────────
 if [[ $EUID -eq 0 ]]; then
@@ -24,90 +22,58 @@ CONFIG_FILE="$CONFIG_DIR/config"
 APPLICATIONS_DIR="$HOME/.local/share/applications"
 ICONS_DIR="$HOME/.local/share/icons/hicolor"
 
-# ── Check prerequisites ──────────────────────────────────────────────
+# ── Prerequisites ─────────────────────────────────────────────────────
 if [[ -z "$FUSION_EXE" ]]; then
-  cat >&2 <<EOF
-ERROR: Fusion360.exe not found in ~/.fusion360-proton2.
-
-Make sure you have completed Phase 2 (Fusion installer via Proton).
-Run install.sh for instructions, or check:
-  ~/.fusion360-proton2/pfx/drive_c/users/steamuser/AppData/Local/Autodesk/webdeploy/production/
-
-If Fusion360.exe is in a different location, set the --configure path or
-run launch-fusion.sh --configure after this script finishes.
-EOF
+  echo "ERROR: Fusion360.exe not found. Complete Phase 2 (Fusion installer) first."
+  echo "  Run: ./install.sh"
   exit 1
 fi
-
 if [[ -z "$GE_PROTON" ]]; then
-  cat >&2 <<EOF
-ERROR: GE-Proton not found in ~/.local/share/Steam/compatibilitytools.d/
-
-Download and extract GE-Proton first:
-  wget https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton11-3/GE-Proton11-3.tar.gz
-  tar -xf GE-Proton*.tar.gz -C ~/.local/share/Steam/compatibilitytools.d/
-EOF
+  echo "ERROR: GE-Proton not found. Run install.sh first."
   exit 1
 fi
 
-echo "=== Fusion360 Linux — Phase 3: Configuration ==="
-echo ""
-echo "Detected:"
-echo "  GE-Proton:     $GE_PROTON"
-echo "  Fusion360.exe: $FUSION_EXE"
-echo "  Browser:       ${BROWSER:-none detected}"
+echo "setup: paths detected"
+echo "  proton:   $GE_PROTON"
+echo "  fusion:   $FUSION_EXE"
+echo "  browser:  ${BROWSER:-none}"
 echo ""
 
-# ── Helper: skip check ───────────────────────────────────────────────
-already_done() {
-  [[ "$FORCE" == "--force" ]] && return 1
-  return 0
-}
-
-# ── Step a: Install WebView2 ─────────────────────────────────────────
+# ── Step 1: WebView2 ──────────────────────────────────────────────────
 install_webview2() {
-  local pfx
-  pfx="$HOME/.fusion360-proton2/pfx"
-
-  if [[ -d "$pfx/drive_c/Program Files (x86)/Microsoft/EdgeWebView" ]]; then
-    echo "[SKIP] WebView2 runtime already installed in Proton prefix."
-    already_done && return
+  local pfx="$HOME/.fusion360-proton2/pfx"
+  local target="$pfx/drive_c/Program Files (x86)/Microsoft/EdgeWebView"
+  if [[ -d "$target" && "$FORCE" != "--force" ]]; then
+    echo "  webview2: already installed"
+    return
   fi
 
-  echo "[WEBVIEW2] Downloading Microsoft Edge WebView2 bootstrapper..."
   local bootstrap="/tmp/MicrosoftEdgeWebview2Setup.exe"
   if [[ ! -f "$bootstrap" ]]; then
-    wget -O "$bootstrap" "https://go.microsoft.com/fwlink/p/?LinkId=2124703" 2>/dev/null || {
-      echo "[ERROR] Failed to download WebView2 bootstrapper. Check your internet connection."
-      return 1
-    }
-  else
-    echo "[WEBVIEW2] Bootstrapper already downloaded."
+    echo "  webview2: downloading..."
+    wget -q -O "$bootstrap" "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
   fi
 
-  echo "[WEBVIEW2] Installing WebView2 runtime into Proton prefix (unattended)..."
-  echo "  This may take a minute. The installer runs silently."
+  echo "  webview2: installing (silent)..."
   STEAM_COMPAT_DATA_PATH="$HOME/.fusion360-proton2" \
   STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
   "$GE_PROTON" run "$bootstrap" /silent /install 2>/dev/null || true
 
-  if [[ -d "$pfx/drive_c/Program Files (x86)/Microsoft/EdgeWebView" ]]; then
-    echo "[WEBVIEW2] Installed successfully."
+  if [[ -d "$target" ]]; then
+    echo "  webview2: done"
   else
-    echo "[WARNING] WebView2 may not have installed. You can run setup-fusion.sh again later."
+    echo "  webview2: install may not have completed (can re-run)"
   fi
 }
 
-# ── Step b: Write config ─────────────────────────────────────────────
+# ── Step 2: config ────────────────────────────────────────────────────
 write_config() {
-  if [[ -f "$CONFIG_FILE" ]]; then
-    echo "[SKIP] Config file already exists: $CONFIG_FILE"
-    already_done && return
+  if [[ -f "$CONFIG_FILE" && "$FORCE" != "--force" ]]; then
+    echo "  config:   already present"
+    return
   fi
 
-  echo "[CONFIG] Writing config file..."
   mkdir -p "$CONFIG_DIR"
-
   FUSION_ROOT="$(dirname "$(dirname "$FUSION_EXE")")"
 
   cat > "$CONFIG_FILE" <<EOF
@@ -136,23 +102,19 @@ FUSION_USE_INTEL_VK_ICD=1
 FUSION_ENABLE_OVERLAY_KILLER=1
 FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT=25
 EOF
-
-  echo "[CONFIG] Written to $CONFIG_FILE"
+  echo "  config:   written"
 }
 
-# ── Step c: Register protocol handlers ───────────────────────────────
+# ── Step 3: protocol handlers ─────────────────────────────────────────
 register_protocols() {
-  local desktop_file="$APPLICATIONS_DIR/fusion360-callback-handler.desktop"
-
-  if [[ -f "$desktop_file" ]]; then
-    echo "[SKIP] Protocol handler desktop file already exists."
-    already_done && return
+  local desktop="$APPLICATIONS_DIR/fusion360-callback-handler.desktop"
+  if [[ -f "$desktop" && "$FORCE" != "--force" ]]; then
+    echo "  adsk://:  already registered"
+    return
   fi
 
-  echo "[PROTOCOLS] Registering adsk:// and adskidmgr:// protocol handlers..."
   mkdir -p "$APPLICATIONS_DIR"
-
-  cat > "$desktop_file" <<EOF
+  cat > "$desktop" <<EOF
 [Desktop Entry]
 Name=Fusion 360 Autodesk Callback Handler
 Exec=$SCRIPT_DIR/scripts/fusion-callback-handler.sh %u
@@ -163,80 +125,49 @@ EOF
 
   xdg-mime default fusion360-callback-handler.desktop x-scheme-handler/adsk 2>/dev/null || true
   xdg-mime default fusion360-callback-handler.desktop x-scheme-handler/adskidmgr 2>/dev/null || true
-
-  if command -v update-desktop-database >/dev/null 2>&1; then
-    update-desktop-database "$APPLICATIONS_DIR" >/dev/null 2>&1 || true
-  fi
-
-  echo "[PROTOCOLS] Registered."
+  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$APPLICATIONS_DIR" 2>/dev/null || true
+  echo "  adsk://:  registered"
 }
 
-# ── Step d: Extract icons ────────────────────────────────────────────
+# ── Step 4: icons ─────────────────────────────────────────────────────
 extract_icons() {
-  local icon_sizes
-  icon_sizes="16 22 24 32 48 64 72 96 128 192 256 512"
-  local need_extract=0
-
-  for size in $icon_sizes; do
-    local icon_file="$ICONS_DIR/${size}x${size}/apps/fusion360.png"
-    if [[ ! -f "$icon_file" ]]; then
-      need_extract=1
-      break
-    fi
+  local sizes="16 22 24 32 48 64 72 96 128 192 256 512"
+  local missing=0
+  for s in $sizes; do
+    [[ -f "$ICONS_DIR/${s}x${s}/apps/fusion360.png" ]] || missing=1
   done
-
-  if [[ $need_extract -eq 0 ]]; then
-    echo "[SKIP] Icons already extracted."
-    already_done && return
-  fi
-
-  echo "[ICONS] Extracting icons from Fusion360.exe..."
-  if ! command -v wrestool &>/dev/null; then
-    echo "[ERROR] wrestool not found. Install icoutils package."
-    return 1
-  fi
-  if ! command -v convert &>/dev/null; then
-    echo "[ERROR] convert (ImageMagick) not found. Install imagemagick package."
-    return 1
-  fi
-
-  local tmp_ico
-  tmp_ico=$(mktemp /tmp/fusion360-icon-XXXXX.ico)
-  local tmp_png
-  tmp_png=$(mktemp /tmp/fusion360-icon-XXXXX.png)
-
-  wrestool -x -t 14 "$FUSION_EXE" > "$tmp_ico" 2>/dev/null || {
-    echo "[WARNING] Failed to extract icon from Fusion360.exe (no icon resource found)."
-    rm -f "$tmp_ico"
+  if [[ $missing -eq 0 && "$FORCE" != "--force" ]]; then
+    echo "  icons:    already extracted"
     return
-  }
+  fi
 
-  for size in $icon_sizes; do
-    local icon_dir="$ICONS_DIR/${size}x${size}/apps"
-    mkdir -p "$icon_dir"
-    convert "$tmp_ico" -resize "${size}x${size}" "$icon_dir/fusion360.png" 2>/dev/null || true
-    if [[ -f "$icon_dir/fusion360.png" ]]; then
-      echo "  Created: $icon_dir/fusion360.png"
-    fi
+  if ! command -v wrestool &>/dev/null || ! command -v convert &>/dev/null; then
+    echo "  icons:    skip (wrestool/convert not available)"
+    return
+  fi
+
+  local ico; ico=$(mktemp /tmp/fusion360-icon-XXXXX.ico)
+  wrestool -x -t 14 "$FUSION_EXE" > "$ico" 2>/dev/null || { rm -f "$ico"; echo "  icons:    no icon resource found"; return; }
+
+  for s in $sizes; do
+    local dir="$ICONS_DIR/${s}x${s}/apps"
+    mkdir -p "$dir"
+    convert "$ico" -resize "${s}x${s}" "$dir/fusion360.png" 2>/dev/null || true
   done
-
-  rm -f "$tmp_ico" "$tmp_png"
-  echo "[ICONS] Done."
+  rm -f "$ico"
+  echo "  icons:    extracted"
 }
 
-# ── Step e: Install desktop entry ────────────────────────────────────
+# ── Step 5: desktop entry ────────────────────────────────────────────
 install_desktop_entry() {
-  local desktop_entry="$APPLICATIONS_DIR/autodesk-fusion360.desktop"
-
-  if [[ -f "$desktop_entry" ]]; then
-    echo "[SKIP] Desktop entry already exists."
-    already_done && return
+  local entry="$APPLICATIONS_DIR/autodesk-fusion360.desktop"
+  if [[ -f "$entry" && "$FORCE" != "--force" ]]; then
+    echo "  desktop:  already installed"
+    return
   fi
 
-  echo "[DESKTOP] Installing desktop entry..."
   mkdir -p "$APPLICATIONS_DIR"
-
-  cat > "$desktop_entry" <<EOF
+  cat > "$entry" <<EOF
 [Desktop Entry]
 Name=Autodesk Fusion 360
 Comment=Fusion 360 CAD/CAM/CAE tool
@@ -245,55 +176,31 @@ Type=Application
 Categories=Graphics;Science;Engineering;
 StartupNotify=true
 StartupWMClass=fusion360.exe
-MimeType=application/x-fusion360
 EOF
 
-  chmod 644 "$desktop_entry"
-
-  if command -v update-desktop-database >/dev/null 2>&1; then
-    update-desktop-database "$APPLICATIONS_DIR" >/dev/null 2>&1 || true
-  fi
-
-  echo "[DESKTOP] Installed: $desktop_entry"
+  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$APPLICATIONS_DIR" 2>/dev/null || true
+  echo "  desktop:  installed"
 }
 
-# ── Step f: Refresh KDE menu ─────────────────────────────────────────
+# ── Step 6: KDE menu ─────────────────────────────────────────────────
 refresh_kde_menu() {
-  if command -v kbuildsycoca6 &>/dev/null; then
-    echo "[KDE] Refreshing KDE menu cache..."
-    kbuildsycoca6 2>/dev/null || true
-    echo "[KDE] Done."
-  elif command -v kbuildsycoca5 &>/dev/null; then
-    echo "[KDE] Refreshing KDE menu cache..."
-    kbuildsycoca5 2>/dev/null || true
-    echo "[KDE] Done."
-  else
-    echo "[KDE] kbuildsycoca not found (not a KDE Plasma session, skipping)."
-  fi
+  command -v kbuildsycoca6 &>/dev/null && { kbuildsycoca6 2>/dev/null || true; }
+  command -v kbuildsycoca5 &>/dev/null && { kbuildsycoca5 2>/dev/null || true; }
 }
 
-# ── Step g: Clean bridge temp dirs ───────────────────────────────────
+# ── Step 7: cleanup ──────────────────────────────────────────────────
 clean_bridge_temps() {
-  echo "[CLEAN] Removing stale bridge temp files..."
   rm -rf /tmp/fusion360-* 2>/dev/null || true
-  echo "[CLEAN] Done."
 }
 
 # ── Main ─────────────────────────────────────────────────────────────
-main() {
-  install_webview2
-  write_config
-  register_protocols
-  extract_icons
-  install_desktop_entry
-  refresh_kde_menu
-  clean_bridge_temps
-
-  echo ""
-  echo "============================================================"
-  echo "Setup complete! Run ./launch-fusion.sh to start Fusion360."
-  echo "Or use: make run"
-  echo "============================================================"
-}
-
-main "$@"
+echo "── setup: configuring fusion360 ──"
+install_webview2
+write_config
+register_protocols
+extract_icons
+install_desktop_entry
+refresh_kde_menu
+clean_bridge_temps
+echo ""
+echo "  done. run ./launch-fusion.sh or make run"

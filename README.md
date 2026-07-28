@@ -1,54 +1,38 @@
 # Fusion 360 on Linux
 
-Self-contained helper scripts for running Autodesk Fusion 360 on Linux through Proton/GE-Proton with working sign-in, browser bridge, and gray overlay fix.
+Helper scripts for running Autodesk Fusion 360 on Linux through Proton/GE-Proton with working sign-in, browser bridge, and gray overlay fix.
 
-## Quick Start (3 Phases)
-
-### Phase 1: System Prep
-
-Install system dependencies and create required directories:
+## Install
 
 ```bash
 ./install.sh
 ```
 
-This installs packages (icoutils, zenity, wget, xdg-utils, etc.), creates `~/.fusion360-proton2/` and `~/.local/share/Steam/compatibilitytools.d/`, then prints instructions for Phase 2.
+This installs system dependencies, downloads GE-Proton, launches the Fusion installer, and runs post-install configuration. The Fusion GUI installer will pop up — click through it.
 
-### Phase 2: Install Fusion 360
-
-Download GE-Proton and run the Fusion installer manually (the installer is GUI-only):
-
-```bash
-# Download GE-Proton
-wget https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton11-3/GE-Proton11-3.tar.gz
-tar -xf GE-Proton*.tar.gz -C ~/.local/share/Steam/compatibilitytools.d/
-
-# Run the Fusion installer through Proton
-STEAM_COMPAT_DATA_PATH="$HOME/.fusion360-proton2" \
-STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
-~/.local/share/Steam/compatibilitytools.d/GE-Proton11-3/proton run \
-  ~/Downloads/fusion360-linux-install/FusionClientDownloader.exe
-```
-
-Click through the installer GUI. When it shows "Finish", Phase 2 is done.
-
-### Phase 3: Finalize Configuration
-
-```bash
-./setup-fusion.sh
-```
-
-This installs WebView2 into the Proton prefix, writes configuration, registers protocol handlers (`adsk://`, `adskidmgr://`), extracts application icons, and installs a desktop entry. Re-runnable any time.
-
-### Launch
+After install completes, launch with:
 
 ```bash
 ./launch-fusion.sh
-# Or
+# or
 make run
 ```
 
-## Commands Reference
+## Individual steps
+
+| Command | What it does |
+|---------|-------------|
+| `./install.sh --deps-only` | System packages only |
+| `./install.sh --ge-proton-only` | Download + extract GE-Proton only |
+| `./install.sh --run-installer` | Launch Fusion installer only |
+| `./setup-fusion.sh` | Re-run post-install config (WebView2, handlers, icons, desktop entry) |
+| `./setup-fusion.sh --force` | Re-do all config steps |
+| `./launch-fusion.sh --configure` | Interactive path configuration |
+| `./status.sh` | Quick prerequisite check |
+| `./doctor.sh` | Full diagnostic report |
+| `./uninstall.sh` | Remove Fusion, config, icons, desktop entries |
+
+## Commands reference
 
 | Command | Description |
 |---------|-------------|
@@ -56,30 +40,20 @@ make run
 | `make kill` | Force-kill all Fusion/Wine processes |
 | `make ps` | Check if Fusion is running |
 | `make log` | View Fusion log output |
-| `./launch-fusion.sh --configure` | Interactive path configuration |
-| `./status.sh` | Diagnostic: check all prerequisites |
-| `./setup-fusion.sh` | Re-run post-install configuration |
-| `./setup-fusion.sh --force` | Re-do all config steps |
-| `./uninstall.sh` | Remove Fusion, config, icons, desktop entries |
 
 ## Platform Support
 
 | Distro | Status | Notes |
 |--------|--------|-------|
-| KDE Neon 24.04 | Tested 2026-07-28 | All patches verified, all features working |
+| KDE Neon 24.04 | Tested 2026-07-28 | All patches verified |
 | Ubuntu 24.04 | Likely works | Same base; adjust env vars if not on KDE |
-| Fedora | Upstream target | Original scripts designed for Fedora; may not need all patches |
-| Arch | Untested | Package names may differ; see install.sh distro detection |
-| openSUSE | Added | Package names included in install.sh |
-| Other | Manual deps | install.sh exits with manual package list for unknown distros |
+| Fedora | Upstream target | Original scripts designed for Fedora |
+| Arch | Untested | Package names may differ |
+| openSUSE | Supported | Package names included |
 
 ## How It Works
 
-The launcher handles three separate jobs:
-
-1. **Start Fusion 360** through Proton.
-2. **Bridge sign-in** from Wine/Proton to your Linux browser.
-3. **Bridge the callback** back into Proton's Identity Manager.
+The launcher handles three jobs: start Fusion through Proton, bridge sign-in from Wine to your Linux browser, and bridge the callback back into Proton's Identity Manager.
 
 ```
 Fusion / Wine
@@ -96,19 +70,25 @@ Fusion / Wine
   -> Fusion receives sign-in
 ```
 
-No passwords are written to files. The bridge writes short-lived URLs and callback tokens only.
+No passwords are written to files. The bridge writes short-lived URLs only.
 
 ## Repository Structure
 
 ```
-├── install.sh                 # Phase 1: system deps, dirs, prints next steps
-├── setup-fusion.sh            # Phase 3: WebView2, handlers, config, icons
-├── status.sh                  # Diagnostic: checks all prerequisites
+├── install.sh                 # Full installer (deps, GE-Proton, Fusion, setup)
+├── setup-fusion.sh            # Re-runnable post-install config
+├── status.sh                  # Quick prerequisite check
+├── doctor.sh                  # Full diagnostic (sources doctor/*.sh modules)
 ├── uninstall.sh               # Clean removal
-├── launch-fusion.sh           # Main launcher (runtime)
+├── launch-fusion.sh           # Main launcher
 ├── Makefile                   # make run/kill/ps/log
-├── README.md                  # This file
-├── scripts/                   # Runtime scripts (used by launch-fusion.sh)
+├── README.md
+├── doctor/                    # Diagnostic modules (10 numbered scripts)
+│   ├── 00-common.sh
+│   ├── 10-env.sh
+│   ├── 20-deps.sh
+│   └── ...
+├── scripts/                   # Runtime scripts used by launch-fusion.sh
 │   ├── fusion-browser.sh
 │   ├── fusion-browser-listener.sh
 │   ├── fusion-callback-handler.sh
@@ -117,7 +97,7 @@ No passwords are written to files. The bridge writes short-lived URLs and callba
 │   ├── launcher-functions.sh
 │   └── launcher-config-user-interface.py
 └── docs/
-    ├── troubleshooting.md     # All known issues and fixes
+    ├── troubleshooting.md     # Known issues and fixes
     ├── what-worked-what-didnt.md
     ├── actions-log.md
     └── fusion360-linux-install-guide.md
@@ -125,4 +105,4 @@ No passwords are written to files. The bridge writes short-lived URLs and callba
 
 ## Troubleshooting
 
-See [docs/troubleshooting.md](docs/troubleshooting.md) for known issues and fixes.
+See [docs/troubleshooting.md](docs/troubleshooting.md) for known issues.

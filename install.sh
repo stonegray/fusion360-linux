@@ -1,142 +1,235 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# install.sh — Install Fusion360 on Linux: deps, GE-Proton, Fusion installer, post-setup.
+# Runs the full install flow. The Fusion GUI installer still requires clicks,
+# but everything else is automated.
+#
+# Usage:
+#   ./install.sh                        # full install
+#   ./install.sh --deps-only           # system packages only
+#   ./install.sh --ge-proton-only      # download/extract GE-Proton only
+#   ./install.sh --run-installer       # launch Fusion installer only
 
-# install.sh — Phase 1: System dependencies & directory setup for Fusion360 on Linux
-# This script installs system packages, creates required directories,
-# and prints instructions for Phase 2 (Fusion installer via Proton).
+set -euo pipefail
 
 # ── Root guard ─────────────────────────────────────────────────────────
 if [[ $EUID -eq 0 ]]; then
   cat >&2 <<EOF
 ERROR: Do not run install.sh as root.
   Run it as a normal user — the script will use sudo when needed.
-  Running as root creates directories under /root/ instead of your home.
 EOF
   exit 1
 fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MODE="${1:-full}"
+
+# ── Config ────────────────────────────────────────────────────────────
+GE_PROTON_VERSION="GE-Proton11-3"
+GE_PROTON_URL="https://github.com/GloriousEggroll/proton-ge-custom/releases/download/${GE_PROTON_VERSION}/${GE_PROTON_VERSION}.tar.gz"
+COMPAT_DIR="$HOME/.local/share/Steam/compatibilitytools.d"
+PFX_DIR="$HOME/.fusion360-proton2"
+INSTALLER_PATH=""
+
+find_installer() {
+  local candidates=(
+    "$HOME/Downloads/fusion360-linux-install/FusionClientDownloader.exe"
+    "$HOME/Downloads/FusionClientDownloader.exe"
+    "$HOME/Desktop/FusionClientDownloader.exe"
+  )
+  for c in "${candidates[@]}"; do
+    if [[ -f "$c" ]]; then
+      INSTALLER_PATH="$c"
+      return 0
+    fi
+  done
+  return 1
+}
 
 # ── Distro detection ──────────────────────────────────────────────────
 detect_distro() {
   source /etc/os-release
   case "$ID" in
     ubuntu|neon|debian|pop|elementary|linuxmint)
-      PKG_MGR="apt-get"
-      PKGS="icoutils zenity python3-tk cabextract wget xdg-utils desktop-file-utils"
       INSTALL_CMD="sudo apt-get install -y"
+      PKGS="icoutils zenity python3-tk cabextract wget xdg-utils desktop-file-utils"
       ;;
     fedora)
-      PKG_MGR="dnf"
-      PKGS="icoutils zenity python3-tk cabextract wget xdg-utils desktop-file-utils"
       INSTALL_CMD="sudo dnf install -y"
+      PKGS="icoutils zenity python3-tk cabextract wget xdg-utils desktop-file-utils"
       ;;
     arch|manjaro|endeavour)
-      PKG_MGR="pacman"
-      PKGS="icoutils zenity python3-tk cabextract wget xdg-utils desktop-file-utils"
       INSTALL_CMD="sudo pacman -S --needed --noconfirm"
+      PKGS="icoutils zenity python3-tk cabextract wget xdg-utils desktop-file-utils"
       ;;
     opensuse*|suse)
-      PKG_MGR="zypper"
-      PKGS="icoutils zenity python3-tk cabextract wget xdg-utils desktop-file-utils"
       INSTALL_CMD="sudo zypper install -y"
+      PKGS="icoutils zenity python3-tk cabextract wget xdg-utils desktop-file-utils"
       ;;
     *)
-      echo "============================================================"
-      echo "WARNING: Unknown distro '$ID'. Install these packages manually:"
+      echo "ERROR: Unknown distro '$ID'. Install these manually, then re-run:"
       echo "  icoutils zenity python3-tk cabextract wget xdg-utils desktop-file-utils"
-      echo "Then re-run this script, or continue manually."
-      echo "============================================================"
       exit 1
       ;;
   esac
 }
 
-# ── Pre-flight checks ────────────────────────────────────────────────
+# ── Pre-flight ────────────────────────────────────────────────────────
 pre_flight() {
-  # Display server
   if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
-    echo "ERROR: No display server detected (\$DISPLAY and \$WAYLAND_DISPLAY both unset)."
-    echo "  Are you running from a desktop session?"
+    echo "ERROR: No display server detected. Are you running from a desktop session?"
     exit 1
   fi
-
-  # Sudo access
   if ! sudo -n true 2>/dev/null; then
-    echo "NOTE: Passwordless sudo not available. Trying sudo with askpass..."
-    if [[ -n "${SUDO_ASKPASS:-}" ]]; then
-      SUDO_CMD="sudo -A"
-    else
-      echo "============================================================"
-      echo "sudo access is required to install packages."
-      echo "Set SUDO_ASKPASS if you want a GUI prompt, or simply run:"
-      echo "  sudo $INSTALL_CMD $PKGS"
-      echo "Then re-run this script to continue."
-      echo "============================================================"
-      exit 1
+    if [[ -z "${SUDO_ASKPASS:-}" ]]; then
+      echo "sudo access is required. Run this script as a normal user; it will prompt for sudo."
     fi
   fi
-
-  # Disk space (check home partition)
-  local available_kb
-  available_kb=$(df --output=avail "$HOME" 2>/dev/null | tail -n1)
-  local available_gb=$((available_kb / 1024 / 1024))
-  if [[ $available_gb -lt 10 ]]; then
-    echo "WARNING: Only ${available_gb}GB free on $HOME partition."
-    echo "  Fusion360 + Proton prefix requires at least 10GB free space."
-    echo "  Consider freeing space before continuing."
-    echo ""
+  local avail_kb; avail_kb=$(df --output=avail "$HOME" 2>/dev/null | tail -n1)
+  local avail_gb=$((avail_kb / 1024 / 1024))
+  if [[ $avail_gb -lt 15 ]]; then
+    echo "WARNING: Only ${avail_gb}GB free on $HOME. Fusion needs ~10GB."
+    echo "  Press Ctrl+C to abort, or wait 5s to continue..."
+    sleep 5
   fi
 }
 
-# ── Main ─────────────────────────────────────────────────────────────
-main() {
-  echo "=== Fusion360 Linux — Phase 1: System Preparation ==="
+# ── Step 1: system deps ───────────────────────────────────────────────
+install_deps() {
+  detect_distro
+  echo "  [deps] Installing packages: $PKGS"
+  $INSTALL_CMD $PKGS
+  mkdir -p "$COMPAT_DIR" "$PFX_DIR"
+  echo "  [deps] Done."
+}
+
+# ── Step 2: GE-Proton ─────────────────────────────────────────────────
+install_ge_proton() {
+  mkdir -p "$COMPAT_DIR"
+
+  existing=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
+  if [[ -n "$existing" ]]; then
+    echo "  [ge-proton] Already installed: $(dirname "$existing")"
+    return 0
+  fi
+
+  local tarball="/tmp/${GE_PROTON_VERSION}.tar.gz"
+  if [[ ! -f "$tarball" ]]; then
+    echo "  [ge-proton] Downloading ${GE_PROTON_VERSION} (~500MB)..."
+    echo "  [ge-proton] URL: $GE_PROTON_URL"
+    wget -O "$tarball" "$GE_PROTON_URL"
+  else
+    echo "  [ge-proton] Already downloaded: $tarball"
+  fi
+
+  echo "  [ge-proton] Extracting to $COMPAT_DIR..."
+  tar -xf "$tarball" -C "$COMPAT_DIR"
+  echo "  [ge-proton] Done: $COMPAT_DIR/$GE_PROTON_VERSION/proton"
+}
+
+# ── Step 3: run Fusion installer ──────────────────────────────────────
+run_fusion_installer() {
+  local proton
+  proton=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
+  if [[ -z "$proton" ]]; then
+    echo "  [installer] GE-Proton not found. Run install.sh (without flags) first."
+    exit 1
+  fi
+
+  find_installer || true
+  if [[ -z "$INSTALLER_PATH" ]]; then
+    echo "  [installer] FusionClientDownloader.exe not found in Downloads."
+    echo "  [installer] Download it from https://www.autodesk.com/products/fusion-360/free-trial"
+    echo "  [installer] Save as: $HOME/Downloads/fusion360-linux-install/FusionClientDownloader.exe"
+    echo "  [installer] Then re-run: ./install.sh --run-installer"
+    exit 1
+  fi
+
+  echo "  [installer] Found: $INSTALLER_PATH"
+  echo "  [installer] Launching Fusion installer through Proton..."
+  echo "  [installer] A Windows installer window will appear. Click through it."
+  echo ""
+  echo "  ┌─ IMPORTANT ────────────────────────────────────────────┐"
+  echo "  │ Complete the installer in the window that appears.     │"
+  echo "  │ When it shows \"Finish\", the installation is done.      │"
+  echo "  │ Close the installer window, then come back here.       │"
+  echo "  └────────────────────────────────────────────────────────┘"
   echo ""
 
-  detect_distro
+  mkdir -p "$PFX_DIR"
+  STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
+  STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
+  "$proton" run "$INSTALLER_PATH"
+
+  echo ""
+  echo "  [installer] Installer exited. Checking for Fusion360.exe..."
+  local fusion_exe
+  fusion_exe=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1 || true)
+  if [[ -n "$fusion_exe" ]]; then
+    echo "  [installer] Fusion360.exe found — install succeeded."
+  else
+    echo "  [installer] Fusion360.exe not found yet. The installer may still be running"
+    echo "  [installer] or it may need to finish downloading components."
+    echo "  [installer] Run ./setup-fusion.sh once Fusion360.exe exists."
+  fi
+}
+
+# ── Step 4: post-install setup ────────────────────────────────────────
+run_setup() {
+  if [[ -f "$SCRIPT_DIR/setup-fusion.sh" ]]; then
+    echo "  [setup] Running post-install configuration..."
+    "$SCRIPT_DIR/setup-fusion.sh"
+  else
+    echo "  [setup] setup-fusion.sh not found. Run it manually from the repo."
+  fi
+}
+
+# ── Main ──────────────────────────────────────────────────────────────
+main() {
+  case "$MODE" in
+    --deps-only)
+      install_deps
+      exit 0
+      ;;
+    --ge-proton-only)
+      install_ge_proton
+      exit 0
+      ;;
+    --run-installer)
+      run_fusion_installer
+      exit 0
+      ;;
+  esac
+
+  echo "╔══════════════════════════════════════════════════════════════╗"
+  echo "║     Fusion360 Linux Installer                               ║"
+  echo "╚══════════════════════════════════════════════════════════════╝"
+  echo ""
+
   pre_flight
 
-  echo "Detected: $(source /etc/os-release && echo "$PRETTY_NAME")"
-  echo "Package manager: $PKG_MGR"
-  echo "Packages: $PKGS"
+  # Step 1: system deps
+  echo "── Step 1/4: System dependencies ──"
+  install_deps
   echo ""
 
-  # Install packages
-  echo "Installing system dependencies..."
-  $INSTALL_CMD $PKGS
+  # Step 2: GE-Proton
+  echo "── Step 2/4: GE-Proton ──"
+  install_ge_proton
   echo ""
 
-  # Create required directories
-  echo "Creating directories..."
-  mkdir -p "$HOME/.local/share/Steam/compatibilitytools.d"
-  mkdir -p "$HOME/.fusion360-proton2"
-  echo "  Created: $HOME/.local/share/Steam/compatibilitytools.d"
-  echo "  Created: $HOME/.fusion360-proton2"
+  # Step 3: Fusion installer
+  echo "── Step 3/4: Fusion Installer ──"
+  run_fusion_installer
   echo ""
 
-  # ── Phase 1 complete — print Phase 2 instructions ──────────────
-  cat <<EOF
-============================================================
-PHASE 1 COMPLETE: System dependencies installed.
+  # Step 4: post-install setup
+  echo "── Step 4/4: Post-install Setup ──"
+  run_setup
+  echo ""
 
-PHASE 2: Install Fusion360
----------------------------
-Step 1: Download GE-Proton (if not already done):
-  wget https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton11-3/GE-Proton11-3.tar.gz
-  tar -xf GE-Proton*.tar.gz -C "$HOME/.local/share/Steam/compatibilitytools.d/"
-
-Step 2: Download the Fusion 360 installer from Autodesk:
-  Place FusionClientDownloader.exe in ~/Downloads/fusion360-linux-install/
-
-Step 3: Run the Fusion installer through Proton:
-  STEAM_COMPAT_DATA_PATH="$HOME/.fusion360-proton2" \\
-  STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \\
-  "$HOME/.local/share/Steam/compatibilitytools.d/GE-Proton11-3/proton" run \\
-  "$HOME/Downloads/fusion360-linux-install/FusionClientDownloader.exe"
-
-After the installer finishes, run Phase 3:
-  ./setup-fusion.sh
-============================================================
-EOF
+  echo "╔══════════════════════════════════════════════════════════════╗"
+  echo "║     Install complete. Run:  ./launch-fusion.sh              ║"
+  echo "╚══════════════════════════════════════════════════════════════╝"
 }
 
 main "$@"
