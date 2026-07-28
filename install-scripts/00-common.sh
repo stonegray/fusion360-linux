@@ -75,22 +75,46 @@ INSTALLER_PID=""
 
 kill_installer() {
   local user; user=$(id -u)
-  local count=0
 
-  # Count what's running before kill
-  for pattern in wineserver wine proton xalia \
+  # Collect ALL wine/proton PIDs — check both cmdline AND /proc/PID/exe
+  # because Wine processes show Windows paths in cmdline (no "wine" string)
+  # but their actual binary is wine64-preloader or similar
+  local pids=()
+  local pid
+
+  # Method 1: pgrep by cmdline patterns
+  for pattern in wineserver wine proton xalia streamer \
     Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
     steam.exe node.exe fusion-gray-overlay; do
     while IFS= read -r pid; do
-      count=$((count + 1))
+      pids+=("$pid")
     done < <(pgrep -u "$user" -f "$pattern" 2>/dev/null || true)
   done
 
-  if (( count == 0 )); then
+  # Method 2: scan /proc/PID/exe for wine/proton binaries
+  for proc in /proc/[0-9]*/exe; do
+    exe=$(readlink "$proc" 2>/dev/null || true)
+    [[ -z "$exe" ]] && continue
+    if [[ "$exe" == *wine* ]] || [[ "$exe" == *proton* ]]; then
+      pid=${proc%/exe}
+      pid=${pid#/proc/}
+      pids+=("$pid")
+    fi
+  done
+
+  # Deduplicate and remove empty entries
+  local unique=()
+  for pid in "${pids[@]}"; do
+    [[ -z "$pid" ]] && continue
+    case " ${unique[*]} " in *" $pid "*) continue ;; esac
+    unique+=("$pid")
+  done
+
+  if (( ${#unique[@]} == 0 )); then
     return 0
   fi
 
-  echo "  [lifecycle] Killing $count Wine/Proton process(es)..."
+  echo "  [lifecycle] Killing ${#unique[@]} Wine/Proton process(es)..."
 
   # Kill tracked installer PID
   if [[ -n "${INSTALLER_PID:-}" ]] && kill -0 "$INSTALLER_PID" 2>/dev/null; then
@@ -99,25 +123,24 @@ kill_installer() {
     kill -9 "$INSTALLER_PID" 2>/dev/null || true
   fi
 
-  # Nuclear: kill ALL wine/proton/Fusion processes for this user
-  # Safe because the prefix is dedicated — nothing else uses it
-  for pattern in wineserver wine proton xalia \
-    Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
-    steam.exe node.exe fusion-gray-overlay; do
-    pkill -9 -u "$user" -f "$pattern" 2>/dev/null || true
+  # Kill all collected PIDs
+  for pid in "${unique[@]}"; do
+    kill -9 "$pid" 2>/dev/null || true
   done
 
   sleep 1
 
-  # Verify nothing survived
+  # Verify — rescan with same methods
   local survivors=0
-  for pattern in wineserver wine proton xalia \
-    Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
-    steam.exe node.exe fusion-gray-overlay; do
-    for pid in $(pgrep -u "$user" -f "$pattern" 2>/dev/null || true); do
-      echo "  [lifecycle]   SURVIVED: $(ps -p "$pid" -o comm= 2>/dev/null || echo "PID $pid")"
+  for proc in /proc/[0-9]*/exe; do
+    exe=$(readlink "$proc" 2>/dev/null || true)
+    [[ -z "$exe" ]] && continue
+    if [[ "$exe" == *wine* ]] || [[ "$exe" == *proton* ]]; then
+      pid=${proc%/exe}
+      pid=${pid#/proc/}
+      echo "  [lifecycle]   SURVIVED: PID $pid ($exe)"
       survivors=$((survivors + 1))
-    done
+    fi
   done
 
   if (( survivors == 0 )); then

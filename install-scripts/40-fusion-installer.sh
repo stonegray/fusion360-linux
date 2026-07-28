@@ -8,7 +8,7 @@ fi
 # ── Check for leftover processes, prompt to kill ──────────────────────
 user_id=$(id -u)
 running=0
-for pattern in wineserver wine proton xalia \
+for pattern in wineserver wine proton xalia streamer \
   Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
   steam.exe node.exe fusion-gray-overlay; do
   if pgrep -u "$user_id" -f "$pattern" &>/dev/null; then
