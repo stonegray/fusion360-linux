@@ -83,9 +83,39 @@ if [[ -n "$FUSION_ICO" ]]; then
     mkdir -p "$FUSION_DATA_DIR/icons"
     cp "$master_png" "$FUSION_DATA_DIR/icons/fusion360.png" 2>/dev/null || true
 
-    # Update icon cache so file managers pick up the new icons immediately
+    # Create/update hicolor index.theme so GTK/KDE find our MIME icons.
+    # Without a "Directories=" line listing our mimetypes subdirs, the icon
+    # theme engine ignores them and falls back to generic icons.
+    local idx_file="$HICOLOR_DIR/index.theme"
+    if [[ ! -f "$idx_file" ]] || ! grep -q 'mimetypes' "$idx_file" 2>/dev/null; then
+      mkdir -p "$HICOLOR_DIR"
+      {
+        echo "[Icon Theme]"
+        echo "Name=Hicolor"
+        echo "Comment=Fallback icon theme"
+        echo "Hidden=true"
+        echo "Directories=16x16/mimetypes,22x22/mimetypes,24x24/mimetypes,32x32/mimetypes,48x48/mimetypes,64x64/mimetypes,128x128/mimetypes,256x256/mimetypes"
+        for s in 16 22 24 32 48 64 128 256; do
+          echo ""
+          echo "[${s}x${s}/mimetypes]"
+          echo "Size=${s}"
+          echo "Context=FileTypes"
+          echo "Type=Threshold"
+        done
+      } > "$idx_file"
+    fi
+
+    # Update GTK icon cache — targeting the hicolor theme directory specifically
     if command -v gtk-update-icon-cache &>/dev/null; then
-      gtk-update-icon-cache -f -t "$ICON_CACHE_DIR" 2>/dev/null || true
+      gtk-update-icon-cache -f "$HICOLOR_DIR" 2>/dev/null || true
+    fi
+
+    # Refresh KDE icon/mime caches for Dolphin — even with GTK cache, KDE
+    # needs its own syscache rebuild to pick up new MIME icon associations
+    if command -v kbuildsycoca6 &>/dev/null; then
+      kbuildsycoca6 --noincremental 2>/dev/null || true
+    elif command -v kbuildsycoca5 &>/dev/null; then
+      kbuildsycoca5 --noincremental 2>/dev/null || true
     fi
 
     echo "  [11/12] Fusion 360 MIME icons installed (from $FUSION_ICO)"
