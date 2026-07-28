@@ -5,6 +5,18 @@ if [[ -z "$proton" ]]; then
 return 1
 fi
 
+# ── Check if installer already completed ──────────────────────────────
+F360_LOG="$PFX_DIR/pfx/drive_c/users/steamuser/AppData/Local/Autodesk/autodesk.webdeploy.streamer.log"
+if [[ -f "$F360_LOG" ]] && grep -q "Configure app complete" "$F360_LOG" 2>/dev/null; then
+  echo "  [5/5] Fusion installer already completed. Skipping."
+  # Still check for Fusion.exe for desktop entry
+  fusion_exe=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1 || true)
+  if [[ -n "$fusion_exe" ]]; then
+    echo "  [5/5] Fusion360.exe found."
+  fi
+return 0
+fi
+
 # ── Check for leftover processes, prompt to kill ──────────────────────
 user_id=$(id -u)
 running=0
