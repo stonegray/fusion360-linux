@@ -5,6 +5,12 @@ set -euo pipefail
 # Re-runnable: safe to run any time to fix a broken configuration.
 # Pass --force to re-do all steps even if already configured.
 
+# ── Root guard ─────────────────────────────────────────────────────────
+if [[ $EUID -eq 0 ]]; then
+  echo "ERROR: Do not run setup-fusion.sh as root. Run as a normal user." >&2
+  exit 1
+fi
+
 FORCE="${1:-}"
 
 # ── Auto-detect paths ────────────────────────────────────────────────
@@ -102,7 +108,7 @@ write_config() {
   echo "[CONFIG] Writing config file..."
   mkdir -p "$CONFIG_DIR"
 
-  FUSION_ROOT="$(dirname "$(dirname "$(dirname "$(dirname "$FUSION_EXE")")")")"
+  FUSION_ROOT="$(dirname "$(dirname "$FUSION_EXE")")"
 
   cat > "$CONFIG_FILE" <<EOF
 PROTON=$GE_PROTON

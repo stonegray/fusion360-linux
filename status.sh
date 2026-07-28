@@ -4,6 +4,12 @@
 
 set -euo pipefail
 
+# ── Root guard ─────────────────────────────────────────────────────────
+if [[ $EUID -eq 0 ]]; then
+  echo "ERROR: Do not run status.sh as root. Run as a normal user." >&2
+  exit 1
+fi
+
 PASS=0
 FAIL=0
 

@@ -5,6 +5,16 @@ set -euo pipefail
 # This script installs system packages, creates required directories,
 # and prints instructions for Phase 2 (Fusion installer via Proton).
 
+# ── Root guard ─────────────────────────────────────────────────────────
+if [[ $EUID -eq 0 ]]; then
+  cat >&2 <<EOF
+ERROR: Do not run install.sh as root.
+  Run it as a normal user — the script will use sudo when needed.
+  Running as root creates directories under /root/ instead of your home.
+EOF
+  exit 1
+fi
+
 # ── Distro detection ──────────────────────────────────────────────────
 detect_distro() {
   source /etc/os-release

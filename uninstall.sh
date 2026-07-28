@@ -5,6 +5,16 @@
 
 set -euo pipefail
 
+# ── Root guard ─────────────────────────────────────────────────────────
+if [[ $EUID -eq 0 ]]; then
+  cat >&2 <<EOF
+ERROR: Do not run uninstall.sh as root.
+  It removes files from your home directory. Run as a normal user.
+  (If you need to remove root-owned files, re-clone and run as user.)
+EOF
+  exit 1
+fi
+
 RED='\033[0;31m'
 NC='\033[0m'
 

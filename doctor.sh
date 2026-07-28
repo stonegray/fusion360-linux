@@ -10,6 +10,12 @@
 
 set -uo pipefail
 
+# ── Root guard ─────────────────────────────────────────────────────────
+if [[ $EUID -eq 0 ]]; then
+  echo "ERROR: Do not run doctor.sh as root. Run as a normal user." >&2
+  exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 source "$SCRIPT_DIR/doctor/00-common.sh"
