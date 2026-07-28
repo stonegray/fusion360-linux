@@ -8,7 +8,7 @@ if [[ $EUID -eq 0 ]]; then
 fi
 
 # ── Quick health check ────────────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 if [[ -x "$SCRIPT_DIR/runtime-scripts/health-check.sh" ]]; then
   if ! "$SCRIPT_DIR/runtime-scripts/health-check.sh" &>/dev/null; then
     echo "launch-fusion.sh warning: health check failed. Run ./setup-fusion.sh to fix." >&2
@@ -20,7 +20,6 @@ fail() {
   exit 1
 }
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux"
 CONFIG_FILE="$CONFIG_DIR/config"
 
