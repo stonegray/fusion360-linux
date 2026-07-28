@@ -122,7 +122,7 @@ echo ""
 
 log_step "Step 12/12: Health check"
 if [[ -x "$SCRIPT_DIR/src/doctor/doctor.sh" ]]; then
-  "$SCRIPT_DIR/src/doctor/doctor.sh" --quick 2>/dev/null || true
+  "$SCRIPT_DIR/src/doctor/doctor.sh" --quick || true
 fi
 echo ""
 
