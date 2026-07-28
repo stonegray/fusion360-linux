@@ -76,13 +76,13 @@ _install_fusion_mime_icon() {
     _resize_icon "$master" "$d/application-vnd.autodesk.fusion360.png" "$s" || true
   done
 
-  # Clean up any stale index.theme or icon-theme.cache left from a
-  # previous broken install.  The old code created a local index.theme
-  # that only listed 8 mimetypes dirs — this shadowed the system theme
-  # and caused all apps icons (Firefox, Dolphin, etc.) to disappear
-  # from the icon cache.  The stale cache file would also keep the
-  # old directory listing alive even if we removed the index.theme.
-  rm -f "$hicolor/index.theme" "$hicolor/icon-theme.cache"
+  # Clean up any stale icon-theme.cache left from a previous broken
+  # install.  The old code used gtk-update-icon-cache on the local
+  # hicolor dir, which created a cache file listing only the 8
+  # mimetypes dirs known to our old broken index.theme.  That cache
+  # shadows the filesystem — GTK uses it exclusively, so it would
+  # hide all apps icons (Firefox, Dolphin, etc.) if present.
+  rm -f "$hicolor/icon-theme.cache"
 
   # Also install App icon so the desktop entry (`Icon=fusion360`) resolves
   for s in $sizes; do
