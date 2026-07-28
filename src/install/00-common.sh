@@ -25,26 +25,40 @@ detect_distro() {
   case "$ID" in
     ubuntu|neon|debian|pop|elementary|linuxmint)
       INSTALL_CMD="sudo apt-get install -y"
-      PKGS="icoutils zenity python3-tk cabextract wget xdg-utils desktop-file-utils winetricks"
       ;;
     fedora)
       INSTALL_CMD="sudo dnf install -y"
-      PKGS="icoutils zenity python3-tk cabextract wget xdg-utils desktop-file-utils winetricks"
       ;;
     arch|manjaro|endeavour)
       INSTALL_CMD="sudo pacman -S --needed --noconfirm"
-      PKGS="icoutils zenity python3-tk cabextract wget xdg-utils desktop-file-utils winetricks"
       ;;
     opensuse*|suse)
       INSTALL_CMD="sudo zypper install -y"
-      PKGS="icoutils zenity python3-tk cabextract wget xdg-utils desktop-file-utils winetricks"
+      ;;
+    void)
+      INSTALL_CMD="sudo xbps-install -S"
+      ;;
+    solus)
+      INSTALL_CMD="sudo eopkg install -y"
       ;;
     *)
-      echo "ERROR: Unknown distro '$ID'. Install these manually:"
-      echo "  icoutils zenity python3-tk cabextract wget xdg-utils desktop-file-utils winetricks"
-      exit 1
+      INSTALL_CMD=""
+      echo "WARNING: Unknown distro '$ID'. Installing generic packages — you may need to adapt."
       ;;
   esac
+
+  # Read package list from distro file, fall back to generic
+  local distro_file="$SCRIPT_DIR/src/install/distro/${ID}.txt"
+  if [[ ! -f "$distro_file" ]]; then
+    distro_file="$SCRIPT_DIR/src/install/distro/generic.txt"
+  fi
+
+  if [[ -f "$distro_file" ]]; then
+    PKGS=$(cat "$distro_file" | tr '\n' ' ' | sed 's/ *$//')
+  else
+    echo "ERROR: Package list not found for distro '$ID' and no generic.txt fallback." >&2
+    exit 1
+  fi
 }
 
 pre_flight() {
