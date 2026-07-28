@@ -74,23 +74,57 @@ pre_flight() {
 INSTALLER_PID=""
 
 kill_installer() {
-  echo "  [lifecycle] Killing all Wine/Proton processes for this user..."
+  local user; user=$(id -u)
+  local count=0
+
+  # Count what's running before kill
+  for pattern in wineserver wine proton xalia \
+    Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
+    steam.exe node.exe fusion-gray-overlay; do
+    while IFS= read -r pid; do
+      ((count++))
+    done < <(pgrep -u "$user" -f "$pattern" 2>/dev/null || true)
+  done
+
+  if (( count == 0 )); then
+    return 0
+  fi
+
+  echo "  [lifecycle] Killing $count Wine/Proton process(es)..."
 
   # Kill tracked installer PID
   if [[ -n "${INSTALLER_PID:-}" ]] && kill -0 "$INSTALLER_PID" 2>/dev/null; then
     kill "$INSTALLER_PID" 2>/dev/null || true
-    sleep 0.5
+    sleep 0.3
     kill -9 "$INSTALLER_PID" 2>/dev/null || true
   fi
 
   # Nuclear: kill ALL wine/proton/Fusion processes for this user
   # Safe because the prefix is dedicated — nothing else uses it
-  local user; user=$(id -u)
   for pattern in wineserver wine proton xalia \
     Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
     steam.exe node.exe fusion-gray-overlay; do
     pkill -9 -u "$user" -f "$pattern" 2>/dev/null || true
   done
+
+  sleep 1
+
+  # Verify nothing survived
+  local survivors=0
+  for pattern in wineserver wine proton xalia \
+    Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
+    steam.exe node.exe fusion-gray-overlay; do
+    for pid in $(pgrep -u "$user" -f "$pattern" 2>/dev/null || true); do
+      echo "  [lifecycle]   SURVIVED: $(ps -p "$pid" -o comm= 2>/dev/null || echo "PID $pid")"
+      ((survivors++))
+    done
+  done
+
+  if (( survivors == 0 )); then
+    echo "  [lifecycle] Killed successfully."
+  else
+    echo "  [lifecycle] $survivors process(es) still running."
+  fi
 
   # Remove wineserver lock so next start is clean
   rm -f "$PFX_DIR/pfx/.wineserver.lock" 2>/dev/null || true
