@@ -110,20 +110,19 @@ fusion_exe=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1 |
 if [[ -n "$fusion_exe" ]]; then
   echo "  [5/5] Fusion360.exe found — install succeeded."
   echo "  [5/5] Installing desktop entry..."
-  local apps="$HOME/.local/share/applications"
-  mkdir -p "$apps"
-  cat > "$apps/autodesk-fusion360.desktop" <<EOF
+  mkdir -p "$F360_APPS_DIR"
+  cat > "$F360_APPS_DIR/autodesk-fusion360.desktop" <<EOF
 [Desktop Entry]
 Name=Autodesk Fusion 360
 Comment=Fusion 360 CAD/CAM/CAE tool
-Exec=$SCRIPT_DIR/launch-fusion.sh
+Exec=$F360_DATA_DIR/launch-fusion.sh
 Icon=fusion360
 Type=Application
 Categories=Graphics;Science;Engineering;
 StartupNotify=true
 StartupWMClass=fusion360.exe
 EOF
-  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$apps" 2>/dev/null || true
+  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$F360_APPS_DIR" 2>/dev/null || true
   command -v kbuildsycoca6 &>/dev/null && kbuildsycoca6 2>/dev/null || true
   command -v kbuildsycoca5 &>/dev/null && kbuildsycoca5 2>/dev/null || true
   echo "  [5/5] Desktop entry installed."

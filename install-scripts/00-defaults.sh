@@ -8,13 +8,13 @@ XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 XDG_BIN_HOME="${XDG_BIN_HOME:-$HOME/.local/bin}"
 
 # Fusion360 install target (stable location, not tied to repo)
-F360_DATA_DIR="$XDG_DATA_HOME/fusion360-linux"
-F360_CONFIG_DIR="$XDG_CONFIG_HOME/fusion360-linux"
-F360_CONFIG_FILE="$F360_CONFIG_DIR/config"
-F360_BIN_DIR="$XDG_BIN_HOME"
+F360_DATA_DIR="$XDG_DATA_HOME/fusion360-linux"     # runtime scripts live here
+F360_CONFIG_DIR="$XDG_CONFIG_HOME/fusion360-linux"  # config
+F360_CONFIG_FILE="$F360_CONFIG_DIR/config"           # config file
+F360_BIN_DIR="$XDG_BIN_HOME"                         # CLI symlinks
 
-# Desktop integration
-F360_APPS_DIR="$XDG_DATA_HOME/applications"
+# Desktop integration — apps under a fusion360-linux subdir to avoid polluting
+F360_APPS_DIR="$XDG_DATA_HOME/applications/fusion360-linux"
 F360_ICONS_DIR="$XDG_DATA_HOME/icons/hicolor"
 
 # Proton / Wine

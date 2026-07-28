@@ -53,6 +53,7 @@ case "$MODE" in
     pre_flight
     run_step 10-deps.sh
     run_step 20-ge-proton.sh
+    run_step 25-install-to-location.sh
     run_step 30-prefix.sh
     clear_traps
     exit 0
@@ -72,30 +73,35 @@ esac
 echo "╔══════════════════════════════════════════════════════════════╗"
 echo "║     Fusion360 Linux Installer                               ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
-echo ""
-
-pre_flight
-
-echo "── Step 1/5: System dependencies ──"
+echo "── Step 1/8: System dependencies ──"
 run_step 10-deps.sh
 echo ""
 
-echo "── Step 2/5: GE-Proton ──"
+echo "── Step 2/8: GE-Proton ──"
 run_step 20-ge-proton.sh
 echo ""
-echo "── Step 4/7: WebView2 ──"
+
+echo "── Step 3/8: Install to system ──"
+run_step 25-install-to-location.sh
+echo ""
+
+echo "── Step 4/8: Proton prefix ──"
+run_step 30-prefix.sh
+echo ""
+
+echo "── Step 5/8: WebView2 ──"
 run_step 35-webview2.sh
 echo ""
 
-echo "── Step 5/7: Config ──"
+echo "── Step 6/8: Config ──"
 run_step 37-config.sh
 echo ""
 
-echo "── Step 6/7: Protocol handlers ──"
+echo "── Step 7/8: Protocol handlers ──"
 "$SCRIPT_DIR/runtime-scripts/register-protocols.sh"
 echo ""
 
-echo "── Step 7/7: Fusion Installer ──"
+echo "── Step 8/8: Fusion Installer ──"
 run_step 40-fusion-installer.sh
 echo ""
 
