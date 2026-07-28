@@ -71,10 +71,10 @@ EOF
   fi
 fi
 
-# ── Launch installer — redirect output to a named pipe for scrollbox ──
-echo "  [5/5] Found: $INSTALLER_PATH"
-echo "  [5/5] Launching Fusion installer through Proton..."
-echo "  [5/5] A Windows installer window will appear. Click through it."
+# ── Launch installer ──────────────────────────────────────────────────
+echo "  [5/7] Found: $INSTALLER_PATH"
+echo "  [5/7] Launching Fusion installer through Proton..."
+echo "  [5/7] A Windows installer window will appear. Click through it."
 echo ""
 echo "  ┌─ IMPORTANT ────────────────────────────────────────────┐"
 echo "  │ Complete the installer in the window that appears.     │"
@@ -82,24 +82,14 @@ echo "  │ When it shows \"Finish\", the installation is done.      │"
 echo "  └────────────────────────────────────────────────────────┘"
 echo ""
 
-source "$SCRIPT_DIR/helpers/run_scrollbox.sh"
-
-mkfifo /tmp/fusion-installer-pipe 2>/dev/null || true
 mkdir -p "$PFX_DIR"
-
-# Run installer in background, redirecting output to the pipe
 STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
 STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
-"$proton" run "$INSTALLER_PATH" > /tmp/fusion-installer-pipe 2>&1 &
-INSTALLER_PID=$!
+"$proton" run "$INSTALLER_PATH" 2>/dev/null || true
 
-# Read from pipe in scrollbox — auto-detects completion by pattern
-run_scrollbox --until "install.*complete\|package.*installed\|Finish" 5 < /tmp/fusion-installer-pipe
-
-# Completion detected or pipe closed — kill installer and clean up
+# Kill leftover processes
 kill_installer
 sleep 0.5
-rm -f /tmp/fusion-installer-pipe
 
 # ── Check result ──────────────────────────────────────────────────────
 echo ""

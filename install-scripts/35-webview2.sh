@@ -15,10 +15,9 @@ if [[ ! -f "$bootstrap" ]]; then
 fi
 
 echo "  [webview2] installing (silent)..."
-source "$SCRIPT_DIR/helpers/run_scrollbox.sh"
 STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
 STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
-"$proton" run "$bootstrap" /silent /install 2>&1 | run_scrollbox 5 || true
+"$proton" run "$bootstrap" /silent /install 2>/dev/null || true
 
 if [[ -d "$target" ]]; then
   echo "  [webview2] done"
