@@ -44,13 +44,12 @@ if [[ -n "$FUSION_ICO" ]]; then
 
   # Extract a master PNG from the .ico, then resize to each standard size
   if command -v convert &>/dev/null; then
-    # ImageMagick: flatten all .ico frames into a single PNG (picks the largest frame)
+    # ImageMagick: extract the largest frame first (256x256 at [7], fall back to [0])
     master_png=$(mktemp /tmp/fusion-icon-XXXXXX.png)
-    convert "$FUSION_ICO" -flatten "$master_png" 2>/dev/null || true
-    if [[ ! -f "$master_png" ]]; then
-      # Fallback: try extracting just the 256x256 frame (usually index [7])
-      convert "${FUSION_ICO}[7]" "$master_png" 2>/dev/null || true
-    fi
+    convert "${FUSION_ICO}[7]" "$master_png" 2>/dev/null || \
+      convert "${FUSION_ICO}[6]" "$master_png" 2>/dev/null || \
+      convert "${FUSION_ICO}[5]" "$master_png" 2>/dev/null || \
+      convert "$FUSION_ICO" -flatten "$master_png" 2>/dev/null || true
 
     if [[ -f "$master_png" ]]; then
       icon_converted=true
