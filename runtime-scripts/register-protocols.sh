@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # runtime-scripts/register-protocols.sh — Register adsk:// and adskidmgr:// protocol handlers
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APPS="$HOME/.local/share/applications"
+APPS="${F360_APPS_DIR:-$HOME/.local/share/applications/fusion360-linux}"
 mkdir -p "$APPS"
 
 cat > "$APPS/fusion360-callback-handler.desktop" <<EOF

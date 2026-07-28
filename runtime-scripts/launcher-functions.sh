@@ -276,7 +276,7 @@ install_callback_protocol_handlers() {
   local applications_dir
   local desktop_file
 
-  applications_dir="$HOME/.local/share/applications"
+  applications_dir="${F360_APPS_DIR:-$HOME/.local/share/applications/fusion360-linux}"
   desktop_file="$applications_dir/fusion360-callback-handler.desktop"
 
   mkdir -p "$applications_dir"
