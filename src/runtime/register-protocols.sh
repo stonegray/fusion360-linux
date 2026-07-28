@@ -2,13 +2,14 @@
 # runtime-scripts/register-protocols.sh — Register adsk:// and adskidmgr:// protocol handlers
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RUNTIME_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APPS="${F360_APPS_DIR:-$HOME/.local/share/applications/fusion360-linux}"
 mkdir -p "$APPS"
 
 cat > "$APPS/fusion360-callback-handler.desktop" <<EOF
 [Desktop Entry]
 Name=Fusion 360 Autodesk Callback Handler
-Exec=$SCRIPT_DIR/runtime-scripts/fusion-callback-handler.sh %u
+Exec=$RUNTIME_DIR/fusion-callback-handler.sh %u
 Type=Application
 NoDisplay=true
 MimeType=x-scheme-handler/adsk;x-scheme-handler/adskidmgr;
