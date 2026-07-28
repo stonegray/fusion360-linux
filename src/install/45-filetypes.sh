@@ -161,30 +161,22 @@ if [[ -f "$system_reg" ]]; then
 fi
 
 # ── Set Wine shell folders to real Linux home directories ────────
-# Makes Fusion's file open/save dialog default to the user's
-# actual Documents and Desktop folders instead of the prefix's
-# virtual C: drive directories.
+# Makes Fusion's file open/save dialog open the user's real Documents
+# and Desktop folders instead of the Wine prefix's virtual C: drive.
 local user_reg="$PFX_DIR/pfx/user.reg"
-if [[ -f "$user_reg" ]]; then
-  if grep -q 'User Shell Folders' "$user_reg" 2>/dev/null; then
-    echo "  [11/12] Wine shell folders already configured."
-  else
-    {
-      printf '\n[Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders] 1785266656\n#time=1dd1ebee782a462\n'
-      printf '"Personal"="Z:%s\\Documents"\n' "$HOME"
-      printf '"Desktop"="Z:%s\\Desktop"\n' "$HOME"
-      printf '"My Pictures"="Z:%s\\Pictures"\n' "$HOME"
-      printf '"My Video"="Z:%s\\Videos"\n' "$HOME"
-      printf '"My Music"="Z:%s\\Music"\n' "$HOME"
-      printf '"Downloads"="Z:%s\\Downloads"\n' "$HOME"
-      printf '"Favorites"="Z:%s"\n' "$HOME"
-      printf '"Recent"="Z:%s"\n' "$HOME"
-    } >> "$user_reg"
-    echo "  [11/12] Wine shell folders set to $HOME."
-  fi
+if [[ -f "$user_reg" ]] && ! grep -q '^"Personal"="Z:' "$user_reg" 2>/dev/null; then
+  # Remove any existing Personal/Desktop/Downloads entries
+  sed -i '/^"Personal"=/d; /^"Desktop"=/d; /^"Downloads"=/d' "$user_reg" 2>/dev/null || true
+  # Append correct entries — use short pattern match because full
+  # Windows path escaping is unreliable across sed versions
+  sed -i \
+    -e '/User Shell Folders\]/a ""' \
+    -e '/User Shell Folders\]/a "Personal"="Z:\\'"$HOME"'\\Documents"' \
+    -e '/User Shell Folders\]/a "Desktop"="Z:\\'"$HOME"'\\Desktop"' \
+    -e '/User Shell Folders\]/a "Downloads"="Z:\\'"$HOME"'\\Downloads"' \
+    "$user_reg" 2>/dev/null || true
+  echo "  [11/12] Wine shell folders set to $HOME/Documents, $HOME/Desktop, $HOME/Downloads."
 fi
-
-# ── Build or copy toolwindow fixer into Wine prefix ──────────────
 mkdir -p "$PFX_DIR/pfx/drive_c"
 local twf_src="$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.c"
 local twf_prebuilt="$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.exe"
