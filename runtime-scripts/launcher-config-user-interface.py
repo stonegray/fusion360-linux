@@ -128,6 +128,34 @@ def detected_kde_scale_percent():
     return None
 
 
+def read_xft_dpi():
+    """Read Xft.dpi from xrdb (set by KDE font DPI, .Xresources, etc.)."""
+    xrdb = shutil.which("xrdb")
+    if xrdb is None:
+        return None
+    try:
+        result = subprocess.run(
+            [xrdb, "-query"],
+            check=False, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
+        )
+        for line in result.stdout.splitlines():
+            if line.startswith("Xft.dpi:"):
+                dpi_str = line.split(":", 1)[1].strip()
+                if dpi_str.isdigit() and int(dpi_str) > 0:
+                    return int(dpi_str)
+    except Exception:
+        pass
+    return None
+
+
+def detected_xft_scale_percent():
+    """Convert Xft.dpi to scale percent."""
+    dpi = read_xft_dpi()
+    if dpi and dpi > 0:
+        return dpi_to_percent(dpi)
+    return None
+
+
 def initial_scale_percent():
     scale_percent = getenv("FUSION_WINE_SCALE_PERCENT", "auto")
     legacy_dpi = getenv("FUSION_WINE_DPI", "auto")
@@ -143,6 +171,8 @@ def initial_scale_percent():
     detected_scale = detected_cinnamon_scale_percent()
     if not detected_scale:
         detected_scale = detected_kde_scale_percent()
+    if not detected_scale:
+        detected_scale = detected_xft_scale_percent()
     if detected_scale:
         return detected_scale
 
