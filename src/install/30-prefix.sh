@@ -23,12 +23,19 @@ if command -v winetricks &>/dev/null; then
     STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
     STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
     WINEDLLOVERRIDES="regedit.exe,msiexec.exe=" \
-    winetricks -q vcrun2022 2>/dev/null || echo "  [3/7] Warning: winetricks failed (prefix may already be initialized)"
+    winetricks -q vcrun2022 dotnet48 winhttp 2>/dev/null || echo "  [3/7] Warning: some winetricks verbs failed (prefix may still work without cloud features)"
   else
     echo "  [3/7] VC++ runtimes already present."
   fi
 else
   echo "  [3/7] winetricks not available — skipping VC++ runtime install."
 fi
+echo "  [3/7] Configuring DLL overrides..."
+STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
+STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
+"$proton" run wine reg add "HKCU\\Software\\Wine\\DllOverrides" /v "adpclientservice.exe" /t REG_SZ /d native /f 2>/dev/null || echo "  [3/7] Warning: could not set adpclientservice override"
+STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
+STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
+"$proton" run wine reg add "HKCU\\Software\\Wine\\DllOverrides" /v "AdCefWebBrowser.exe" /t REG_SZ /d builtin /f 2>/dev/null || echo "  [3/7] Warning: could not set AdCefWebBrowser override"
 
 echo "  [3/7] Done."
