@@ -12,14 +12,16 @@ cd fusion360-linux
 ```
 
 The installer walks through 12 steps automatically — installing system
-dependencies, downloading GE-Proton, setting up the Wine prefix, configuring
-DPI, running the Fusion installer, and registering file type associations.
-Once complete, Fusion appears in your application launcher as a native app.
+dependencies, downloading GE-Proton, downloading Fusion 360 (no Autodesk
+account needed), setting up the Wine prefix, configuring DPI, running the
+Fusion installer, and registering file type associations.  Once complete,
+Fusion appears in your application launcher as a native app.
 
 ## ✨ Features
 
 | Feature | Details |
 |---------|---------|
+| **Auto-download without sign-in** | The installer fetches Fusion 360 directly from Autodesk's CDN — no Autodesk account required to download.  Just run `./install.sh`. |
 | **File type associations** | `.f3d` / `.step` / `.stl` / `.3mf` / `.dxf` / `.obj` and 15 more — double-click opens in Fusion via NLauncher.exe, MIME icons in file manager |
 | **Toolwindow z-order fix** | Custom Win32 daemon (`fusion-toolwindow-fixer.exe`, 40 KB) — adds `WS_EX_APPWINDOW` to docked panels so they stack behind other windows instead of floating on top |
 | **WebView2 GPU acceleration** | `--ignore-gpu-blocklist`, `--enable-gpu-rasterization`, `--use-angle=d3d11` — smoother browser panels on iGPU |
