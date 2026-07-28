@@ -79,37 +79,47 @@ esac
 echo "╔══════════════════════════════════════════════════════════════╗"
 echo "║     Fusion360 Linux Installer                               ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
-echo "── Step 1/8: System dependencies ──"
+echo "── Step 1/10: System dependencies ──"
 pre_flight
 run_step 10-deps.sh
 echo ""
 
-echo "── Step 2/8: GE-Proton ──"
+echo "── Step 2/10: GE-Proton ──"
 run_step 20-ge-proton.sh
 echo ""
 
-echo "── Step 3/8: Install to system ──"
+echo "── Step 3/10: Install to system ──"
 run_step 25-install-to-location.sh
 echo ""
 
-echo "── Step 4/8: Proton prefix ──"
+echo "── Step 4/10: Proton prefix ──"
 run_step 30-prefix.sh
 echo ""
 
-echo "── Step 5/8: WebView2 ──"
+echo "── Step 5/10: WebView2 ──"
 run_step 35-webview2.sh
 echo ""
 
-echo "── Step 6/8: Config ──"
+echo "── Step 6/10: Config ──"
 run_step 37-config.sh
 echo ""
 
-echo "── Step 7/8: Protocol handlers ──"
+echo "── Step 7/10: Protocol handlers ──"
 "$SCRIPT_DIR/src/runtime/register-protocols.sh"
 echo ""
 
-echo "── Step 8/8: Fusion Installer ──"
+echo "── Step 8/10: Fusion Installer ──"
 run_step 40-fusion-installer.sh
+echo ""
+
+echo "── Step 9/10: File type associations ──"
+run_step 45-filetypes.sh
+echo ""
+
+echo "── Step 10/10: Health check ──"
+if [[ -x "$SCRIPT_DIR/src/doctor/doctor.sh" ]]; then
+  "$SCRIPT_DIR/src/doctor/doctor.sh"
+fi
 echo ""
 
 clear_traps
