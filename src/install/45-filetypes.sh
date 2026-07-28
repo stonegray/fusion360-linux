@@ -160,6 +160,30 @@ if [[ -f "$system_reg" ]]; then
   fi
 fi
 
+# ── Set Wine shell folders to real Linux home directories ────────
+# Makes Fusion's file open/save dialog default to the user's
+# actual Documents and Desktop folders instead of the prefix's
+# virtual C: drive directories.
+local user_reg="$PFX_DIR/pfx/user.reg"
+if [[ -f "$user_reg" ]]; then
+  if grep -q 'User Shell Folders' "$user_reg" 2>/dev/null; then
+    echo "  [11/12] Wine shell folders already configured."
+  else
+    {
+      printf '\n[Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders] 1785266656\n#time=1dd1ebee782a462\n'
+      printf '"Personal"="Z:%s\\Documents"\n' "$HOME"
+      printf '"Desktop"="Z:%s\\Desktop"\n' "$HOME"
+      printf '"My Pictures"="Z:%s\\Pictures"\n' "$HOME"
+      printf '"My Video"="Z:%s\\Videos"\n' "$HOME"
+      printf '"My Music"="Z:%s\\Music"\n' "$HOME"
+      printf '"Downloads"="Z:%s\\Downloads"\n' "$HOME"
+      printf '"Favorites"="Z:%s"\n' "$HOME"
+      printf '"Recent"="Z:%s"\n' "$HOME"
+    } >> "$user_reg"
+    echo "  [11/12] Wine shell folders set to $HOME."
+  fi
+fi
+
 # ── Build or copy toolwindow fixer into Wine prefix ──────────────
 mkdir -p "$PFX_DIR/pfx/drive_c"
 local twf_src="$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.c"
