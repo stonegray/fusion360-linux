@@ -76,23 +76,42 @@ _install_fusion_mime_icon() {
     _resize_icon "$master" "$d/application-vnd.autodesk.fusion360.png" "$s" || true
   done
 
-  # Ensure hicolor index.theme lists our mimetypes directories
-  # (without Directories= the icon cache ignores them entirely)
+  # Ensure hicolor/index.theme exists — without it gtk-update-icon-cache
+  # ignores the entire directory AND the local file shadows the system
+  # hicolor theme, hiding all apps/mimetypes icons from the cache.
+  #
+  # Symlink to the system hicolor index.theme which already lists every
+  # standard directory (*/apps, */mimetypes, */actions, etc.) — our
+  # icons go into exactly those standard subdirectories.
+  #
+  # If no system hicolor exists (unusual), create a minimal one that
+  # covers both our mimetypes AND apps directories.
   local idx="$hicolor/index.theme"
-  if [[ ! -f "$idx" ]] || ! grep -q 'mimetypes' "$idx" 2>/dev/null; then
+  local sys_idx="/usr/share/icons/hicolor/index.theme"
+  if [[ -f "$sys_idx" ]]; then
+    if [[ ! -L "$idx" ]] || [[ "$(readlink "$idx")" != "$sys_idx" ]]; then
+      ln -sf "$sys_idx" "$idx" 2>/dev/null || true
+    fi
+  elif [[ ! -f "$idx" ]]; then
+    # No system hicolor — create a comprehensive local one
     local dirs="" sd
-    for sd in $sizes; do dirs="${dirs}${sd}x${sd}/mimetypes,"; done
+    for sd in $sizes; do dirs="${dirs}${sd}x${sd}/mimetypes,${sd}x${sd}/apps,"; done
     mkdir -p "$hicolor"
     {
       echo "[Icon Theme]"
       echo "Name=Hicolor"
-      echo "Comment=Fusion 360 MIME icons"
+      echo "Comment=Fallback icon theme"
       echo "Directories=${dirs%,}"
       for sd in $sizes; do
         echo ""
         echo "[${sd}x${sd}/mimetypes]"
         echo "Size=${sd}"
         echo "Context=MimeTypes"
+        echo "Type=Fixed"
+        echo ""
+        echo "[${sd}x${sd}/apps]"
+        echo "Size=${sd}"
+        echo "Context=Applications"
         echo "Type=Fixed"
       done
     } > "$idx"
