@@ -19,20 +19,45 @@ else
 fi
 ## Install MIME type icons so file managers show the Fusion icon for .f3d files
 HICOLOR_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ICON_SRC_DIR="$SCRIPT_DIR/data/icons/hicolor"
-if [[ -d "$ICON_SRC_DIR" ]]; then
-  for size_dir in "$ICON_SRC_DIR"/*; do
-    size=$(basename "$size_dir")
-    icon_file="$size_dir/mimetypes/application-vnd.autodesk.fusion360.png"
-    if [[ -f "$icon_file" ]]; then
-      mkdir -p "$HICOLOR_DIR/$size/mimetypes"
-      cp "$icon_file" "$HICOLOR_DIR/$size/mimetypes/"
-    fi
-  done
-  echo "  [11/12] MIME type icons installed."
+FUSION_DATA_DIR="${F360_DATA_DIR:-$HOME/.local/share/fusion360-linux}"
+ICON_TARGET="$FUSION_DATA_DIR/icons/fusion360.png"
+
+# Find the Fusion icon in the Wine prefix (extracted by Fusion's installer)
+FUSION_ICO=$(find "$PFX_DIR" -maxdepth 5 -name "Fusion360.ico" 2>/dev/null | head -1)
+if [[ -z "$FUSION_ICO" ]]; then
+  # Try extracting from Fusion360.exe directly
+  local fusion_exe
+  fusion_exe=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1)
+  if [[ -n "$fusion_exe" ]] && command -v wrestool &>/dev/null; then
+    mkdir -p "$FUSION_DATA_DIR/icons"
+    wrestool -x -t 14 "$fusion_exe" -o "$FUSION_DATA_DIR/icons/" 2>/dev/null || true
+    FUSION_ICO=$(find "$FUSION_DATA_DIR/icons" -name "*.ico" 2>/dev/null | head -1)
+  fi
+fi
+
+if [[ -n "$FUSION_ICO" ]]; then
+  mkdir -p "$(dirname "$ICON_TARGET")"
+  # Convert .ico to .png for use as MIME icon
+  if command -v convert &>/dev/null; then
+    convert "$FUSION_ICO" -resize 128x128 "$ICON_TARGET" 2>/dev/null || true
+  elif command -v ffmpeg &>/dev/null; then
+    ffmpeg -i "$FUSION_ICO" -vf scale=128:128 "$ICON_TARGET" -y 2>/dev/null || true
+  fi
+
+  if [[ -f "$ICON_TARGET" ]]; then
+    mkdir -p "$HICOLOR_DIR/128x128/mimetypes"
+    cp "$ICON_TARGET" "$HICOLOR_DIR/128x128/mimetypes/application-vnd.autodesk.fusion360.png"
+    # Also create symlinks at other standard sizes
+    for size in 16 22 24 32 48 64 256; do
+      mkdir -p "$HICOLOR_DIR/${size}x${size}/mimetypes"
+      ln -sf "$ICON_TARGET" "$HICOLOR_DIR/${size}x${size}/mimetypes/application-vnd.autodesk.fusion360.png" 2>/dev/null || true
+    done
+    echo "  [11/12] Fusion 360 MIME icon installed from $FUSION_ICO"
+  else
+    echo "  [11/12] Warning: could not convert Fusion icon to PNG — skipping MIME icon."
+  fi
 else
-  echo "  [11/12] MIME type icons not found at $ICON_SRC_DIR — skipping."
+  echo "  [11/12] Warning: Fusion icon not found in prefix — skipping MIME icon."
 fi
 
 # Register Fusion 360 as default for its native formats

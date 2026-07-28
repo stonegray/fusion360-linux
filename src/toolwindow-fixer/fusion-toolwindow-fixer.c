@@ -106,38 +106,39 @@ static void fix_window(HWND hwnd)
     LONG_PTR ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
     LONG_PTR new_ex = ex | WS_EX_APPWINDOW;
 
-    /* Save current position — the WM may reposition the window when it
-     * transitions from override-redirect (unmanaged) to managed.  On
-     * HiDPI displays the WM may misplace the window so we restore the
-     * original coordinates afterward.                                        */
+    /* Save current position and size. */
     RECT pos;
     GetWindowRect(hwnd, &pos);
+    int w = pos.right - pos.left;
+    int h = pos.bottom - pos.top;
 
     SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex);
 
-    /* Force Wine to re-evaluate the managed state via WindowPosChanging. */
-    SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
-                 SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER |
-                 SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    /* Hide → set position → show.  Hiding the window before the
+     * unmanaged→managed transition prevents the WM from applying its
+     * own placement during the remap, and showing it at the saved
+     * coordinates lets Wine tell the WM exactly where to put it.     */
+    ShowWindow(hwnd, SW_HIDE);
 
-    /* Restore original position — the WM may have moved it during
-     * the unmanaged → managed transition (especially on HiDPI).        */
-    SetWindowPos(hwnd, NULL, pos.left, pos.top, 0, 0,
-                 SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    /* First SetWindowPos after the style change triggers the managed
+     * transition (is_window_managed now returns TRUE with APPWINDOW). */
+    SetWindowPos(hwnd, NULL, pos.left, pos.top, w, h,
+                 SWP_NOZORDER | SWP_NOACTIVATE);
+
+    /* Show at the saved position. */
+    SetWindowPos(hwnd, NULL, pos.left, pos.top, w, h,
+                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
 
     {
         WCHAR buf[256];
         int len = GetWindowTextW(hwnd, buf, sizeof(buf)/sizeof(buf[0]));
         if (len > 0) buf[len] = 0;
-        log_msg(L"  fixed: hwnd=%p ex=0x%lx pos=(%d,%d) title=\"%s\"\n",
+        log_msg(L"  fixed: hwnd=%p ex=0x%lx pos=(%d,%d) size=(%d,%d) title=\"%s\"\n",
                 (void*)hwnd, (unsigned long)new_ex,
-                pos.left, pos.top, buf);
+                pos.left, pos.top, w, h, buf);
     }
 }
 
-/* ------------------------------------------------------------------ */
-/* Callback for EnumWindows                                           */
-/* ------------------------------------------------------------------ */
 static BOOL CALLBACK enum_proc(HWND hwnd, LPARAM lparam)
 {
     int *fixed_count = (int *)lparam;
