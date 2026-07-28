@@ -36,7 +36,7 @@ winebrowser_log="/tmp/fusion360-winebrowser-register.log"
 if [[ -f "$winebrowser_log" ]]; then
   if grep -qi 'error\|fail' "$winebrowser_log" 2>/dev/null; then
     warn "WineBrowser registration had errors:"
-    cat "$winebrowser_log" | sed 's/^/    /'
+    sed 's/^/    /' "$winebrowser_log"
   else
     pass "WineBrowser registration log clean"
   fi

@@ -20,6 +20,9 @@ parse_args() {
     --quick)
       QUICK=true
       ;;
+    "")
+      # No argument — run full report
+      ;;
     *)
       echo "Unknown option: $SAVE"
       echo "Usage: doctor.sh [--save] [--quick]"
