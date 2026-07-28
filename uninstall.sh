@@ -42,25 +42,28 @@ case "$response" in
     ;;
 esac
 
-# Kill any running Fusion/Wine processes before removing files
+
+# Kill any running Fusion/Wine processes before removing files.
+# Use the nuclear kill from launcher-functions.sh if available.
 echo "  Stopping Fusion 360 processes..."
-fusion_pids=( $(pgrep -f "Fusion360\.exe" 2>/dev/null || true) )
-if [[ ${#fusion_pids[@]} -gt 0 ]]; then
-  echo "    Found Fusion running (PID ${fusion_pids[*]}) — sending SIGTERM..."
-  kill "${fusion_pids[@]}" 2>/dev/null || true
-  sleep 2
-  # Check if still alive and escalate
-  still_alive=( $(pgrep -f "Fusion360\.exe" 2>/dev/null || true) )
-  if [[ ${#still_alive[@]} -gt 0 ]]; then
-    echo "    SIGTERM did not stop Fusion — sending SIGKILL..."
-    kill -9 "${still_alive[@]}" 2>/dev/null || true
-    sleep 1
-  fi
-  # Also kill wineserver so prefix locks are released
-  pkill -f wineserver 2>/dev/null || true
-  echo "    Fusion processes stopped."
+if [[ -f "$HOME/.local/share/fusion360-linux/runtime-scripts/launcher-functions.sh" ]]; then
+  source "$HOME/.local/share/fusion360-linux/runtime-scripts/launcher-functions.sh"
+  kill_fusion_processes
+elif [[ -f "$SCRIPT_DIR/src/runtime/launcher-functions.sh" ]]; then
+  source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
+  kill_fusion_processes
 else
-  echo "    No Fusion processes running."
+  # Fallback: broad process kill
+  patterns=( wineserver wine proton Fusion360 FusionClientDownloader \
+    AdskIdentity adexmtsv steam.exe fusion-gray-overlay )
+  for pattern in "${patterns[@]}"; do
+    pkill -u "$(id -u)" -f "$pattern" 2>/dev/null || true
+  done
+  sleep 2
+  for pattern in "${patterns[@]}"; do
+    pkill -9 -u "$(id -u)" -f "$pattern" 2>/dev/null || true
+  done
+  echo "    Fusion/Wine processes killed."
 fi
 echo ""
 echo "Removing..."
