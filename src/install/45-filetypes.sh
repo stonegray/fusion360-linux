@@ -17,119 +17,88 @@ if command -v update-mime-database &>/dev/null; then
 else
   echo "  [11/12] update-mime-database not found — MIME types installed but not indexed."
 fi
-## Install MIME type icons so file managers show the Fusion icon for .f3d files
-HICOLOR_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"
-FUSION_DATA_DIR="${F360_DATA_DIR:-$HOME/.local/share/fusion360-linux}"
-ICON_CACHE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/icons"
+# ── Install MIME type icon for .f3d files ───────────────────────
+# Extracts Fusion's icon from the Wine prefix and installs it at
+# standard sizes in the hicolor theme so file managers show a
+# Fusion icon for .f3d files instead of a generic one.
+_install_fusion_mime_icon() {
+  local sizes="16 22 24 32 48 64 128 256"
+  local hicolor="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"
+  local icondir="${F360_DATA_DIR:-$HOME/.local/share/fusion360-linux}/icons"
+  local master="$icondir/fusion360.png"
+  local ico="" ok=false d s
 
-# Standard icon sizes per XDG icon theme spec
-ICON_SIZES=(16 22 24 32 48 64 128 256)
-
-# Find the Fusion icon in the Wine prefix (extracted by Fusion's installer)
-FUSION_ICO=$(find "$PFX_DIR" -maxdepth 5 -name "Fusion360.ico" 2>/dev/null | head -1)
-if [[ -z "$FUSION_ICO" ]]; then
-  # Try extracting from Fusion360.exe directly
-  local fusion_exe
-  fusion_exe=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1)
-  if [[ -n "$fusion_exe" ]] && command -v wrestool &>/dev/null; then
-    mkdir -p "$FUSION_DATA_DIR/icons"
-    wrestool -x -t 14 "$fusion_exe" -o "$FUSION_DATA_DIR/icons/" 2>/dev/null || true
-    FUSION_ICO=$(find "$FUSION_DATA_DIR/icons" -name "*.ico" 2>/dev/null | head -1)
+  # Find Fusion360.ico in the prefix or extract from Fusion360.exe
+  ico=$(find "$PFX_DIR" -maxdepth 5 -name "Fusion360.ico" 2>/dev/null | head -1)
+  if [[ -z "$ico" ]]; then
+    local exe; exe=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1) || true
+    if [[ -n "$exe" ]] && command -v wrestool &>/dev/null; then
+      mkdir -p "$icondir"
+      wrestool -x -t 14 "$exe" -o "$icondir/" 2>/dev/null || true
+      ico=$(find "$icondir" -maxdepth 1 -name "*.ico" 2>/dev/null | head -1)
+    fi
   fi
-fi
+  [[ -z "$ico" ]] && { echo "  [11/12] Warning: Fusion icon not found — skipping MIME icon."; return; }
 
-if [[ -n "$FUSION_ICO" ]]; then
-  local icon_converted=false
-  local master_png=""
-
-  # Extract a master PNG from the .ico, then resize to each standard size
+  # Convert .ico → master PNG (try ImageMagick first, then ffmpeg)
   if command -v convert &>/dev/null; then
-    # ImageMagick: extract the largest frame first (256x256 at [7], fall back to [0])
-    master_png=$(mktemp /tmp/fusion-icon-XXXXXX.png)
-    convert "${FUSION_ICO}[7]" "$master_png" 2>/dev/null || \
-      convert "${FUSION_ICO}[6]" "$master_png" 2>/dev/null || \
-      convert "${FUSION_ICO}[5]" "$master_png" 2>/dev/null || \
-      convert "$FUSION_ICO" -flatten "$master_png" 2>/dev/null || true
+    mkdir -p "$icondir"
+    convert "${ico}[7]" "$master" 2>/dev/null || \
+    convert "${ico}[6]" "$master" 2>/dev/null || \
+    convert "$ico" -flatten "$master" 2>/dev/null || true
+    [[ -f "$master" ]] && ok=true
+  fi
+  if ! $ok && command -v ffmpeg &>/dev/null; then
+    mkdir -p "$icondir"
+    ffmpeg -i "$ico" "$master" -y 2>/dev/null || true
+    [[ -f "$master" ]] && ok=true
+  fi
+  if ! $ok; then
+    echo "  [11/12] Warning: could not convert icon to PNG — skipping MIME icon."
+    return
+  fi
 
-    if [[ -f "$master_png" ]]; then
-      icon_converted=true
-      for size in "${ICON_SIZES[@]}"; do
-        local icon_dir="$HICOLOR_DIR/${size}x${size}/mimetypes"
-        local icon_file="$icon_dir/application-vnd.autodesk.fusion360.png"
-        mkdir -p "$icon_dir"
-        convert "$master_png" -resize "${size}x${size}" "$icon_file" 2>/dev/null || true
+  # Install resized PNGs into the hicolor MIME theme
+  for s in $sizes; do
+    d="$hicolor/${s}x${s}/mimetypes"
+    mkdir -p "$d"
+    convert "$master" -resize "${s}x${s}" "$d/application-vnd.autodesk.fusion360.png" 2>/dev/null || true
+  done
+
+  # Ensure hicolor index.theme lists our mimetypes directories
+  # (without Directories= the icon cache ignores them entirely)
+  local idx="$hicolor/index.theme"
+  if [[ ! -f "$idx" ]] || ! grep -q 'mimetypes' "$idx" 2>/dev/null; then
+    local dirs="" sd
+    for sd in $sizes; do dirs="${dirs}${sd}x${sd}/mimetypes,"; done
+    mkdir -p "$hicolor"
+    {
+      echo "[Icon Theme]"
+      echo "Name=Hicolor"
+      echo "Comment=Fusion 360 MIME icons"
+      echo "Directories=${dirs%,}"
+      for sd in $sizes; do
+        echo ""
+        echo "[${sd}x${sd}/mimetypes]"
+        echo "Size=${sd}"
+        echo "Context=MimeTypes"
+        echo "Type=Fixed"
       done
-    fi
+    } > "$idx"
   fi
 
-  if [[ "$icon_converted" != true ]] && command -v ffmpeg &>/dev/null; then
-    # ffmpeg fallback — extract the largest frame from the .ico
-    master_png=$(mktemp /tmp/fusion-icon-XXXXXX.png)
-    ffmpeg -i "$FUSION_ICO" "$master_png" -y 2>/dev/null || true
-
-    if [[ -f "$master_png" ]]; then
-      icon_converted=true
-      for size in "${ICON_SIZES[@]}"; do
-        local icon_dir="$HICOLOR_DIR/${size}x${size}/mimetypes"
-        local icon_file="$icon_dir/application-vnd.autodesk.fusion360.png"
-        mkdir -p "$icon_dir"
-        ffmpeg -i "$master_png" -vf scale="${size}:${size}" "$icon_file" -y 2>/dev/null || true
-      done
-    fi
+  # Refresh icon caches so file managers pick up the new icons immediately
+  command -v gtk-update-icon-cache &>/dev/null && gtk-update-icon-cache -f "$hicolor" 2>/dev/null || true
+  if command -v kbuildsycoca6 &>/dev/null; then
+    kbuildsycoca6 --noincremental 2>/dev/null || true
+  elif command -v kbuildsycoca5 &>/dev/null; then
+    kbuildsycoca5 --noincremental 2>/dev/null || true
   fi
 
-  if [[ "$icon_converted" == true ]]; then
-    # Copy master PNG to runtime icon directory for reuse by tools (launcher, tray, etc.)
-    mkdir -p "$FUSION_DATA_DIR/icons"
-    cp "$master_png" "$FUSION_DATA_DIR/icons/fusion360.png" 2>/dev/null || true
-
-    # Create/update hicolor index.theme so GTK/KDE find our MIME icons.
-    # Without a "Directories=" line listing our mimetypes subdirs, the icon
-    # theme engine ignores them and falls back to generic icons.
-    local idx_file="$HICOLOR_DIR/index.theme"
-    if [[ ! -f "$idx_file" ]] || ! grep -q 'mimetypes' "$idx_file" 2>/dev/null; then
-      mkdir -p "$HICOLOR_DIR"
-      {
-        echo "[Icon Theme]"
-        echo "Name=Hicolor"
-        echo "Comment=Fallback icon theme"
-        echo "Hidden=true"
-        echo "Directories=16x16/mimetypes,22x22/mimetypes,24x24/mimetypes,32x32/mimetypes,48x48/mimetypes,64x64/mimetypes,128x128/mimetypes,256x256/mimetypes"
-        for s in 16 22 24 32 48 64 128 256; do
-          echo ""
-          echo "[${s}x${s}/mimetypes]"
-          echo "Size=${s}"
-          echo "Context=FileTypes"
-          echo "Type=Threshold"
-        done
-      } > "$idx_file"
-    fi
-
-    # Update GTK icon cache — targeting the hicolor theme directory specifically
-    if command -v gtk-update-icon-cache &>/dev/null; then
-      gtk-update-icon-cache -f "$HICOLOR_DIR" 2>/dev/null || true
-    fi
-
-    # Refresh KDE icon/mime caches for Dolphin — even with GTK cache, KDE
-    # needs its own syscache rebuild to pick up new MIME icon associations
-    if command -v kbuildsycoca6 &>/dev/null; then
-      kbuildsycoca6 --noincremental 2>/dev/null || true
-    elif command -v kbuildsycoca5 &>/dev/null; then
-      kbuildsycoca5 --noincremental 2>/dev/null || true
-    fi
-
-    echo "  [11/12] Fusion 360 MIME icons installed (from $FUSION_ICO)"
-  else
-    echo "  [11/12] Warning: could not convert Fusion icon to PNG — skipping MIME icon."
-  fi
-
-  # Clean up temporary master PNG
-  [[ -n "$master_png" ]] && rm -f "$master_png" 2>/dev/null || true
-  # Remove any extracted .ico files from wrestool extraction
-  rm -f "$FUSION_DATA_DIR/icons"/*.ico 2>/dev/null || true
-else
-  echo "  [11/12] Warning: Fusion icon not found in prefix — skipping MIME icon."
-fi
+  rm -f "$icondir"/*.ico 2>/dev/null || true
+  echo "  [11/12] Fusion 360 MIME icons installed."
+}
+_install_fusion_mime_icon
 
 # Register Fusion 360 as default for its native formats
 if command -v xdg-mime &>/dev/null; then
