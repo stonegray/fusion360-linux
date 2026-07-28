@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# helpers/run_scrollbox.sh — Show piped output in a fixed-height scrollable box.
+# helpers/run_scrollbox.sh — Show piped output in a scrollable box.
 # Pipe into it:  long-command 2>&1 | run_scrollbox 5
-# Box is removed when stdin closes or --until pattern matches.
+# Output overwrites in-place at the cursor. Box is removed when done.
 #
 # Usage:
 #   command 2>&1 | run_scrollbox 5
@@ -12,48 +12,39 @@ run_scrollbox() {
     [[ "${1:-}" == "--until" ]] && { until_pat="$2"; shift 2; }
     local height="${1:-5}"
 
-    # Not a terminal — pass stdin through
-    if [[ ! -t 1 ]]; then
-        cat -
-        return
-    fi
-
-    local save="\033[s" restore="\033[u" clearline="\033[K" cleardown="\033[J"
-    local cols; cols=$(tput cols 2>/dev/null || echo 80)
-
-    # Save cursor, reserve blank lines, restore to top of box
-    echo -ne "$save"
-    for ((i=0; i<height; i++)); do echo; done
-    echo -ne "$restore"
+    # Not a terminal — pass through
+    [[ -t 1 ]] || { cat -; return; }
 
     local -a buf=()
+    local cols; cols=$(tput cols 2>/dev/null || echo 80)
+    local clean=0
+
     while IFS= read -r line; do
-        # Truncate long lines
+        # Truncate
         (( ${#line} >= cols-1 )) && line="${line:0:cols-2}…"
 
         buf+=("$line")
         buf=("${buf[@]: -$height}")
 
-        # Redraw full block from top of box
-        echo -ne "$restore"
+        # Move cursor to start of output, overwrite with current buffer
+        # From below the box, go up by (buffer_size - 1) lines to reach first line
+        if (( ${#buf[@]} > 1 )); then
+            printf '\033[%dA\r' "$((${#buf[@]} - 1))"
+        fi
         for l in "${buf[@]}"; do
-            echo -ne "$clearline"
-            printf '%s\n' "$l"
+            printf '\033[K%s\n' "$l"
         done
-        # Clear remaining lines in the box
-        for ((i=${#buf[@]}; i<height; i++)); do
-            echo -ne "$clearline"
-            echo
-        done
+        clean=${#buf[@]}
 
-        # Completion pattern detected — return early
+        # Completion pattern
         if [[ -n "$until_pat" ]] && grep -q "$until_pat" <<< "$line"; then
             sleep 0.5
-            echo -ne "$restore$cleardown"
+            # Go to top of box, clear to bottom
+            printf '\033[%dA\033[J' "$clean"
             return
         fi
     done
 
-    # Clean up the box area
-    echo -ne "$restore$cleardown"
+    # Remove the box from display
+    printf '\033[%dA\033[J' "$clean"
 }

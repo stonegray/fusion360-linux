@@ -74,31 +74,26 @@ pre_flight() {
 INSTALLER_PID=""
 
 kill_installer() {
-  local proton
-  proton=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
+  echo "  [lifecycle] Killing all Wine/Proton processes for this user..."
 
   # Kill tracked installer PID
   if [[ -n "${INSTALLER_PID:-}" ]] && kill -0 "$INSTALLER_PID" 2>/dev/null; then
-    echo ""
-    echo "  [lifecycle] Killing installer (PID $INSTALLER_PID)..."
     kill "$INSTALLER_PID" 2>/dev/null || true
-    sleep 1
+    sleep 0.5
     kill -9 "$INSTALLER_PID" 2>/dev/null || true
   fi
 
-  # Kill wineserver directly by name (works even if GE-Proton is removed)
-  pkill -f wineserver 2>/dev/null || true
+  # Nuclear: kill ALL wine/proton/Fusion processes for this user
+  # Safe because the prefix is dedicated — nothing else uses it
+  local user; user=$(id -u)
+  pkill -9 -u "$user" -f "wineserver" 2>/dev/null || true
+  pkill -9 -u "$user" -f "/wine" 2>/dev/null || true
+  pkill -9 -u "$user" -f "proton" 2>/dev/null || true
+  pkill -9 -u "$user" -f "FusionClientDownloader" 2>/dev/null || true
+  pkill -9 -u "$user" -f "Fusion360\|AdskIdentity\|steam.exe" 2>/dev/null || true
 
-  # Kill Fusion installer processes
-  pkill -f "FusionClientDownloader" 2>/dev/null || true
-  pkill -f "proton.*run.*Fusion" 2>/dev/null || true
-
-  # Also try through Proton if available (cleaner shutdown)
-  if [[ -n "$proton" && -d "$PFX_DIR" ]]; then
-    STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
-    STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
-    "$proton" run wineserver -k 2>/dev/null || true
-  fi
+  # Remove wineserver lock so next start is clean
+  rm -f "$PFX_DIR/pfx/.wineserver.lock" 2>/dev/null || true
 }
 
 installer_is_running() {
