@@ -1,0 +1,8 @@
+icoutils
+zenity
+python3-tk
+cabextract
+wget
+xdg-utils
+desktop-file-utils
+winetricks
