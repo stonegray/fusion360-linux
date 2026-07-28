@@ -2,20 +2,20 @@
 MIME_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/mime"
 MIME_PACKAGE="$MIME_DIR/packages/fusion360.xml"
 
-echo "  [11/12] Registering Fusion 360 file type associations..."
+log_info " Registering Fusion 360 file type associations..."
 
 if [[ ! -f "$MIME_PACKAGE" ]]; then
-  echo "  [11/12] MIME definitions not found at $MIME_PACKAGE"
-  echo "  [11/12] Run install step 3 first to copy MIME XML."
+  log_info " MIME definitions not found at $MIME_PACKAGE"
+  log_info " Run install step 3 first to copy MIME XML."
   return 1
 fi
 
 # Update MIME database so file managers know .f3d/.step/.stl etc.
 if command -v update-mime-database &>/dev/null; then
   update-mime-database "$MIME_DIR" 2>/dev/null || true
-  echo "  [11/12] MIME database updated — file managers should recognize Fusion formats."
+  log_info " MIME database updated — file managers should recognize Fusion formats."
 else
-  echo "  [11/12] update-mime-database not found — MIME types installed but not indexed."
+  log_info " update-mime-database not found — MIME types installed but not indexed."
 fi
 # ── Install MIME type icon for .f3d files ───────────────────────
 # Extracts Fusion's icon from the Wine prefix and installs it at
@@ -38,7 +38,7 @@ _install_fusion_mime_icon() {
       ico=$(find "$icondir" -maxdepth 1 -name "*.ico" 2>/dev/null | head -1)
     fi
   fi
-  [[ -z "$ico" ]] && { echo "  [11/12] Warning: Fusion icon not found — skipping MIME icon."; return; }
+  [[ -z "$ico" ]] && { log_info " Warning: Fusion icon not found — skipping MIME icon."; return; }
 
   # Convert .ico → master PNG (try ImageMagick first, then ffmpeg)
   if command -v convert &>/dev/null; then
@@ -54,7 +54,7 @@ _install_fusion_mime_icon() {
     [[ -f "$master" ]] && ok=true
   fi
   if ! $ok; then
-    echo "  [11/12] Warning: could not convert icon to PNG — skipping MIME icon."
+    log_info " Warning: could not convert icon to PNG — skipping MIME icon."
     return
   fi
 
@@ -96,27 +96,27 @@ _install_fusion_mime_icon() {
   fi
 
   rm -f "$icondir"/*.ico 2>/dev/null || true
-  echo "  [11/12] Fusion 360 MIME icons installed."
+  log_info " Fusion 360 MIME icons installed."
 }
 _install_fusion_mime_icon
 
 # Register Fusion 360 as default for its native formats
 if command -v xdg-mime &>/dev/null; then
   xdg-mime default autodesk-fusion360.desktop application/vnd.autodesk.fusion360 2>/dev/null || true
-  echo "  [11/12] Fusion 360 set as default for .f3d/.f3z files."
+  log_info " Fusion 360 set as default for .f3d/.f3z files."
   fi
 
 # Re-assert protocol handlers — Wine/Fusion installer may have registered its own
 if command -v xdg-mime &>/dev/null; then
   xdg-mime default fusion360-callback-handler.desktop x-scheme-handler/adsk 2>/dev/null || true
   xdg-mime default fusion360-callback-handler.desktop x-scheme-handler/adskidmgr 2>/dev/null || true
-  echo "  [11/12] Protocol handlers (adsk://, adskidmgr://) re-registered."
+  log_info " Protocol handlers (adsk://, adskidmgr://) re-registered."
 fi
 
 # Regenerate global desktop database to flush stale Wine entries
 if command -v update-desktop-database &>/dev/null; then
   update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
-  echo "  [11/12] Global desktop database refreshed."
+  log_info " Global desktop database refreshed."
 fi
 
 # Refresh desktop database for our app directory
@@ -147,16 +147,16 @@ if [[ -f "$system_reg" ]]; then
     local nlauncher_dos; nlauncher_dos="Z:${nlauncher//\//\\}"
     local cmdline="\"$nlauncher_dos\" \"%1\""
     if grep -q 'NLauncher\.exe.*%1' "$system_reg" 2>/dev/null; then
-      echo "  [11/12] Wine prefix already has NLauncher.exe registry entries."
+      log_info " Wine prefix already has NLauncher.exe registry entries."
     else
       printf '\n[Software\\Classes\\.f3d] 1785266656\n#time=1dd1ebee782a462\n@="Fusion360.AssocDocument"\n' >> "$system_reg"
       printf '[Software\\Classes\\Fusion360.AssocDocument\\shell\\open\\command] 1785266656\n#time=1dd1ebee782a462\n@=%s\n' "$cmdline" >> "$system_reg"
       printf '[Software\\Classes\\fusion360] 1785265986\n#time=1dd1ebee782a462\n"URL Protocol"=""\n@="URL:Fusion360 Protocol"\n' >> "$system_reg"
       printf '[Software\\Classes\\fusion360\\shell\\open\\command] 1785266657\n#time=1dd1ebee782a462\n@=%s\n' "$cmdline" >> "$system_reg"
-      echo "  [11/12] Wine prefix registered NLauncher.exe for .f3d and fusion360://."
+      log_info " Wine prefix registered NLauncher.exe for .f3d and fusion360://."
     fi
   else
-    echo "  [11/12] Warning: NLauncher.exe not found — skipping Wine prefix registration."
+    log_info " Warning: NLauncher.exe not found — skipping Wine prefix registration."
   fi
 fi
 
@@ -175,7 +175,7 @@ if [[ -f "$user_reg" ]] && ! grep -q '^"Personal"="Z:' "$user_reg" 2>/dev/null; 
     -e '/User Shell Folders\]/a "Desktop"="Z:\\'"$HOME"'\\Desktop"' \
     -e '/User Shell Folders\]/a "Downloads"="Z:\\'"$HOME"'\\Downloads"' \
     "$user_reg" 2>/dev/null || true
-  echo "  [11/12] Wine shell folders set to $HOME/Documents, $HOME/Desktop, $HOME/Downloads."
+  log_info " Wine shell folders set to $HOME/Documents, $HOME/Desktop, $HOME/Downloads."
 fi
 mkdir -p "$PFX_DIR/pfx/drive_c"
 local twf_src="$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.c"
@@ -185,24 +185,24 @@ local built_ok=false
 
 # Try compiling from source if the cross-compiler is available
 if command -v x86_64-w64-mingw32-gcc &>/dev/null && [[ -f "$twf_src" ]]; then
-  echo "  [11/12] Building toolwindow fixer from source..."
+  log_info " Building toolwindow fixer from source..."
   if x86_64-w64-mingw32-gcc -Os -s -o "$twf_target" "$twf_src" -luser32 2>&1; then
-    echo "  [11/12] Toolwindow fixer built from source."
+    log_info " Toolwindow fixer built from source."
     built_ok=true
   else
-    echo "  [11/12] Warning: source build failed, falling back to pre-built binary."
+    log_info " Warning: source build failed, falling back to pre-built binary."
   fi
 fi
 
 # Fall back to pre-built binary
 if [[ "$built_ok" != true ]] && [[ -f "$twf_prebuilt" ]]; then
   cp "$twf_prebuilt" "$twf_target"
-  echo "  [11/12] Toolwindow fixer installed (pre-built binary)."
+  log_info " Toolwindow fixer installed (pre-built binary)."
   built_ok=true
 fi
 
 if [[ "$built_ok" != true ]]; then
-  echo "  [11/12] Warning: toolwindow fixer not found — skipping."
+  log_info " Warning: toolwindow fixer not found — skipping."
 fi
 
-echo "  [11/12] Done."
+log_info " Done."

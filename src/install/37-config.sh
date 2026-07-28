@@ -55,12 +55,12 @@ if [[ -f "$CONFIG_FILE" ]]; then
   for i in "${!CONFIG_KEYS[@]}"; do
     if ! grep -q "^${CONFIG_KEYS[$i]}=" "$CONFIG_FILE" 2>/dev/null; then
       printf '%s=%s\n' "${CONFIG_KEYS[$i]}" "$(quote_val "${CONFIG_VALS[$i]}")" >> "$CONFIG_FILE"
-      echo "  [config]  added missing ${CONFIG_KEYS[$i]}"
+      log_info "  added missing ${CONFIG_KEYS[$i]}"
       wrote=1
     fi
   done
   if [[ $wrote -eq 0 ]]; then
-    echo "  [config]  already present, nothing to add"
+    log_info "  already present, nothing to add"
   fi
   return 0
 fi
@@ -69,4 +69,4 @@ mkdir -p "$CONFIG_DIR"
 for i in "${!CONFIG_KEYS[@]}"; do
   printf '%s=%s\n' "${CONFIG_KEYS[$i]}" "$(quote_val "${CONFIG_VALS[$i]}")"
 done > "$CONFIG_FILE"
-echo "  [config]  written"
+log_info "  written"

@@ -1,7 +1,7 @@
 # src/install/38-dpi.sh — Apply DPI registry settings to Wine prefix
 # Runs before the Fusion installer so the installer GUI also uses correct DPI.
 
-echo "  [9/12] Applying display DPI settings..."
+log_info " Applying display DPI settings..."
 
 # Source config to get DPI values (written by step 6)
 CONFIG_FILE="$F360_CONFIG_FILE"
@@ -10,7 +10,7 @@ if [[ -f "$CONFIG_FILE" ]]; then
 fi
 
 if [[ ! -f "$PFX_DIR/pfx/user.reg" ]]; then
-  echo "  [9/12] Prefix not yet initialized — skipping DPI config."
+  log_info " Prefix not yet initialized — skipping DPI config."
   return 0
 fi
 source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
@@ -26,13 +26,13 @@ FUSION_DPI_LOG_FILE="/tmp/fusion360-dpi.log"
 # Win8DpiScaling is applied at launch time by apply_fusion_wine_dpi
 local user_reg="$PFX_DIR/pfx/user.reg"
 local dpi_value; dpi_value="$(resolve_fusion_wine_dpi)"
-[[ "$dpi_value" =~ ^[0-9]+$ ]] || { echo "  [9/12] Warning: invalid DPI value '$dpi_value'" >&2; return 1; }
+[[ "$dpi_value" =~ ^[0-9]+$ ]] || { log_info " Warning: invalid DPI value '$dpi_value'" >&2; return 1; }
 local dpi_hex; dpi_hex=$(printf 'dword:%08x' "$dpi_value")
 
 if grep -q '^\[Software\\\\Wine\\\\Fonts\]' "$user_reg" 2>/dev/null; then
-  sed -i -e '/^\[Software\\\\Wine\\\\Fonts\]/,/^\[/{/^"LogPixels"/d;}' -e '/^\[Software\\\\Wine\\\\Fonts\]/a "LogPixels"='"$dpi_hex" "$user_reg" || { echo "  [9/12] Warning: failed to write DPI registry" >&2; return 1; }
+  sed -i -e '/^\[Software\\\\Wine\\\\Fonts\]/,/^\[/{/^"LogPixels"/d;}' -e '/^\[Software\\\\Wine\\\\Fonts\]/a "LogPixels"='"$dpi_hex" "$user_reg" || { log_info " Warning: failed to write DPI registry" >&2; return 1; }
 else
   printf '\n[Software\\Wine\\Fonts]\n#time=1dd1c05750735e4\n"LogPixels"=%s\n' "$dpi_hex" >> "$user_reg"
 fi
 
-echo "  [9/12] DPI configured in Wine registry (LogPixels=$dpi_value)."
+log_info " DPI configured in Wine registry (LogPixels=$dpi_value)."

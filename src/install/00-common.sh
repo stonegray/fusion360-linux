@@ -129,7 +129,7 @@ installer_is_running() {
 setup_traps() {
   trap_cleanup() {
     echo ""
-    echo "  [lifecycle] Interrupted. Cleaning up..."
+    log_info " Interrupted. Cleaning up..."
     kill_installer
     exit 1
   }

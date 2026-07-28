@@ -1,7 +1,7 @@
 # src/install/25-install-to-location.sh — Copy runtime scripts to XDG data dir
 # After this step, the install is self-contained and doesn't need the repo.
 
-echo "  [install] Installing runtime scripts to $F360_DATA_DIR..."
+log_info " Installing runtime scripts to $F360_DATA_DIR..."
 
 # Create target directories
 mkdir -p "$F360_DATA_DIR"
@@ -22,16 +22,16 @@ ln -sf "$F360_DATA_DIR/doctor.sh" "$F360_BIN_DIR/fusion-doctor" 2>/dev/null || t
 ln -sf "$F360_DATA_DIR/uninstall.sh" "$F360_BIN_DIR/fusion-uninstall" 2>/dev/null || true
 
 # Install MIME type definitions for Fusion 360 file formats
-echo "  [install] Installing MIME types..."
+log_info " Installing MIME types..."
 MIME_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/mime"
 mkdir -p "$MIME_DIR/packages"
 cp "$SCRIPT_DIR/src/install/data/fusion360-mime.xml" "$MIME_DIR/packages/fusion360.xml"
 if command -v update-mime-database &>/dev/null; then
   update-mime-database "$MIME_DIR" 2>/dev/null || true
-  echo "  [install] MIME database updated."
+  log_info " MIME database updated."
 else
-  echo "  [install] update-mime-database not found — MIME types copied but not activated."
+  log_info " update-mime-database not found — MIME types copied but not activated."
 fi
 
-echo "  [install] Runtime scripts installed to $F360_DATA_DIR"
-echo "  [install] CLI symlinks in $F360_BIN_DIR: launch-fusion, fusion360, fusion-doctor, fusion-uninstall"
+log_info " Runtime scripts installed to $F360_DATA_DIR"
+log_info " CLI symlinks in $F360_BIN_DIR: launch-fusion, fusion360, fusion-doctor, fusion-uninstall"
