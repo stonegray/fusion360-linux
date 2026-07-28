@@ -66,7 +66,6 @@ FUSION_WEBVIEW_DISABLE_GPU="${FUSION_WEBVIEW_DISABLE_GPU:-0}"
 FUSION_USE_INTEL_VK_ICD="${FUSION_USE_INTEL_VK_ICD:-1}"
 FUSION_ENABLE_OVERLAY_KILLER="${FUSION_ENABLE_OVERLAY_KILLER:-1}"
 FUSION_ENABLE_TOOLWINDOW_FIXER="${FUSION_ENABLE_TOOLWINDOW_FIXER:-1}"
-FUSION_ENABLE_POWER_INHIBIT="${FUSION_ENABLE_POWER_INHIBIT:-1}"
 FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="${FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT:-25}"
 
 BRIDGE_BROWSER_REQUEST_DIR="/tmp/fusion360-browser-requests"
@@ -145,19 +144,15 @@ apply_fusion_wine_dpi
 install_callback_protocol_handlers
 register_wine_browser_bridge
 start_browser_listener
+start_overlay_killer
 start_toolwindow_fixer
 
-# Build power-inhibit prefix if enabled
-_INHIBIT=()
-if is_enabled "$FUSION_ENABLE_POWER_INHIBIT" && command -v systemd-inhibit &>/dev/null; then
-  _INHIBIT=(systemd-inhibit --what=sleep:idle --who="Fusion 360" --why="Running design work")
-fi
-
 if (( ${#FUSION_ARGS[@]} > 0 )); then
-  "${_INHIBIT[@]}" "$PROTON" run "$FUSION_EXE" "${FUSION_ARGS[@]}"
+  "$PROTON" run "$FUSION_EXE" "${FUSION_ARGS[@]}"
 else
-  "${_INHIBIT[@]}" "$PROTON" run "$FUSION_EXE" "$@"
+  "$PROTON" run "$FUSION_EXE" "$@"
 fi
 fusion_status=$?
+
 [[ $fusion_status -eq 0 ]] || fail "Fusion exited or crashed with status $fusion_status"
 exit 0
