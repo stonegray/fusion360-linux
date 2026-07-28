@@ -2,7 +2,7 @@
 proton=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
 if [[ -z "$proton" ]]; then
   echo "  [5/5] GE-Proton not found. Run install.sh first."
-  exit 1
+return 1
 fi
 
 # ── Check for leftover processes, prompt to kill ──────────────────────
@@ -24,7 +24,7 @@ if (( running )); then
   case "$response" in
     n|N|no|No)
       echo "  [5/5] Aborted."
-      exit 1
+return 1
       ;;
   esac
   kill_installer
@@ -36,7 +36,7 @@ if [[ -n "${INSTALLER_PATH_OVERRIDE:-}" ]]; then
     INSTALLER_PATH="$INSTALLER_PATH_OVERRIDE"
   else
     echo "  [5/5] Specified path not found: $INSTALLER_PATH_OVERRIDE"
-    exit 1
+return 1
   fi
 fi
 
@@ -62,12 +62,12 @@ if [[ -z "${INSTALLER_PATH:-}" ]]; then
   │                                                                │
   └────────────────────────────────────────────────────────────────┘
 EOF
-    exit 1
+return 1
   }
   find_installer || true
   if [[ -z "$INSTALLER_PATH" ]]; then
     echo "  [5/5] Download failed. Try manually with --installer-path."
-    exit 1
+return 1
   fi
 fi
 

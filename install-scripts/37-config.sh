@@ -4,7 +4,7 @@ CONFIG_FILE="$CONFIG_DIR/config"
 
 if [[ -f "$CONFIG_FILE" ]]; then
   echo "  [config]  already present"
-  exit 0
+return 0
 fi
 
 mkdir -p "$CONFIG_DIR"

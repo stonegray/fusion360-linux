@@ -2,7 +2,7 @@
 proton=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
 if [[ -z "$proton" ]]; then
   echo "  [3/7] GE-Proton not found. Run install.sh first."
-  exit 1
+return 1
 fi
 
 if [[ -f "$PFX_DIR/pfx/user.reg" ]]; then

@@ -1,11 +1,11 @@
 # install-scripts/35-webview2.sh — Install WebView2 into Proton prefix
 proton=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
-[[ -n "$proton" ]] || { echo "  [webview2] GE-Proton not found"; exit 1; }
+[[ -n "$proton" ]] || { echo "  [webview2] GE-Proton not found"; return 1; }
 
 target="$PFX_DIR/pfx/drive_c/Program Files (x86)/Microsoft/EdgeWebView"
 if [[ -d "$target" ]]; then
   echo "  [webview2] already installed"
-  exit 0
+return 0
 fi
 
 bootstrap="/tmp/MicrosoftEdgeWebview2Setup.exe"
