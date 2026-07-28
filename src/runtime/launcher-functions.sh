@@ -233,13 +233,14 @@ read_kde_forced_dpi() {
   printf "%s" "$dpi"
 }
 
-# Detect primary monitor's scale factor via kscreen-doctor (KDE Plasma)
-# Returns DPI equivalent of the scale, e.g. 1.5 scale → 144 DPI
+# Check all KDE outputs via kscreen-doctor and return the highest scale factor as DPI
 read_kde_primary_scale() {
   command -v kscreen-doctor &>/dev/null || return 1
   local scale
-  scale=$(kscreen-doctor -o 2>/dev/null | grep -B5 'priority 1' | grep -i '^\tScale:' | head -1 | awk '{print $2}')
+  scale=$(kscreen-doctor -o 2>/dev/null | grep -i '^\tScale:' | awk '{print $2}' | sort -r | head -1)
   [[ -n "$scale" ]] || return 1
+  # Only return if actual scaling is active (> 1.0)
+  awk -v value="$scale" 'BEGIN { exit !(value > 1.0) }' || return 1
   scale_to_dpi "$scale"
 }
 
