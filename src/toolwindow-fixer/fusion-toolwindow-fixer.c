@@ -103,13 +103,11 @@ static BOOL needs_fix(HWND hwnd)
     /* Already done?  Skip so we don't keep calling SetWindowLong.    */
     if (ex & WS_EX_APPWINDOW) return FALSE;
 
-    /* Skip invisible windows — hidden helper windows with TOOLWINDOW
-     * style should not be promoted to managed; showing them would
-     * create phantom white boxes on screen.                          */
+    /* Skip invisible windows — hidden helper windows should not be   */
+    /* promoted to managed; showing them creates phantom white boxes. */
     if (!IsWindowVisible(hwnd)) return FALSE;
 
-    /* Skip zero-size windows — Fusion creates 1x1 helper windows that
-     * carry TOOLWINDOW style but should remain invisible/unmanaged.   */
+    /* Skip zero-size windows — Fusion creates 1x1 helper windows.    */
     RECT r;
     GetWindowRect(hwnd, &r);
     if (r.right - r.left <= 1 && r.bottom - r.top <= 1) return FALSE;
@@ -122,39 +120,31 @@ static void fix_window(HWND hwnd)
     LONG_PTR ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
     LONG_PTR new_ex = ex | WS_EX_APPWINDOW;
 
-    /* Save current position and size. */
+    /* Save current position in case the WM misplaces the window
+     * during the unmanaged->managed transition on HiDPI.             */
     RECT pos;
     GetWindowRect(hwnd, &pos);
-    int w = pos.right - pos.left;
-    int h = pos.bottom - pos.top;
 
     SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex);
 
-    /* Hide → set position → show.  Hiding the window before the
-     * unmanaged→managed transition prevents the WM from applying its
-     * own placement during the remap, and showing it at the saved
-     * coordinates lets Wine tell the WM exactly where to put it.     */
-    ShowWindow(hwnd, SW_HIDE);
-
-    /* First SetWindowPos after the style change triggers the managed
-     * transition (is_window_managed now returns TRUE with APPWINDOW). */
-    SetWindowPos(hwnd, NULL, pos.left, pos.top, w, h,
-                 SWP_NOZORDER | SWP_NOACTIVATE);
-
-    /* Show at the saved position. */
-    SetWindowPos(hwnd, NULL, pos.left, pos.top, w, h,
-                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    /* Transition to managed + restore position in one call.          */
+    SetWindowPos(hwnd, NULL, pos.left, pos.top,
+                 pos.right - pos.left, pos.bottom - pos.top,
+                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 
     {
         WCHAR buf[256];
         int len = GetWindowTextW(hwnd, buf, sizeof(buf)/sizeof(buf[0]));
         if (len > 0) buf[len] = 0;
-        log_msg(L"  fixed: hwnd=%p ex=0x%lx pos=(%d,%d) size=(%d,%d) title=\"%s\"\n",
+        log_msg(L"  fixed: hwnd=%p ex=0x%lx pos=(%d,%d) title=\"%s\"\n",
                 (void*)hwnd, (unsigned long)new_ex,
-                pos.left, pos.top, w, h, buf);
+                pos.left, pos.top, buf);
     }
 }
 
+/* ------------------------------------------------------------------ */
+/* Callback for EnumWindows                                           */
+/* ------------------------------------------------------------------ */
 static BOOL CALLBACK enum_proc(HWND hwnd, LPARAM lparam)
 {
     int *fixed_count = (int *)lparam;
