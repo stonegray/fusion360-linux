@@ -24,13 +24,17 @@ Fusion appears in your application launcher as a native app.
 | **Auto-download without sign-in** | The installer fetches Fusion 360 directly from Autodesk's CDN — no Autodesk account required to download.  Just run `./install.sh`. |
 | **File type associations** | `.f3d` / `.step` / `.stl` / `.3mf` / `.dxf` / `.obj` and 15 more — double-click opens in Fusion via NLauncher.exe, MIME icons in file manager |
 | **Toolwindow z-order fix** | Custom Win32 daemon (`fusion-toolwindow-fixer.exe`, 40 KB) — adds `WS_EX_APPWINDOW` to docked panels so they stack behind other windows instead of floating on top |
+| **Auto-detect install completion** | The installer watches Fusion's streamer log for "Configure app complete" and steps 10 → 11 automatically.  No manual "click next" intervention. |
 | **WebView2 GPU acceleration** | `--ignore-gpu-blocklist`, `--enable-gpu-rasterization`, `--use-angle=d3d11` — smoother browser panels on iGPU |
 | **DXVK tuning** | `syncInterval=0`, `tearFree=1`, `numBackBuffers=3` — reduced swapchain latency |
 | **Reliable browser bridge** | 4-tier fallback: configured Chrome → `xdg-open` → `kde-open6`/`kde-open5` → known browsers.  Works with Snap Firefox on Ubuntu. |
 | **Application + MIME icons** | Fusion logo extracted from the Wine prefix at install time, installed at 8 sizes for launcher, taskbar, and file manager |
+| **Config UI** | Python Tkinter GUI (`launcher-config-user-interface.py`) for toggling GPU flags, overlay killer, toolwindow fixer, DXVK async — no config file editing required |
 | **DPI detection** | Auto-detects display scale (KDE → GNOME → xrdb → default), writes Wine DPI registry before Fusion installer runs |
 | **Cloud sign-in** | dotnet48 + winhttp winetricks, DLL overrides for telemetry suppression, callback protocol handlers |
-| **Doctor diagnostic** | `./doctor.sh` — full system check with `--quick` summary and `--save` report |
+| **Preflight checks** | Step 2 validates Vulkan driver, disk space, and existing prefix before proceeding |
+| **Doctor diagnostic** | `./doctor.sh` — full system check with `--quick` summary, `--save` report, and color output |
+| **Graceful process kill** | `kill_fusion_processes()` sends SIGTERM, waits 2s, escalates to SIGKILL — used by cleanup and uninstall |
 | **Cross-distro packages** | Debian / Ubuntu, Fedora, Arch, OpenSUSE, Void, Solus |
 
 ## How the Browser Bridge Works
