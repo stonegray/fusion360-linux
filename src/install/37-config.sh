@@ -25,31 +25,54 @@ return 0
 fi
 
 {
-  printf 'PROTON=%q\n' "$GE_PROTON"
-  printf 'STEAM_COMPAT_DATA_PATH=%q\n' "$HOME/.fusion360-proton2"
-  printf 'STEAM_COMPAT_CLIENT_INSTALL_PATH=%q\n' "$HOME/.local/share/Steam"
-  printf 'FUSION_ROOT=%q\n' "$fusion_root"
-  printf 'BROWSER=%q\n' "$F360_DATA_DIR/runtime-scripts/fusion-browser.sh"
-  printf 'BROWSER_LISTENER=%q\n' "$F360_DATA_DIR/runtime-scripts/fusion-browser-listener.sh"
-  printf 'CALLBACK_HANDLER=%q\n' "$F360_DATA_DIR/runtime-scripts/fusion-callback-handler.sh"
-  printf 'CHROME=%q\n' "${BROWSER:-/usr/bin/firefox}"
-  printf 'FUSION_OVERLAY_KILLER=%q\n' "$F360_DATA_DIR/runtime-scripts/fusion-gray-overlay-event-killer.sh"
-  printf 'FUSION_WINE_RESTART_SCRIPT=%q\n' "$F360_DATA_DIR/runtime-scripts/kill-wine-proton-fusion-nuclear.sh"
-  printf 'FUSION_WINE_DPI=%q\n' "auto"
-  printf 'FUSION_WINE_SCALE_PERCENT=%q\n' "auto"
-  printf 'FUSION_WINE_DPI_FALLBACK=%q\n' "144"
-  printf 'FUSION_WINE_SCALE_FALLBACK_PERCENT=%q\n' "150"
-  printf 'FUSION_PROTON_USE_WINED3D=%q\n' "0"
-  printf 'FUSION_PROTON_USE_XALIA=%q\n' "0"
-  printf 'FUSION_DXVK_ASYNC=%q\n' "1"
-  printf 'FUSION_NO_AT_BRIDGE=%q\n' "1"
-  printf 'FUSION_FIX_BCP47LANGS=%q\n' "1"
-  printf 'FUSION_WEBVIEW_NO_SANDBOX=%q\n' "1"
-  printf 'FUSION_WEBVIEW_DISABLE_GPU=%q\n' "0"
-  printf 'FUSION_USE_INTEL_VK_ICD=%q\n' "1"
-  printf 'FUSION_STAGING_WRITECOPY=%q\n' "1"
-  printf 'FUSION_HEAP_DELAY_FREE=%q\n' "1"
-  printf 'FUSION_ENABLE_OVERLAY_KILLER=%q\n' "1"
-  printf 'FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT=%q\n' "25"
+  local keys=(
+    PROTON STEAM_COMPAT_DATA_PATH STEAM_COMPAT_CLIENT_INSTALL_PATH
+    FUSION_ROOT BROWSER BROWSER_LISTENER CALLBACK_HANDLER CHROME
+    FUSION_OVERLAY_KILLER FUSION_WINE_RESTART_SCRIPT
+    FUSION_WINE_DPI FUSION_WINE_SCALE_PERCENT FUSION_WINE_DPI_FALLBACK
+    FUSION_WINE_SCALE_FALLBACK_PERCENT FUSION_PROTON_USE_WINED3D
+    FUSION_PROTON_USE_XALIA FUSION_DXVK_ASYNC FUSION_NO_AT_BRIDGE
+    FUSION_FIX_BCP47LANGS FUSION_WEBVIEW_NO_SANDBOX FUSION_WEBVIEW_DISABLE_GPU
+    FUSION_USE_INTEL_VK_ICD FUSION_STAGING_WRITECOPY FUSION_HEAP_DELAY_FREE
+    FUSION_ENABLE_OVERLAY_KILLER FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT
+  )
+  local vals=(
+    "$GE_PROTON"
+    "$HOME/.fusion360-proton2"
+    "$HOME/.local/share/Steam"
+    "$fusion_root"
+    "$F360_DATA_DIR/runtime-scripts/fusion-browser.sh"
+    "$F360_DATA_DIR/runtime-scripts/fusion-browser-listener.sh"
+    "$F360_DATA_DIR/runtime-scripts/fusion-callback-handler.sh"
+    "${BROWSER:-/usr/bin/firefox}"
+    "$F360_DATA_DIR/runtime-scripts/fusion-gray-overlay-event-killer.sh"
+    "$F360_DATA_DIR/runtime-scripts/kill-wine-proton-fusion-nuclear.sh"
+    "auto"
+    "auto"
+    "144"
+    "150"
+    "0"
+    "0"
+    "1"
+    "1"
+    "1"
+    "1"
+    "0"
+    "1"
+    "1"
+    "1"
+    "1"
+    "1"
+    "25"
+  )
+  local i val
+  for i in "${!keys[@]}"; do
+    val=$(printf '%q' "${vals[$i]}")
+    # bash 5.0+ printf %q outputs $'...' which older bash can't parse
+    if [[ "$val" == \$* ]]; then
+      val="'${vals[$i]}'"
+    fi
+    printf '%s=%s\n' "${keys[$i]}" "$val"
+  done
 } > "$CONFIG_FILE"
 echo "  [config]  written"
