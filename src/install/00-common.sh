@@ -21,6 +21,10 @@ find_installer() {
 }
 
 detect_distro() {
+  if [[ ! -f /etc/os-release ]]; then
+    echo "ERROR: /etc/os-release not found. Cannot detect distro." >&2
+    exit 1
+  fi
   source /etc/os-release
   case "$ID" in
     ubuntu|neon|debian|pop|elementary|linuxmint)
@@ -47,16 +51,22 @@ detect_distro() {
       ;;
   esac
 
-  # Read package list from distro file, fall back to generic
-  local distro_file="$SCRIPT_DIR/src/install/distro/${ID}.txt"
+  # Normalize distro ID for package file lookup (aliases map to canonical files)
+  local distro_id="$ID"
+  case "$distro_id" in
+    ubuntu|neon|pop|elementary|linuxmint) distro_id="debian" ;;
+    manjaro|endeavour) distro_id="arch" ;;
+    opensuse*|suse) distro_id="opensuse" ;;
+  esac
+  local distro_file="$SCRIPT_DIR/src/install/distro/${distro_id}.txt"
   if [[ ! -f "$distro_file" ]]; then
     distro_file="$SCRIPT_DIR/src/install/distro/generic.txt"
   fi
 
   if [[ -f "$distro_file" ]]; then
-    PKGS=$(cat "$distro_file" | tr '\n' ' ' | sed 's/ *$//')
+    PKGS=$(tr '\n' ' ' < "$distro_file" | sed 's/ *$//')
   else
-    echo "ERROR: Package list not found for distro '$ID' and no generic.txt fallback." >&2
+    echo "ERROR: Package list not found for distro '$distro_id' and no generic.txt fallback." >&2
     exit 1
   fi
 }
@@ -72,6 +82,7 @@ pre_flight() {
     fi
   fi
   local avail_kb; avail_kb=$(df --output=avail "$HOME" 2>/dev/null | tail -n1)
+  [[ -z "$avail_kb" ]] && avail_kb=0
   local avail_gb=$((avail_kb / 1024 / 1024))
   if [[ $avail_gb -lt 15 ]]; then
     echo "WARNING: Only ${avail_gb}GB free on $HOME. Fusion needs ~10GB."
@@ -111,7 +122,7 @@ installer_is_running() {
   # Check if a Fusion installer is already running through Proton
   pgrep -f "FusionClientDownloader" 2>/dev/null | grep -q . && return 0
   # Check if wineserver is running for our prefix
-  [[ -f "$PFX_DIR/pfx/.wineserver.lock" ]] && return 0
+  [[ -f "${PFX_DIR:-}/pfx/.wineserver.lock" ]] && return 0
   return 1
 }
 
