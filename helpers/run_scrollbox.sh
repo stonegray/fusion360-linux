@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # helpers/run_scrollbox.sh — Show piped output in a scrollable box.
-# The last 'height' lines remain visible when done (no cleanup).
 
 run_scrollbox() {
     local until_pat=""
@@ -9,6 +8,9 @@ run_scrollbox() {
 
     [[ -t 1 ]] || { cat -; return 0; }
 
+    # STEP 1: test if ANY output works
+    printf 'SCROLLBOX_ACTIVE\n'
+
     local -a buf=()
     local prev_lines=0
 
@@ -16,18 +18,13 @@ run_scrollbox() {
         buf+=("$line")
         buf=("${buf[@]: -$height}")
 
-        # Go to top of box and rewrite
-        if (( prev_lines > 0 )); then
-            printf '\033[%dA\r' "$prev_lines"
-        fi
-        for l in "${buf[@]}"; do
-            printf '\r\033[K%s\n' "$l"
-        done
-        prev_lines=${#buf[@]}
+        # Just print — no ANSI at all
+        printf '%s\n' "$line"
 
         if [[ -n "$until_pat" ]] && grep -q "$until_pat" <<< "$line"; then
-            return 0  # last lines stay visible
+            printf 'SCROLLBOX_DONE\n'
+            return 0
         fi
     done
-    # No cleanup — last lines stay visible
+    printf 'SCROLLBOX_DONE\n'
 }

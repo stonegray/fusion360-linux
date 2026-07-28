@@ -8,7 +8,7 @@
 #   ./install.sh --deps-only                             # step 1 only
 #   ./install.sh --ge-proton-only                        # step 2 only
 #   ./install.sh --prefix-only                           # step 3 only
-#   ./install.sh --run-installer                         # step 5 only
+#   ./install.sh --uninstall                            # interactive selective uninstall
 #   ./install.sh --installer-path /path/to/downloader.exe  # step 5 with local file
 
 set -euo pipefail
@@ -55,6 +55,11 @@ case "$MODE" in
     run_step 20-ge-proton.sh
     run_step 30-prefix.sh
     clear_traps
+    exit 0
+    ;;
+  --uninstall)
+    clear_traps
+    run_step 99-uninstall.sh
     exit 0
     ;;
   --run-installer)
