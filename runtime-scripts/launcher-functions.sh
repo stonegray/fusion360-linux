@@ -234,21 +234,33 @@ apply_fusion_wine_dpi() {
   local win8_dpi_scaling
 
   dpi_value="$(resolve_fusion_wine_dpi)"
+  [[ "$dpi_value" -eq 96 ]] && win8_dpi_scaling=0 || win8_dpi_scaling=1
 
-  if [[ "$dpi_value" -eq 96 ]]; then
-    win8_dpi_scaling=0
+  local user_reg="$STEAM_COMPAT_DATA_PATH/pfx/user.reg"
+  [[ -f "$user_reg" ]] || return 0
+
+  local dpi_hex
+  dpi_hex=$(printf 'dword:%08x' "$dpi_value")
+  local win8_hex
+  win8_hex=$(printf 'dword:%08x' "$win8_dpi_scaling")
+
+  # Write LogPixels under [Software\\Wine\\Fonts]
+  if grep -q '^\[Software\\\\Wine\\\\Fonts\]' "$user_reg" 2>/dev/null; then
+    sed -i '/^\[Software\\\\Wine\\\\Fonts\]/,/^\[/{/^"LogPixels"/d}' "$user_reg"
+    sed -i '/^\[Software\\\\Wine\\\\Fonts\]/a\'$'\n'"\"LogPixels\"=$dpi_hex" "$user_reg"
   else
-    win8_dpi_scaling=1
+    echo -e "\n[Software\\\\Wine\\\\Fonts]\n#time=1dd1c05750735e4\n\"LogPixels\"=$dpi_hex" >> "$user_reg"
   fi
 
-  # Check if already set correctly — skip if so
-  local current_dpi current_win8
-  current_dpi=$("$PROTON" run reg query 'HKCU\Software\Wine\Fonts' /v LogPixels 2>/dev/null | grep -oP '0x[0-9a-fA-F]+|[0-9]+' | tail -1 || echo "")
-  current_win8=$("$PROTON" run reg query 'HKCU\Control Panel\Desktop' /v Win8DpiScaling 2>/dev/null | grep -oP '0x[0-9a-fA-F]+|[0-9]+' | tail -1 || echo "")
-  if [[ "$current_dpi" == "$dpi_value" && "$current_win8" == "$win8_dpi_scaling" ]]; then
-    return 0
+  # Write LogPixels and Win8DpiScaling under [Control Panel\\Desktop]
+  if grep -q '^\[Control\\\\ Panel\\\\Desktop\]' "$user_reg" 2>/dev/null; then
+    sed -i '/^\[Control\\\\ Panel\\\\Desktop\]/,/^\[/{/^"LogPixels"/d;/^"Win8DpiScaling"/d}' "$user_reg"
+    sed -i '/^\[Control\\\\ Panel\\\\Desktop\]/a\'$'\n'"\"LogPixels\"=$dpi_hex\n\"Win8DpiScaling\"=$win8_hex" "$user_reg"
+  else
+    echo -e "\n[Control\\\\ Panel\\\\Desktop]\n\"LogPixels\"=$dpi_hex\n\"Win8DpiScaling\"=$win8_hex" >> "$user_reg"
   fi
 
+  # Log what we did
   {
     echo "timestamp=$(date -Is)"
     echo "FUSION_WINE_DPI=$FUSION_WINE_DPI"
@@ -261,26 +273,6 @@ apply_fusion_wine_dpi() {
     echo "cinnamon_text_scaling_factor=$(read_gsettings_number org.cinnamon.desktop.interface text-scaling-factor || true)"
     echo "kde_forced_dpi=$(read_kde_forced_dpi || true)"
   } > "$FUSION_DPI_LOG_FILE"
-
-  "$PROTON" run reg add 'HKCU\Software\Wine\Fonts' /v LogPixels /t REG_DWORD /d "$dpi_value" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
-    echo "launch-fusion.sh warning: failed to set Wine Fonts LogPixels. See $FUSION_DPI_LOG_FILE" >&2
-  }
-
-  "$PROTON" run reg add 'HKCU\Control Panel\Desktop' /v LogPixels /t REG_DWORD /d "$dpi_value" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
-    echo "launch-fusion.sh warning: failed to set Desktop LogPixels. See $FUSION_DPI_LOG_FILE" >&2
-  }
-
-  "$PROTON" run reg add 'HKCU\Control Panel\Desktop' /v Win8DpiScaling /t REG_DWORD /d "$win8_dpi_scaling" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
-    echo "launch-fusion.sh warning: failed to set Win8DpiScaling. See $FUSION_DPI_LOG_FILE" >&2
-  }
-
-  {
-    echo
-    echo "---- registry check after write ----"
-    "$PROTON" run reg query 'HKCU\Software\Wine\Fonts' /v LogPixels 2>&1 || true
-    "$PROTON" run reg query 'HKCU\Control Panel\Desktop' /v LogPixels 2>&1 || true
-    "$PROTON" run reg query 'HKCU\Control Panel\Desktop' /v Win8DpiScaling 2>&1 || true
-  } >> "$FUSION_DPI_LOG_FILE"
 }
 
 install_callback_protocol_handlers() {
@@ -310,16 +302,13 @@ EOF_DESKTOP
 }
 
 register_wine_browser_bridge() {
-  # Check if already registered
-  local current
-  current=$("$PROTON" run reg query 'HKCU\Software\Wine\WineBrowser' /v Browsers 2>/dev/null | grep "$BROWSER" || true)
-  if [[ -n "$current" ]]; then
-    return 0
-  fi
+  local user_reg="$STEAM_COMPAT_DATA_PATH/pfx/user.reg"
+  [[ -f "$user_reg" ]] || return 0
 
-  "$PROTON" run reg add 'HKCU\Software\Wine\WineBrowser' /v Browsers /t REG_SZ /d "$BROWSER" /f >/tmp/fusion360-winebrowser-register.log 2>&1 || {
-    echo "launch-fusion.sh warning: failed to register WineBrowser. See /tmp/fusion360-winebrowser-register.log" >&2
-  }
+  # Check if already set
+  grep -q '^\[Software\\\\Wine\\\\WineBrowser\]' "$user_reg" 2>/dev/null && return 0
+
+  echo -e "\n[Software\\\\Wine\\\\WineBrowser]\n\"Browsers\"=\"$BROWSER\"" >> "$user_reg"
 }
 
 start_browser_listener() {
