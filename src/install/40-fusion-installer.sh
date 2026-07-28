@@ -116,34 +116,45 @@ STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
 STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
 "$proton" run "$INSTALLER_PATH" 2>/dev/null || true
 
-# ── Wait for Fusion360.exe to start (installer launches it on finish) ──
+# ── Wait for Fusion360.exe + installer completion ─────────────────
 echo ""
-echo "  [installer] Waiting for Fusion360 to start after install..."
-echo "  [installer] (this means the installer completed and Fusion is doing first-run setup)"
+echo "  [installer] Waiting for install to finish..."
+echo "  [installer] Complete the installer in the window that appeared."
+echo "  [installer] The script will detect when it's done automatically."
+F360_LOG="$PFX_DIR/pfx/drive_c/users/steamuser/AppData/Local/Autodesk/autodesk.webdeploy.streamer.log"
 FUSION_PID=""
 for i in $(seq 1 30); do
+  sleep 10
+  # Check both conditions: Fusion360.exe running AND installer log says complete
   FUSION_PID=$(pgrep -u "$(id -u)" -f "Fusion360\.exe" 2>/dev/null | head -1 || true)
-  if [[ -n "$FUSION_PID" ]]; then
-    echo "  [installer] Fusion360.exe started (PID $FUSION_PID). Letting it initialize..."
+  LOG_DONE=0
+  [[ -f "$F360_LOG" ]] && grep -q "Configure app complete" "$F360_LOG" 2>/dev/null && LOG_DONE=1
+  if [[ -n "$FUSION_PID" && $LOG_DONE -eq 1 ]]; then
+    echo "  [installer] Install complete and Fusion360.exe running (PID $FUSION_PID)."
+    echo "  [installer] Letting it initialize for 5 seconds..."
     sleep 5
     break
+  fi
+  if [[ -n "$FUSION_PID" ]]; then
+    # Fusion is running but log isn't complete yet — keep waiting
+    echo "  [installer] Fusion360.exe started, waiting for install to finalize..."
   fi
   if [[ $i -eq 15 ]]; then
     echo "  [installer] Still waiting... (installer window may still be open)"
   fi
-  sleep 10
 done
 
-if [[ -n "$FUSION_PID" ]]; then
+if [[ -n "$FUSION_PID" && $LOG_DONE -eq 1 ]]; then
   echo "  [installer] Killing Fusion360 after first-run setup..."
   source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
   kill_fusion_processes
   kill "$FUSION_PID" 2>/dev/null || true
   sleep 1
   kill -9 "$FUSION_PID" 2>/dev/null || true
+  echo "  [installer] Fusion360 terminated. Auth will complete on next launch."
 else
-  echo "  [installer] Fusion360.exe did not start within 5 minutes."
-  echo "  [installer] The installer window may still be open — complete it manually."
+  echo "  [installer] Install did not complete within 5 minutes."
+  echo "  [installer] Complete the installer manually, then run: ./launch-fusion.sh"
   kill_installer
 fi
 
