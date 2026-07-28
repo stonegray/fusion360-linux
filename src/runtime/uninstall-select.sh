@@ -1,6 +1,7 @@
 # src/install/99-uninstall.sh — Interactive selective uninstall
 # Sourced by install.sh --uninstall
 set -euo pipefail
+: "${HOME:?HOME must be set to run selective uninstall}"
 
 echo "╔══════════════════════════════════════════════════════════════╗"
 echo "║     Fusion360 Linux — Selective Uninstall                   ║"

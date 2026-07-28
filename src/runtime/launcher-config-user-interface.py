@@ -764,7 +764,14 @@ root.after(800, enable_focus_pause)
 
 update_all_dirty_indicators()
 
-if countdown_active:
+if user_interface_mode == "silent":
+    root.withdraw()
+
+if user_interface_mode == "silent":
+    print("Config incomplete -- saving defaults and continuing silently.")
+    write_config_values()
+    sys.exit(0)
+elif countdown_active:
     countdown_tick()
 else:
     countdown_label_var.set("Review settings, then click Continue.")

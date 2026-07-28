@@ -15,6 +15,8 @@ EOF
   exit 1
 fi
 
+: "${HOME:?HOME must be set to run uninstall}"
+
 RED='\033[0;31m'
 NC='\033[0m'
 

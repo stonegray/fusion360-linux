@@ -67,7 +67,7 @@ OVERLAY_KILLER_PID=""
 source "$SCRIPT_DIR/../runtime/launcher-functions.sh"
 load_config
 
-if [[ "${1:-}" == "--configure" ]]; then
+if [[ "${1:-}" == "--config" || "${1:-}" == "--configure" ]]; then
   configure_with_file_browsers hold || exit 1
   exit 0
 fi
@@ -83,12 +83,14 @@ if is_enabled "$FUSION_ENABLE_OVERLAY_KILLER"; then
   [[ -x "$FUSION_OVERLAY_KILLER" ]] || missing_selection=1
 fi
 
-if [[ -n "${DISPLAY:-}" && -z "${FUSION_SKIP_UI:-}" ]]; then
-  if [[ $missing_selection -eq 1 ]]; then
-    configure_with_file_browsers hold || exit 1
-  else
-    configure_with_file_browsers countdown || exit 1
+# Silent config: if config is incomplete, run Python hidden to save defaults
+if [[ $missing_selection -eq 1 ]]; then
+  if [[ -n "${DISPLAY:-}" && -z "${FUSION_SKIP_UI:-}" ]]; then
+    configure_with_file_browsers silent || exit 1
   fi
+elif [[ -z "${FUSION_SKIP_UI:-}" ]]; then
+  # Config complete, skip UI entirely
+  :
 fi
 
 apply_launch_environment

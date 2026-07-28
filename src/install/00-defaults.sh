@@ -2,6 +2,8 @@
 # Sourced by 00-common.sh. All install scripts should reference these
 # instead of hardcoding paths.
 
+: "${HOME:?HOME is not set — aborting}"
+
 # XDG base directories
 XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
