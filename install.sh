@@ -76,61 +76,58 @@ case "$MODE" in
     ;;
 esac
 
-echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║     Fusion360 Linux Installer                               ║"
-echo "╚══════════════════════════════════════════════════════════════╝"
-echo "── Step 1/12: System dependencies ──"
+log_step "Step 1/12: System dependencies"
 run_step 10-deps.sh
 echo ""
 
-echo "── Step 2/12: Preflight checks ──"
+log_step "Step 2/12: Preflight checks"
 run_step 05-preflight.sh
 echo ""
 
-echo "── Step 3/12: GE-Proton ──"
+log_step "Step 3/12: GE-Proton"
 run_step 20-ge-proton.sh
 echo ""
 
-echo "── Step 4/12: Install to system ──"
+log_step "Step 4/12: Install to system"
 run_step 25-install-to-location.sh
 echo ""
 
-echo "── Step 5/12: Proton prefix ──"
+log_step "Step 5/12: Proton prefix"
 run_step 30-prefix.sh
 echo ""
 
-echo "── Step 6/12: WebView2 ──"
+log_step "Step 6/12: WebView2"
 run_step 35-webview2.sh
 echo ""
 
-echo "── Step 7/12: Config ──"
+log_step "Step 7/12: Config"
 run_step 37-config.sh
 echo ""
 
-echo "── Step 8/12: Protocol handlers ──"
+log_step "Step 8/12: Protocol handlers"
 "$SCRIPT_DIR/src/runtime/register-protocols.sh"
 echo ""
 
-echo "── Step 9/12: Display DPI ──"
+log_step "Step 9/12: Display DPI"
 run_step 38-dpi.sh
 echo ""
 
-echo "── Step 10/12: Fusion Installer ──"
+log_step "Step 10/12: Fusion Installer"
 run_step 40-fusion-installer.sh
 echo ""
 
-echo "── Step 11/12: File type associations ──"
+log_step "Step 11/12: File type associations"
 run_step 45-filetypes.sh
 echo ""
 
-echo "── Step 12/12: Health check ──"
+log_step "Step 12/12: Health check"
 if [[ -x "$SCRIPT_DIR/src/doctor/doctor.sh" ]]; then
-  "$SCRIPT_DIR/src/doctor/doctor.sh"
+  "$SCRIPT_DIR/src/doctor/doctor.sh" --quick 2>/dev/null || true
 fi
 echo ""
 
 clear_traps
 
-echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║     Install complete. Run:  ./launch-fusion.sh              ║"
-echo "╚══════════════════════════════════════════════════════════════╝"
+log_pass "Fusion 360 installation complete."
+echo ""
+printf "${_C_DIM}Run:  ./launch-fusion.sh${_C_RESET}\n"

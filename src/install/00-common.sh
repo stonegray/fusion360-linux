@@ -139,3 +139,24 @@ setup_traps() {
 clear_traps() {
   trap - INT TERM
 }
+
+# ── Unified output formatting ─────────────────────────────────────
+# Colors (auto-disabled if NO_COLOR is set or stdout not a terminal)
+if [[ -z "${NO_COLOR:-}" ]] && [[ -t 1 ]]; then
+  _C_RESET="\e[0m"; _C_BOLD="\e[1m"; _C_DIM="\e[2m"
+  _C_RED="\e[31m"; _C_GREEN="\e[32m"; _C_YELLOW="\e[33m"
+  _C_BLUE="\e[34m"; _C_CYAN="\e[36m"
+else
+  _C_RESET=""; _C_BOLD=""; _C_DIM=""; _C_RED=""; _C_GREEN=""
+  _C_YELLOW=""; _C_BLUE=""; _C_CYAN=""
+fi
+
+# Print a step header: "── Step N/M: Title ──"
+log_step()   { printf "${_C_BOLD}${_C_CYAN}── %s${_C_RESET}\n" "$*"; }
+
+# Print a status line
+log_info()   { printf "  ${_C_BLUE}●${_C_RESET} %s\n" "$*"; }
+log_pass()   { printf "  ${_C_GREEN}✓${_C_RESET} %s\n" "$*"; }
+log_warn()   { printf "  ${_C_YELLOW}⚠${_C_RESET} %s\n" "$*"; }
+log_fail()   { printf "  ${_C_RED}✗${_C_RESET} %s\n" "$*"; }
+log_detail() { printf "  ${_C_DIM}%s${_C_RESET}\n" "$*"; }

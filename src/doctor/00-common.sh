@@ -31,12 +31,22 @@ parse_args() {
   esac
 }
 
-header()   { echo ""; echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; echo "  $*"; echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; }
-pass()     { echo "  [PASS] $*"; ((SECTION_PASS++)); }
-fail()     { echo "  [FAIL] $*"; ((SECTION_FAIL++)); RECOMMENDATIONS+=("$*"); }
-warn()     { echo "  [WARN] $*"; ((SECTION_WARN++)); }
-info()     { echo "  [INFO] $*"; }
-detail()   { echo "         $*"; }
+# ── Unified output formatting (mirrors src/install/00-common.sh) ──
+if [[ -z "${NO_COLOR:-}" ]] && [[ -t 1 ]]; then
+  _C_RESET="\e[0m"; _C_BOLD="\e[1m"; _C_DIM="\e[2m"
+  _C_RED="\e[31m"; _C_GREEN="\e[32m"; _C_YELLOW="\e[33m"
+  _C_BLUE="\e[34m"; _C_CYAN="\e[36m"
+else
+  _C_RESET=""; _C_BOLD=""; _C_DIM=""; _C_RED=""; _C_GREEN=""
+  _C_YELLOW=""; _C_BLUE=""; _C_CYAN=""
+fi
+
+header()   { printf "\n${_C_BOLD}${_C_CYAN}━━━ %s ━━━${_C_RESET}\n" "$*"; }
+pass()     { printf "  ${_C_GREEN}✓${_C_RESET} %s\n" "$*"; ((SECTION_PASS++)); }
+fail()     { printf "  ${_C_RED}✗${_C_RESET} %s\n" "$*"; ((SECTION_FAIL++)); RECOMMENDATIONS+=("$*"); }
+warn()     { printf "  ${_C_YELLOW}⚠${_C_RESET} %s\n" "$*"; ((SECTION_WARN++)); }
+info()     { printf "  ${_C_BLUE}●${_C_RESET} %s\n" "$*"; }
+detail()   { printf "  ${_C_DIM}%s${_C_RESET}\n" "$*"; }
 
 print_summary() {
   header "Summary"
@@ -67,10 +77,8 @@ print_summary() {
 }
 
 print_banner() {
-  echo "╔══════════════════════════════════════════════════════════════╗"
-  echo "║     Fusion360 on Linux — Doctor Report                      ║"
-  echo "║     $(date)                ║"
-  echo "╚══════════════════════════════════════════════════════════════╝"
+  header "Fusion360 on Linux — Doctor Report"
+  echo ""
 }
 
 quick_exit() {
