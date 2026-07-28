@@ -11,52 +11,45 @@ echo ""
 components=()
 comp_names=()
 comp_sizes=()
-comp_cmds=()
 
 add_comp() {
-  local name="$1" path="$2" cmd="$3"
+  local name="$1" path="$2"
+  # Handle glob paths — expand with compgen
+  if [[ "$path" == *\** ]]; then
+    local expanded
+    expanded=$(compgen -G "$path" 2>/dev/null | head -1)
+    [[ -z "$expanded" ]] && return 0
+    path="$expanded"
+  fi
   if [[ -e "$path" ]]; then
     local size
     size=$(du -sh "$path" 2>/dev/null | cut -f1)
     components+=("$path")
     comp_names+=("$name")
     comp_sizes+=("$size")
-    comp_cmds+=("$cmd")
   fi
 }
 
-add_comp "Proton prefix (Fusion install)" "$HOME/.fusion360-proton2" \
-  "rm -rf \"$HOME/.fusion360-proton2\""
+add_comp "Proton prefix (Fusion install)" "$HOME/.fusion360-proton2"
 
 for g in "$HOME/.local/share/Steam/compatibilitytools.d"/GE-Proton*; do
   [[ -d "$g" ]] || continue
-  name=$(basename "$g")
-  add_comp "GE-Proton ($name)" "$g" \
-    "rm -rf \"$g\""
+  add_comp "GE-Proton ($name)" "$g"
 done
-
-add_comp "Config files" "$HOME/.config/fusion360-linux" \
-  "rm -rf \"$HOME/.config/fusion360-linux\""
-
+add_comp "Config files" "$HOME/.config/fusion360-linux"
 add_comp "Callback handler desktop entry" \
-  "$HOME/.local/share/applications/fusion360-linux/fusion360-callback-handler.desktop" \
-  "rm -f \"$HOME/.local/share/applications/fusion360-linux/fusion360-callback-handler.desktop\""
-
+  "$HOME/.local/share/applications/fusion360-linux/fusion360-callback-handler.desktop"
 add_comp "Fusion 360 desktop entry" \
-  "$HOME/.local/share/applications/fusion360-linux/autodesk-fusion360.desktop" \
-  "rm -f \"$HOME/.local/share/applications/fusion360-linux/autodesk-fusion360.desktop\""
+  "$HOME/.local/share/applications/fusion360-linux/autodesk-fusion360.desktop"
 
 found_icons=0
 for icon in "$HOME"/.local/share/icons/hicolor/*/apps/fusion360.png; do
   [[ -f "$icon" ]] && found_icons=1
 done
 if (( found_icons )); then
-  add_comp "Application icons" "$HOME/.local/share/icons/hicolor/*/apps/fusion360.png" \
-    "rm -f \"$HOME\"/.local/share/icons/hicolor/*/apps/fusion360.png"
+  add_comp "Application icons" "$HOME/.local/share/icons/hicolor/*/apps/fusion360.png"
 fi
-
-add_comp "Bridge temp files" "/tmp/fusion360-*" \
-  "rm -rf /tmp/fusion360-* 2>/dev/null || true"
+add_comp "Bridge temp files" "/tmp/fusion360-*"
 
 if (( ${#components[@]} == 0 )); then
   echo "  No Fusion360 components found. Nothing to uninstall."
@@ -80,12 +73,14 @@ if [[ "$selection" == "all" ]]; then
     selected+=("$i")
   done
 else
+  set -f
   for num in $selection; do
     idx=$((num - 1))
     if (( idx >= 0 && idx < ${#components[@]} )); then
       selected+=("$idx")
     fi
   done
+  set +f
 fi
 
 if (( ${#selected[@]} == 0 )); then
@@ -115,7 +110,10 @@ esac
 echo ""
 for idx in "${selected[@]}"; do
   echo "  Removing ${comp_names[idx]}..."
-  eval "${comp_cmds[idx]}"
+  comp_path="${components[idx]}"
+  if [[ -n "$comp_path" ]]; then
+    rm -rf "$comp_path"
+  fi
 done
 
 # Refresh KDE menu if available
