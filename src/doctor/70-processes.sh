@@ -44,3 +44,11 @@ if [[ -n "$overlay_procs" ]]; then
 else
   info "fusion-gray-overlay-event-killer not running (starts with launch-fusion.sh)"
 fi
+
+toolwindow_procs=$(pgrep -af 'fusion-toolwindow-fixer' 2>/dev/null || true)
+if [[ -n "$toolwindow_procs" ]]; then
+  pass "fusion-toolwindow-fixer.exe is running"
+  echo "$toolwindow_procs" | sed 's/^/  /'
+else
+  info "fusion-toolwindow-fixer.exe not running (starts with launch-fusion.sh)"
+fi

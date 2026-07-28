@@ -19,6 +19,7 @@ load_config() {
   CALLBACK_HANDLER="${CALLBACK_HANDLER:-${_run_dir:+$_run_dir/fusion-callback-handler.sh}}"
   FUSION_OVERLAY_KILLER="${FUSION_OVERLAY_KILLER:-${_run_dir:+$_run_dir/fusion-gray-overlay-event-killer.sh}}"
   FUSION_WINE_RESTART_SCRIPT="${FUSION_WINE_RESTART_SCRIPT:-${_run_dir:+$_run_dir/kill-wine-proton-fusion-nuclear.sh}}"
+  FUSION_TOOLWINDOW_FIXER="${FUSION_TOOLWINDOW_FIXER:-${_run_dir:+$_run_dir/fusion-toolwindow-fixer.exe}}"
 
   FUSION_WINE_DPI="${FUSION_WINE_DPI:-auto}"
   FUSION_WINE_SCALE_PERCENT="${FUSION_WINE_SCALE_PERCENT:-auto}"
@@ -36,6 +37,7 @@ load_config() {
   FUSION_STAGING_WRITECOPY="${FUSION_STAGING_WRITECOPY:-1}"
   FUSION_HEAP_DELAY_FREE="${FUSION_HEAP_DELAY_FREE:-1}"
   FUSION_ENABLE_OVERLAY_KILLER="${FUSION_ENABLE_OVERLAY_KILLER:-1}"
+  FUSION_ENABLE_TOOLWINDOW_FIXER="${FUSION_ENABLE_TOOLWINDOW_FIXER:-1}"
 }
 
 save_config() {
@@ -45,6 +47,8 @@ save_config() {
     local keys=(
       PROTON STEAM_COMPAT_DATA_PATH STEAM_COMPAT_CLIENT_INSTALL_PATH
       FUSION_ROOT BROWSER BROWSER_LISTENER CALLBACK_HANDLER CHROME
+      FUSION_TOOLWINDOW_FIXER
+      FUSION_ENABLE_TOOLWINDOW_FIXER
       FUSION_OVERLAY_KILLER FUSION_WINE_RESTART_SCRIPT
       FUSION_WINE_DPI FUSION_WINE_SCALE_PERCENT FUSION_WINE_DPI_FALLBACK
       FUSION_WINE_SCALE_FALLBACK_PERCENT FUSION_PROTON_USE_WINED3D
@@ -444,8 +448,30 @@ start_overlay_killer() {
 
   FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="$FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT" "$FUSION_OVERLAY_KILLER" &
   OVERLAY_KILLER_PID="$!"
-
   echo "launch-fusion.sh: overlay killer started with PID $OVERLAY_KILLER_PID"
+}
+
+TOOLWINDOW_FIXER_PID=""
+
+# ── Toolwindow fixer ─────────────────────────────────────────────────
+# Background daemon that adds WS_EX_APPWINDOW to Fusion's docked
+# toolwindow popups so Wine's X11 driver makes them "managed" instead
+# of override-redirect.  Fixes the "always on top" z-order bug.
+start_toolwindow_fixer() {
+  is_enabled "$FUSION_ENABLE_TOOLWINDOW_FIXER" || return 0
+
+  if [[ ! -x "$FUSION_TOOLWINDOW_FIXER" ]]; then
+    echo "launch-fusion.sh warning: toolwindow fixer is enabled but not executable: $FUSION_TOOLWINDOW_FIXER" >&2
+    return 0
+  fi
+
+  # Must run through the Wine prefix to access Win32 API
+  STEAM_COMPAT_DATA_PATH="${STEAM_COMPAT_DATA_PATH:-$PFX_DIR}" \
+  STEAM_COMPAT_CLIENT_INSTALL_PATH="${STEAM_COMPAT_CLIENT_INSTALL_PATH:-$HOME/.local/share/Steam}" \
+  "$FUSION_TOOLWINDOW_FIXER" &
+  TOOLWINDOW_FIXER_PID="$!"
+
+  echo "launch-fusion.sh: toolwindow fixer started with PID $TOOLWINDOW_FIXER_PID"
 }
 
 cleanup() {
@@ -463,6 +489,13 @@ cleanup() {
     fi
   fi
 
+
+  if [[ -n "$TOOLWINDOW_FIXER_PID" ]]; then
+    if kill -0 "$TOOLWINDOW_FIXER_PID" 2>/dev/null; then
+      kill "$TOOLWINDOW_FIXER_PID" 2>/dev/null || true
+      wait "$TOOLWINDOW_FIXER_PID" 2>/dev/null || true
+    fi
+  fi
   clear_bridge_temp_files
 }
 

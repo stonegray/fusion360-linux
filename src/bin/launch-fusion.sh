@@ -47,6 +47,7 @@ done
 CHROME="${CHROME:-$_detected_chrome}"
 unset _detected_chrome _c
 FUSION_OVERLAY_KILLER="${FUSION_OVERLAY_KILLER:-$RUNTIME_DIR/fusion-gray-overlay-event-killer.sh}"
+FUSION_TOOLWINDOW_FIXER="${FUSION_TOOLWINDOW_FIXER:-$RUNTIME_DIR/fusion-toolwindow-fixer.exe}"
 FUSION_WINE_RESTART_SCRIPT="${FUSION_WINE_RESTART_SCRIPT:-$RUNTIME_DIR/kill-wine-proton-fusion-nuclear.sh}"
 
 FUSION_WINE_DPI="${FUSION_WINE_DPI:-auto}"
@@ -64,6 +65,7 @@ FUSION_WEBVIEW_NO_SANDBOX="${FUSION_WEBVIEW_NO_SANDBOX:-1}"
 FUSION_WEBVIEW_DISABLE_GPU="${FUSION_WEBVIEW_DISABLE_GPU:-0}"
 FUSION_USE_INTEL_VK_ICD="${FUSION_USE_INTEL_VK_ICD:-1}"
 FUSION_ENABLE_OVERLAY_KILLER="${FUSION_ENABLE_OVERLAY_KILLER:-1}"
+FUSION_ENABLE_TOOLWINDOW_FIXER="${FUSION_ENABLE_TOOLWINDOW_FIXER:-1}"
 FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="${FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT:-25}"
 
 BRIDGE_BROWSER_REQUEST_DIR="/tmp/fusion360-browser-requests"
@@ -143,6 +145,7 @@ install_callback_protocol_handlers
 register_wine_browser_bridge
 start_browser_listener
 start_overlay_killer
+start_toolwindow_fixer
 
 if (( ${#FUSION_ARGS[@]} > 0 )); then
   "$PROTON" run "$FUSION_EXE" "${FUSION_ARGS[@]}"
