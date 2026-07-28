@@ -23,6 +23,7 @@ run_scrollbox() {
         buf=("${buf[@]: -$height}")
 
         if (( !started )); then
+            echo          # move to a fresh line so box starts below caller's output
             tput sc
             started=1
         fi
