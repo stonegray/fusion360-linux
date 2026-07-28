@@ -19,11 +19,11 @@ fi
 
 if command -v winetricks &>/dev/null; then
   if [[ ! -f "$PFX_DIR/pfx/drive_c/windows/system32/vcruntime140.dll" ]]; then
+    echo "  [3/7] Installing VC++ runtimes (winetricks)..."
     STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
     STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
-    WINEPREFIX="$PFX_DIR/pfx" \
     WINEDLLOVERRIDES="regedit.exe,msiexec.exe=" \
-    winetricks -q vcrun2022 2>/dev/null || true
+    winetricks -q vcrun2022 2>/dev/null || echo "  [3/7] Warning: winetricks failed (prefix may already be initialized)"
   else
     echo "  [3/7] VC++ runtimes already present."
   fi

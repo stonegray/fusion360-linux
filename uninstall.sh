@@ -93,9 +93,12 @@ if [[ $found_icons -eq 0 ]]; then
 fi
 
 # 6. Bridge temp files
-echo "  Removing bridge temp files..."
-rm -rf /tmp/fusion360-* 2>/dev/null || true
-echo "    Removed: /tmp/fusion360-*"
+if compgen -G '/tmp/fusion360-*' > /dev/null 2>&1; then
+  rm -rf /tmp/fusion360-*
+  echo "    Removed: bridge temp files."
+else
+  echo "    No bridge temp files to remove."
+fi
 
 # 7. Refresh KDE menu if available
 if command -v kbuildsycoca6 &>/dev/null; then
