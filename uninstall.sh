@@ -62,18 +62,18 @@ else
 fi
 
 # 3. Protocol handler desktop file
-if [[ -f "$HOME/.local/share/applications/fusion360-callback-handler.desktop" ]]; then
+if [[ -f "$HOME/.local/share/applications/fusion360-linux/fusion360-callback-handler.desktop" ]]; then
   echo "  Removing callback handler desktop entry..."
-  rm -f "$HOME/.local/share/applications/fusion360-callback-handler.desktop"
+  rm -f "$HOME/.local/share/applications/fusion360-linux/fusion360-callback-handler.desktop"
   echo "    Removed: fusion360-callback-handler.desktop"
 else
   echo "  [SKIP] fusion360-callback-handler.desktop not found."
 fi
 
 # 4. Main desktop entry
-if [[ -f "$HOME/.local/share/applications/autodesk-fusion360.desktop" ]]; then
+if [[ -f "$HOME/.local/share/applications/fusion360-linux/autodesk-fusion360.desktop" ]]; then
   echo "  Removing Autodesk Fusion 360 desktop entry..."
-  rm -f "$HOME/.local/share/applications/autodesk-fusion360.desktop"
+  rm -f "$HOME/.local/share/applications/fusion360-linux/autodesk-fusion360.desktop"
   echo "    Removed: autodesk-fusion360.desktop"
 else
   echo "  [SKIP] autodesk-fusion360.desktop not found."

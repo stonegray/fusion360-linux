@@ -38,12 +38,12 @@ add_comp "Config files" "$HOME/.config/fusion360-linux" \
   "rm -rf \"$HOME/.config/fusion360-linux\""
 
 add_comp "Callback handler desktop entry" \
-  "$HOME/.local/share/applications/fusion360-callback-handler.desktop" \
-  "rm -f \"$HOME/.local/share/applications/fusion360-callback-handler.desktop\""
+  "$HOME/.local/share/applications/fusion360-linux/fusion360-callback-handler.desktop" \
+  "rm -f \"$HOME/.local/share/applications/fusion360-linux/fusion360-callback-handler.desktop\""
 
 add_comp "Fusion 360 desktop entry" \
-  "$HOME/.local/share/applications/autodesk-fusion360.desktop" \
-  "rm -f \"$HOME/.local/share/applications/autodesk-fusion360.desktop\""
+  "$HOME/.local/share/applications/fusion360-linux/autodesk-fusion360.desktop" \
+  "rm -f \"$HOME/.local/share/applications/fusion360-linux/autodesk-fusion360.desktop\""
 
 found_icons=0
 for icon in "$HOME"/.local/share/icons/hicolor/*/apps/fusion360.png; do

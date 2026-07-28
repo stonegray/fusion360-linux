@@ -65,7 +65,7 @@ check "adsk:// protocol handler registered" \
 
 # 7. Desktop entry
 check "Desktop entry installed" \
-  test -f "$HOME/.local/share/applications/autodesk-fusion360.desktop"
+  test -f "$HOME/.local/share/applications/fusion360-linux/autodesk-fusion360.desktop"
 
 # 8. Icons installed
 check "Application icons installed" \
