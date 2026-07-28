@@ -76,9 +76,8 @@ fi
 
 if [[ -z "${INSTALLER_PATH:-}" ]]; then
   echo "  [5/5] Downloading Fusion installer..."
-  wget -O "$HOME/Downloads/fusion360-linux-install/FusionClientDownloader.exe" \
+  wget --timeout=30 -O "$HOME/Downloads/fusion360-linux-install/FusionClientDownloader.exe" \
     "https://dl.appstreaming.autodesk.com/production/installers/Fusion%20Client%20Downloader.exe" || {
-    cat >&2 <<EOF
 
   ┌─ Manual download ────────────────────────────────────────────┐
   │                                                                │
