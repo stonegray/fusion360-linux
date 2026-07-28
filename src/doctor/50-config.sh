@@ -40,7 +40,7 @@ else
   fail "Config file not found — run setup-fusion.sh or launch-fusion.sh --configure"
 fi
 
-app_dir="$HOME/.local/share/applications"
+app_dir="$HOME/.local/share/applications/fusion360-linux"
 if [[ -f "$app_dir/fusion360-callback-handler.desktop" ]]; then
   pass "Callback handler desktop entry installed"
   if command -v desktop-file-validate &>/dev/null; then
