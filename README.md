@@ -59,16 +59,71 @@ No passwords are written to files.  Short-lived URLs in `/tmp` only.
 ## Toolwindow Z-Order Fix
 
 Fusion creates docked panels (browser, data panel, toolbar areas) as
-`WS_POPUP` windows.  Under Wine's X11 driver these become override-redirect /
-unmanaged, so the compositor keeps them above every other application.
+`WS_POPUP` windows.  Under Wine's X11 driver, `WS_POPUP` without
+`WS_EX_APPWINDOW` becomes an **override-redirect** X11 window — the
+compositor treats it as unmanaged, keeps it above every other application,
+and skips it for minimize-to-taskbar.
 
-`fusion-toolwindow-fixer.exe` is a background daemon compiled from C
-(`src/toolwindow-fixer/fusion-toolwindow-fixer.c`) via `mingw-w64`.  It finds
-Fusion-owned popup windows and adds `WS_EX_APPWINDOW` to their extended style.
-This forces Wine to create them as *managed* windows that stack correctly behind
-other apps and respond to minimize-to-taskbar.
+`fusion-toolwindow-fixer.exe` is a 40 KB Win32 background daemon compiled
+from C (`src/toolwindow-fixer/fusion-toolwindow-fixer.c`) via `mingw-w64`,
+built from source at install time.  It runs in a 5-second scan loop:
 
-Built from source at install time (no pre-built binary in the repo).
+1. Finds the Fusion 360 process (`CreateToolhelp32Snapshot`)
+2. Enumerates all Fusion-owned windows (`EnumWindows`)
+3. For each `WS_POPUP` window with an owner (child panel):
+   - Skips windows already having `WS_EX_APPWINDOW`
+   - Skips dialogs (those with `WS_CAPTION`, `WS_DLGFRAME`, or `WS_SYSMENU`)
+   - Skips invisible and zero-size helper windows
+4. Adds `WS_EX_APPWINDOW` to the extended style via `SetWindowLongPtrW`
+5. Calls `SetWindowPos` with `SWP_FRAMECHANGED` to transition the
+   window from override-redirect → managed, preserving its position
+
+This is equivalent to what the Wine source patch in Lolig4's
+`GE-Proton11-Fusion` fork does in `window_set_managed()`, but applied at
+runtime — no custom Wine build required.
+
+## File Type Associations
+
+The installer registers Fusion 360 as the default handler for **20 CAD
+formats**.  Double-clicking a `.f3d` file (or `.step`, `.stl`, `.3mf`,
+etc.) in your file manager opens it in Fusion.
+
+### How It Works
+
+```
+File manager / xdg-open
+  ↓ looks up default for application/vnd.autodesk.fusion360
+autodesk-fusion360.desktop
+  ↓ Exec → launch-fusion.sh %F
+launch-fusion.sh
+  ↓ passes file path to Proton
+Proton → NLauncher.exe "%1"
+  ↓ connects to running Fusion via Forge IPC
+Fusion opens the file  ✓
+```
+
+Key details:
+
+- **NLauncher.exe** is Fusion's lightweight bridge process.  It's registered
+  as the handler for both `.f3d` (via `Fusion360.AssocDocument`) and the
+  `fusion360://` protocol in the Wine prefix's `system.reg`.  When invoked,
+  it communicates with the running Fusion process through Autodesk's "Forge"
+  IPC — avoiding the multiple-instances error.
+- **MIME XML** (`src/install/data/fusion360-mime.xml`) defines the mapping
+  between file extensions and MIME types.  Installed to
+  `~/.local/share/mime/packages/` and indexed via `update-mime-database`.
+- **MIME + app icons** — the Fusion logo is extracted from the Wine prefix's
+  `Fusion360.ico` (or via `wrestool` from `Fusion360.exe`), converted to PNG,
+  and installed at 8 standard sizes (16–256 px) into both
+  `hicolor/*/apps/` (launcher, taskbar) and `hicolor/*/mimetypes/`
+  (file manager icons).  No copyrighted assets in the repo — extracted at
+  install time.
+- **`xdg-mime default`** sets Fusion as the default for
+  `application/vnd.autodesk.fusion360` so `xdg-open` routes `.f3d` files
+  to the desktop entry.
+- **Desktop entry** is placed in `~/.local/share/applications/fusion360-linux/`
+  with `MimeType=` listing all 20 formats, so application menus and file
+  managers discover the associations without manual config.
 
 ## Commands
 
