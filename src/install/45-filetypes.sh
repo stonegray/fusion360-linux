@@ -161,12 +161,33 @@ if [[ -f "$system_reg" ]]; then
   fi
 fi
 
-# ── Copy toolwindow fixer into Wine prefix ────────────────────────
-if [[ -f "$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.exe" ]]; then
-  mkdir -p "$PFX_DIR/pfx/drive_c"
-  cp "$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.exe" \
-     "$PFX_DIR/pfx/drive_c/fusion-toolwindow-fixer.exe"
-  echo "  [11/12] Toolwindow fixer installed to Wine prefix."
+# ── Build or copy toolwindow fixer into Wine prefix ──────────────
+mkdir -p "$PFX_DIR/pfx/drive_c"
+local twf_src="$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.c"
+local twf_prebuilt="$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.exe"
+local twf_target="$PFX_DIR/pfx/drive_c/fusion-toolwindow-fixer.exe"
+local built_ok=false
+
+# Try compiling from source if the cross-compiler is available
+if command -v x86_64-w64-mingw32-gcc &>/dev/null && [[ -f "$twf_src" ]]; then
+  echo "  [11/12] Building toolwindow fixer from source..."
+  if x86_64-w64-mingw32-gcc -Os -s -o "$twf_target" "$twf_src" -luser32 2>&1; then
+    echo "  [11/12] Toolwindow fixer built from source."
+    built_ok=true
+  else
+    echo "  [11/12] Warning: source build failed, falling back to pre-built binary."
+  fi
+fi
+
+# Fall back to pre-built binary
+if [[ "$built_ok" != true ]] && [[ -f "$twf_prebuilt" ]]; then
+  cp "$twf_prebuilt" "$twf_target"
+  echo "  [11/12] Toolwindow fixer installed (pre-built binary)."
+  built_ok=true
+fi
+
+if [[ "$built_ok" != true ]]; then
+  echo "  [11/12] Warning: toolwindow fixer not found — skipping."
 fi
 
 echo "  [11/12] Done."
