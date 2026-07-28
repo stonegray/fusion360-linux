@@ -543,6 +543,17 @@ apply_launch_environment() {
   if is_enabled "$FUSION_WEBVIEW_NO_SANDBOX"; then
     webview_arguments+=("--no-sandbox")
   fi
+  if ! is_enabled "$FUSION_WEBVIEW_DISABLE_GPU"; then
+    # GPU acceleration flags for WebView2 — without these, the Edge
+    # renderer may fall back to software rasterization under Wine,
+    # causing slow UI panel rendering.  --use-angle=d3d11 forces the
+    # D3D11 backend through ANGLE, which DXVK then translates to
+    # Vulkan (same fast path as the 3D viewport).
+    webview_arguments+=("--ignore-gpu-blocklist")
+    webview_arguments+=("--enable-gpu-rasterization")
+    webview_arguments+=("--enable-zero-copy")
+    webview_arguments+=("--use-angle=d3d11")
+  fi
   if is_enabled "$FUSION_WEBVIEW_DISABLE_GPU"; then
     webview_arguments+=("--disable-gpu")
     webview_arguments+=("--disable-features=VizDisplayCompositor")
