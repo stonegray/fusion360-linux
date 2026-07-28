@@ -306,6 +306,7 @@ apply_fusion_wine_dpi() {
   local win8_dpi_scaling
 
   dpi_value="$(resolve_fusion_wine_dpi)"
+  [[ "$dpi_value" =~ ^[0-9]+$ ]] || { echo "warning: invalid DPI value '$dpi_value'" >&2; return 1; }
   [[ "$dpi_value" -eq 96 ]] && win8_dpi_scaling=0 || win8_dpi_scaling=1
 
   local user_reg="$STEAM_COMPAT_DATA_PATH/pfx/user.reg"
@@ -318,16 +319,14 @@ apply_fusion_wine_dpi() {
 
   # Write LogPixels under [Software\\Wine\\Fonts]
   if grep -q '^\[Software\\\\Wine\\\\Fonts\]' "$user_reg" 2>/dev/null; then
-    sed -i '/^\[Software\\\\Wine\\\\Fonts\]/,/^\[/{/^"LogPixels"/d}' "$user_reg"
-    sed -i '/^\[Software\\\\Wine\\\\Fonts\]/a\'$'\n'"\"LogPixels\"=$dpi_hex" "$user_reg"
+    sed -i -e '/^"LogPixels"/d' -e '/^\[Software\\\\Wine\\\\Fonts\]/a "LogPixels"='"$dpi_hex" "$user_reg" || { echo "warning: failed to write DPI registry" >&2; return 1; }
   else
     echo -e "\n[Software\\\\Wine\\\\Fonts]\n#time=1dd1c05750735e4\n\"LogPixels\"=$dpi_hex" >> "$user_reg"
   fi
 
   # Write LogPixels and Win8DpiScaling under [Control Panel\\Desktop]
   if grep -q '^\[Control\\\\ Panel\\\\Desktop\]' "$user_reg" 2>/dev/null; then
-    sed -i '/^\[Control\\\\ Panel\\\\Desktop\]/,/^\[/{/^"LogPixels"/d;/^"Win8DpiScaling"/d}' "$user_reg"
-    sed -i '/^\[Control\\\\ Panel\\\\Desktop\]/a\'$'\n'"\"LogPixels\"=$dpi_hex\n\"Win8DpiScaling\"=$win8_hex" "$user_reg"
+    sed -i -e '/^"LogPixels"/d' -e '/^"Win8DpiScaling"/d' -e '/^\[Control\\\\ Panel\\\\Desktop\]/a "LogPixels"='"$dpi_hex"'\n"Win8DpiScaling"='"$win8_hex" "$user_reg" || { echo "warning: failed to write DPI registry" >&2; return 1; }
   else
     echo -e "\n[Control\\\\ Panel\\\\Desktop]\n\"LogPixels\"=$dpi_hex\n\"Win8DpiScaling\"=$win8_hex" >> "$user_reg"
   fi
@@ -344,7 +343,7 @@ apply_fusion_wine_dpi() {
     echo "cinnamon_scaling_factor=$(read_gsettings_number org.cinnamon.desktop.interface scaling-factor || true)"
     echo "cinnamon_text_scaling_factor=$(read_gsettings_number org.cinnamon.desktop.interface text-scaling-factor || true)"
     echo "kde_forced_dpi=$(read_kde_forced_dpi || true)"
-  } > "$FUSION_DPI_LOG_FILE"
+  } >> "$FUSION_DPI_LOG_FILE"
 }
 
 install_callback_protocol_handlers() {
@@ -377,8 +376,9 @@ register_wine_browser_bridge() {
   local user_reg="$STEAM_COMPAT_DATA_PATH/pfx/user.reg"
   [[ -f "$user_reg" ]] || return 0
 
-  # Check if already set
-  grep -q '^\[Software\\\\Wine\\\\WineBrowser\]' "$user_reg" 2>/dev/null && return 0
+  # Check if already set with the same value
+  grep -q '^\[Software\\\\Wine\\\\WineBrowser\]' "$user_reg" 2>/dev/null || return 0
+  grep -qF "\"Browsers\"=\"$BROWSER\"" "$user_reg" 2>/dev/null && return 0
 
   echo -e "\n[Software\\\\Wine\\\\WineBrowser]\n\"Browsers\"=\"$BROWSER\"" >> "$user_reg"
 }
