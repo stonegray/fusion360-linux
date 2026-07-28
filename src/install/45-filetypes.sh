@@ -17,6 +17,23 @@ if command -v update-mime-database &>/dev/null; then
 else
   echo "  [11/12] update-mime-database not found — MIME types installed but not indexed."
 fi
+## Install MIME type icons so file managers show the Fusion icon for .f3d files
+HICOLOR_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ICON_SRC_DIR="$SCRIPT_DIR/data/icons/hicolor"
+if [[ -d "$ICON_SRC_DIR" ]]; then
+  for size_dir in "$ICON_SRC_DIR"/*; do
+    size=$(basename "$size_dir")
+    icon_file="$size_dir/mimetypes/application-vnd.autodesk.fusion360.png"
+    if [[ -f "$icon_file" ]]; then
+      mkdir -p "$HICOLOR_DIR/$size/mimetypes"
+      cp "$icon_file" "$HICOLOR_DIR/$size/mimetypes/"
+    fi
+  done
+  echo "  [11/12] MIME type icons installed."
+else
+  echo "  [11/12] MIME type icons not found at $ICON_SRC_DIR — skipping."
+fi
 
 # Register Fusion 360 as default for its native formats
 if command -v xdg-mime &>/dev/null; then

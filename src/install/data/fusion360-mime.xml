@@ -4,6 +4,7 @@
     <comment>Fusion 360 Archive</comment>
     <glob pattern="*.f3d"/>
     <glob pattern="*.f3z"/>
+    <icon name="application-vnd.autodesk.fusion360"/>
   </mime-type>
   <mime-type type="model/step">
     <comment>STEP 3D Model</comment>
