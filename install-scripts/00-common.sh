@@ -69,3 +69,52 @@ pre_flight() {
     sleep 5
   fi
 }
+
+# ── Install lifecycle management ──────────────────────────────────────
+INSTALLER_PID=""
+
+kill_installer() {
+  local proton
+  proton=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
+
+  # Kill the tracked installer PID if set
+  if [[ -n "${INSTALLER_PID:-}" ]] && kill -0 "$INSTALLER_PID" 2>/dev/null; then
+    echo ""
+    echo "  [lifecycle] Killing installer (PID $INSTALLER_PID)..."
+    kill "$INSTALLER_PID" 2>/dev/null || true
+    sleep 1
+    kill -9 "$INSTALLER_PID" 2>/dev/null || true
+  fi
+
+  # Kill any remaining Proton/wine processes for our prefix
+  if [[ -n "$proton" && -d "$PFX_DIR" ]]; then
+    STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
+    STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
+    "$proton" run wineserver -k 2>/dev/null || true
+  fi
+
+  # Kill any FusionClientDownloader processes
+  pkill -f "FusionClientDownloader" 2>/dev/null || true
+}
+
+installer_is_running() {
+  # Check if a Fusion installer is already running through Proton
+  pgrep -f "FusionClientDownloader" 2>/dev/null | grep -q . && return 0
+  # Check if wineserver is running for our prefix
+  [[ -f "$PFX_DIR/pfx/.wineserver.lock" ]] && return 0
+  return 1
+}
+
+setup_traps() {
+  trap_cleanup() {
+    echo ""
+    echo "  [lifecycle] Interrupted. Cleaning up..."
+    kill_installer
+    exit 1
+  }
+  trap trap_cleanup EXIT INT TERM
+}
+
+clear_traps() {
+  trap - EXIT INT TERM
+}

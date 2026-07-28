@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # install.sh — Install Fusion360 on Linux.
 # Thin wrapper over install-scripts/*.sh (numbered steps).
+# Sets up cleanup traps to kill installer on Ctrl+C or unexpected exit.
 #
 # Usage:
 #   ./install.sh                                         # full install
@@ -26,14 +27,12 @@ INSTALLER_PATH_OVERRIDE=""
 
 if [[ "${1:-}" == "--installer-path" ]]; then
   INSTALLER_PATH_OVERRIDE="${2:-}"
-  if [[ -z "$INSTALLER_PATH_OVERRIDE" ]]; then
-    echo "Usage: ./install.sh --installer-path /path/to/FusionClientDownloader.exe"
-    exit 1
-  fi
+  [[ -n "$INSTALLER_PATH_OVERRIDE" ]] || { echo "Usage: ./install.sh --installer-path /path/to/exe"; exit 1; }
   MODE="--run-installer"
 fi
 
 source "$SCRIPT_DIR/install-scripts/00-common.sh"
+setup_traps
 
 run_step() {
   source "$SCRIPT_DIR/install-scripts/$1"
@@ -42,10 +41,12 @@ run_step() {
 case "$MODE" in
   --deps-only)
     run_step 10-deps.sh
+    clear_traps
     exit 0
     ;;
   --ge-proton-only)
     run_step 20-ge-proton.sh
+    clear_traps
     exit 0
     ;;
   --prefix-only)
@@ -53,10 +54,12 @@ case "$MODE" in
     run_step 10-deps.sh
     run_step 20-ge-proton.sh
     run_step 30-prefix.sh
+    clear_traps
     exit 0
     ;;
   --run-installer)
     run_step 40-fusion-installer.sh
+    clear_traps
     exit 0
     ;;
 esac
@@ -91,6 +94,8 @@ echo ""
 echo "── Step 5/5: Fusion Installer ──"
 run_step 40-fusion-installer.sh
 echo ""
+
+clear_traps
 
 echo "╔══════════════════════════════════════════════════════════════╗"
 echo "║     Install complete. Run:  ./launch-fusion.sh              ║"

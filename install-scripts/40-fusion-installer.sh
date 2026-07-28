@@ -5,7 +5,24 @@ if [[ -z "$proton" ]]; then
   exit 1
 fi
 
-# Use --installer-path if provided
+# ── Check for a running installer ─────────────────────────────────────
+if installer_is_running; then
+  echo "  [5/5] A previous Fusion installer appears to be running."
+  echo -n "  [5/5] Kill it and restart? [Y/n] "
+  read -r response
+  case "$response" in
+    n|N|no|No)
+      echo "  [5/5] Aborted."
+      exit 1
+      ;;
+    *)
+      kill_installer
+      sleep 1
+      ;;
+  esac
+fi
+
+# ── Find or download installer ────────────────────────────────────────
 if [[ -n "${INSTALLER_PATH_OVERRIDE:-}" ]]; then
   if [[ -f "$INSTALLER_PATH_OVERRIDE" ]]; then
     INSTALLER_PATH="$INSTALLER_PATH_OVERRIDE"
@@ -15,7 +32,6 @@ if [[ -n "${INSTALLER_PATH_OVERRIDE:-}" ]]; then
   fi
 fi
 
-# Auto-download if not found
 if [[ -z "${INSTALLER_PATH:-}" ]]; then
   mkdir -p "$HOME/Downloads/fusion360-linux-install"
   find_installer || true
@@ -47,6 +63,7 @@ EOF
   fi
 fi
 
+# ── Launch installer in background (track PID for cleanup) ────────────
 echo "  [5/5] Found: $INSTALLER_PATH"
 echo "  [5/5] Launching Fusion installer through Proton..."
 echo "  [5/5] A Windows installer window will appear. Click through it."
@@ -60,8 +77,11 @@ echo ""
 mkdir -p "$PFX_DIR"
 STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
 STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
-"$proton" run "$INSTALLER_PATH"
+"$proton" run "$INSTALLER_PATH" &
+INSTALLER_PID=$!
+wait $INSTALLER_PID || true
 
+# ── Check result ──────────────────────────────────────────────────────
 echo ""
 echo "  [5/5] Installer exited. Checking for Fusion360.exe..."
 fusion_exe=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1 || true)
