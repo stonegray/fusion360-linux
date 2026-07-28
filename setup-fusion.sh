@@ -48,9 +48,11 @@ install_webview2() {
   fi
 
   echo "  webview2: installing (silent)..."
-  STEAM_COMPAT_DATA_PATH="$HOME/.fusion360-proton2" \
-  STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
-  "$GE_PROTON" run "$bootstrap" /silent /install 2>/dev/null || true
+  source "$SCRIPT_DIR/helpers/run_scrollbox.sh"
+  run_scrollbox 8 \
+    "STEAM_COMPAT_DATA_PATH='$HOME/.fusion360-proton2' \
+     STEAM_COMPAT_CLIENT_INSTALL_PATH='$HOME/.local/share/Steam' \
+     '$GE_PROTON' run '$bootstrap' /silent /install 2>&1" || true
 
   if [[ -d "$target" ]]; then
     echo "  webview2: done"
