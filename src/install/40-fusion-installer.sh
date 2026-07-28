@@ -116,13 +116,40 @@ STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
 STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
 "$proton" run "$INSTALLER_PATH" 2>/dev/null || true
 
-# Kill leftover processes
-kill_installer
-sleep 0.5
+# ── Wait for Fusion360.exe to start (installer launches it on finish) ──
+echo ""
+echo "  [installer] Waiting for Fusion360 to start after install..."
+echo "  [installer] (this means the installer completed and Fusion is doing first-run setup)"
+FUSION_PID=""
+for i in $(seq 1 30); do
+  FUSION_PID=$(pgrep -u "$(id -u)" -f "Fusion360\.exe" 2>/dev/null | head -1 || true)
+  if [[ -n "$FUSION_PID" ]]; then
+    echo "  [installer] Fusion360.exe started (PID $FUSION_PID). Letting it initialize..."
+    sleep 5
+    break
+  fi
+  if [[ $i -eq 15 ]]; then
+    echo "  [installer] Still waiting... (installer window may still be open)"
+  fi
+  sleep 10
+done
+
+if [[ -n "$FUSION_PID" ]]; then
+  echo "  [installer] Killing Fusion360 after first-run setup..."
+  source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
+  kill_fusion_processes
+  kill "$FUSION_PID" 2>/dev/null || true
+  sleep 1
+  kill -9 "$FUSION_PID" 2>/dev/null || true
+else
+  echo "  [installer] Fusion360.exe did not start within 5 minutes."
+  echo "  [installer] The installer window may still be open — complete it manually."
+  kill_installer
+fi
 
 # ── Check result ──────────────────────────────────────────────────────
 echo ""
-echo "  [5/5] Installer exited. Checking for Fusion360.exe..."
+echo "  [5/5] Checking for Fusion360.exe..."
 fusion_exe=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1 || true)
 if [[ -n "$fusion_exe" ]]; then
   echo "  [5/5] Fusion360.exe found — install succeeded."
