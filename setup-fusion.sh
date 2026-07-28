@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # setup-fusion.sh — Post-install configuration for Fusion360 on Linux.
 # Re-runnable: fixes whatever is missing. Pass --force to re-do everything.
+# Does not require Fusion360.exe to be installed yet — skips icon extraction if absent.
 set -euo pipefail
 
-# ── Root guard ─────────────────────────────────────────────────────────
 if [[ $EUID -eq 0 ]]; then
   echo "ERROR: Do not run setup-fusion.sh as root. Run as a normal user." >&2
   exit 1
@@ -11,7 +11,6 @@ fi
 
 FORCE="${1:-}"
 
-# ── Auto-detect paths ────────────────────────────────────────────────
 GE_PROTON=$(find "$HOME/.local/share/Steam/compatibilitytools.d/" -name proton -type f 2>/dev/null | head -1 || true)
 FUSION_EXE=$(find "$HOME/.fusion360-proton2" -name Fusion360.exe -type f 2>/dev/null | head -1 || true)
 BROWSER=$(command -v google-chrome chromium-browser chromium firefox 2>/dev/null | head -1 || true)
@@ -22,12 +21,6 @@ CONFIG_FILE="$CONFIG_DIR/config"
 APPLICATIONS_DIR="$HOME/.local/share/applications"
 ICONS_DIR="$HOME/.local/share/icons/hicolor"
 
-# ── Prerequisites ─────────────────────────────────────────────────────
-if [[ -z "$FUSION_EXE" ]]; then
-  echo "ERROR: Fusion360.exe not found. Complete Phase 2 (Fusion installer) first."
-  echo "  Run: ./install.sh"
-  exit 1
-fi
 if [[ -z "$GE_PROTON" ]]; then
   echo "ERROR: GE-Proton not found. Run install.sh first."
   exit 1
@@ -35,7 +28,7 @@ fi
 
 echo "setup: paths detected"
 echo "  proton:   $GE_PROTON"
-echo "  fusion:   $FUSION_EXE"
+echo "  fusion:   ${FUSION_EXE:-not installed yet}"
 echo "  browser:  ${BROWSER:-none}"
 echo ""
 
@@ -74,13 +67,19 @@ write_config() {
   fi
 
   mkdir -p "$CONFIG_DIR"
-  FUSION_ROOT="$(dirname "$(dirname "$FUSION_EXE")")"
+
+  local fusion_root=""
+  if [[ -n "$FUSION_EXE" ]]; then
+    fusion_root="$(dirname "$(dirname "$FUSION_EXE")")"
+  else
+    fusion_root="$HOME/.fusion360-proton2/pfx/drive_c/users/steamuser/AppData/Local/Autodesk/webdeploy/production"
+  fi
 
   cat > "$CONFIG_FILE" <<EOF
 PROTON=$GE_PROTON
 STEAM_COMPAT_DATA_PATH=$HOME/.fusion360-proton2
 STEAM_COMPAT_CLIENT_INSTALL_PATH=$HOME/.local/share/Steam
-FUSION_ROOT=$FUSION_ROOT
+FUSION_ROOT=$fusion_root
 BROWSER=$SCRIPT_DIR/scripts/fusion-browser.sh
 BROWSER_LISTENER=$SCRIPT_DIR/scripts/fusion-browser-listener.sh
 CALLBACK_HANDLER=$SCRIPT_DIR/scripts/fusion-callback-handler.sh
@@ -129,8 +128,13 @@ EOF
   echo "  adsk://:  registered"
 }
 
-# ── Step 4: icons ─────────────────────────────────────────────────────
+# ── Step 4: icons (requires Fusion.exe) ───────────────────────────────
 extract_icons() {
+  if [[ -z "$FUSION_EXE" ]]; then
+    echo "  icons:    skip (Fusion360.exe not installed yet)"
+    return
+  fi
+
   local sizes="16 22 24 32 48 64 72 96 128 192 256 512"
   local missing=0
   for s in $sizes; do
@@ -203,4 +207,5 @@ install_desktop_entry
 refresh_kde_menu
 clean_bridge_temps
 echo ""
-echo "  done. run ./launch-fusion.sh or make run"
+echo "  done. install fusion with:  ./install.sh --run-installer"
+echo "  or launch with:             ./launch-fusion.sh"
