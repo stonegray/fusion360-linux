@@ -146,18 +146,6 @@ done
 
 
 if [[ -n "$FUSION_PID" && $LOG_DONE -eq 1 ]]; then
-  # Apply DPI registry settings before killing first-run Fusion
-  echo "  [installer] Applying DPI registry settings..."
-  if [[ -f "$PFX_DIR/pfx/user.reg" ]]; then
-    source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
-    STEAM_COMPAT_DATA_PATH="$PFX_DIR"
-    FUSION_WINE_DPI=144
-    FUSION_WINE_SCALE_PERCENT=auto
-    FUSION_WINE_DPI_FALLBACK=144
-    FUSION_WINE_SCALE_FALLBACK_PERCENT=150
-    FUSION_DPI_LOG_FILE="/tmp/fusion360-dpi.log"
-    apply_fusion_wine_dpi
-  fi
   echo "  [installer] Killing Fusion360 after first-run setup..."
   source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
   kill_fusion_processes
