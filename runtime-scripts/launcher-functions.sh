@@ -208,6 +208,16 @@ resolve_fusion_wine_dpi() {
     fi
   fi
 
+  # Xft.dpi from xrdb (set by KDE font DPI, GNOME, or .Xresources)
+  if command -v xrdb &>/dev/null; then
+    local xft_dpi
+    xft_dpi=$(xrdb -query 2>/dev/null | grep '^Xft\.dpi:' | awk '{print $2}' || true)
+    if [[ -n "$xft_dpi" ]] && [[ "$xft_dpi" =~ ^[0-9]+$ ]] && [[ "$xft_dpi" -gt 0 ]]; then
+      printf "%s" "$xft_dpi"
+      return 0
+    fi
+  fi
+
   if printf "%s\n" "$FUSION_WINE_SCALE_FALLBACK_PERCENT" | grep -Eq '^[0-9]+$'; then
     percent_to_dpi "$FUSION_WINE_SCALE_FALLBACK_PERCENT"
     return 0
