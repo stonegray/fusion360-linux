@@ -106,6 +106,13 @@ static void fix_window(HWND hwnd)
     LONG_PTR ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
     LONG_PTR new_ex = ex | WS_EX_APPWINDOW;
 
+    /* Save current position — the WM may reposition the window when it
+     * transitions from override-redirect (unmanaged) to managed.  On
+     * HiDPI displays the WM may misplace the window so we restore the
+     * original coordinates afterward.                                        */
+    RECT pos;
+    GetWindowRect(hwnd, &pos);
+
     SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex);
 
     /* Force Wine to re-evaluate the managed state via WindowPosChanging. */
@@ -113,12 +120,18 @@ static void fix_window(HWND hwnd)
                  SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER |
                  SWP_NOACTIVATE | SWP_FRAMECHANGED);
 
+    /* Restore original position — the WM may have moved it during
+     * the unmanaged → managed transition (especially on HiDPI).        */
+    SetWindowPos(hwnd, NULL, pos.left, pos.top, 0, 0,
+                 SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+
     {
         WCHAR buf[256];
         int len = GetWindowTextW(hwnd, buf, sizeof(buf)/sizeof(buf[0]));
         if (len > 0) buf[len] = 0;
-        log_msg(L"  fixed: hwnd=%p ex=0x%lx title=\"%s\"\n",
-                (void*)hwnd, (unsigned long)new_ex, buf);
+        log_msg(L"  fixed: hwnd=%p ex=0x%lx pos=(%d,%d) title=\"%s\"\n",
+                (void*)hwnd, (unsigned long)new_ex,
+                pos.left, pos.top, buf);
     }
 }
 
