@@ -107,8 +107,24 @@ echo "  [5/5] Installer exited. Checking for Fusion360.exe..."
 fusion_exe=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1 || true)
 if [[ -n "$fusion_exe" ]]; then
   echo "  [5/5] Fusion360.exe found — install succeeded."
+  echo "  [5/5] Installing desktop entry..."
+  local apps="$HOME/.local/share/applications"
+  mkdir -p "$apps"
+  cat > "$apps/autodesk-fusion360.desktop" <<EOF
+[Desktop Entry]
+Name=Autodesk Fusion 360
+Comment=Fusion 360 CAD/CAM/CAE tool
+Exec=$SCRIPT_DIR/launch-fusion.sh
+Type=Application
+Categories=Graphics;Science;Engineering;
+StartupNotify=true
+StartupWMClass=fusion360.exe
+EOF
+  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$apps" 2>/dev/null || true
+  command -v kbuildsycoca6 &>/dev/null && kbuildsycoca6 2>/dev/null || true
+  command -v kbuildsycoca5 &>/dev/null && kbuildsycoca5 2>/dev/null || true
+  echo "  [5/5] Desktop entry installed."
 else
-  echo "  [5/5] Fusion360.exe not found yet. The installer may still be running"
-  echo "  [5/5] or it may need to finish downloading components."
+  echo "  [5/5] Fusion360.exe not found yet. Install may still be in progress."
   echo "  [5/5] Run ./setup-fusion.sh once Fusion360.exe exists."
 fi

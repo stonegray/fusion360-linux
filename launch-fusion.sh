@@ -7,6 +7,14 @@ if [[ $EUID -eq 0 ]]; then
   exit 1
 fi
 
+# ── Quick health check ────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -x "$SCRIPT_DIR/runtime-scripts/health-check.sh" ]]; then
+  if ! "$SCRIPT_DIR/runtime-scripts/health-check.sh" &>/dev/null; then
+    echo "launch-fusion.sh warning: health check failed. Run ./setup-fusion.sh to fix." >&2
+  fi
+fi
+
 fail() {
   echo "launch-fusion.sh failed: $*" >&2
   exit 1

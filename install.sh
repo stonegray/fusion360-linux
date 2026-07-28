@@ -83,20 +83,19 @@ echo ""
 echo "── Step 2/5: GE-Proton ──"
 run_step 20-ge-proton.sh
 echo ""
-
-echo "── Step 3/5: Proton prefix + winetricks ──"
-run_step 30-prefix.sh
+echo "── Step 4/7: WebView2 ──"
+run_step 35-webview2.sh
 echo ""
 
-echo "── Step 4/5: Configuration (WebView2, handlers, desktop) ──"
-if [[ -f "$SCRIPT_DIR/setup-fusion.sh" ]]; then
-  "$SCRIPT_DIR/setup-fusion.sh"
-else
-  echo "  [4/5] setup-fusion.sh not found"
-fi
+echo "── Step 5/7: Config ──"
+run_step 37-config.sh
 echo ""
 
-echo "── Step 5/5: Fusion Installer ──"
+echo "── Step 6/7: Protocol handlers ──"
+"$SCRIPT_DIR/runtime-scripts/register-protocols.sh"
+echo ""
+
+echo "── Step 7/7: Fusion Installer ──"
 run_step 40-fusion-installer.sh
 echo ""
 
