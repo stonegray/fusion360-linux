@@ -98,16 +98,29 @@ static BOOL needs_fix(HWND hwnd)
     LONG style = GetWindowLongPtrW(hwnd, GWL_STYLE);
     LONG_PTR ex  = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
 
-    /* Only popup windows — WS_POPUP triggers Wine X11's override-redirect
-     * behaviour.  WS_OVERLAPPED / WS_CHILD windows are always managed.   */
+    /* WS_POPUP is what triggers Wine X11's override-redirect behaviour.   */
     if (!(style & WS_POPUP)) return FALSE;
 
-    /* Must have an owner (i.e. a parent window that owns this popup).
-     * Independent tooltop-level popups (splash, dialogs) should stay as-is. */
+    /* Must have an owner — owned popups are child panels / toolwindows.   */
     if (!GetWindow(hwnd, GW_OWNER)) return FALSE;
 
     /* Already done — skip so we don't keep calling SetWindowLong.      */
     if (ex & WS_EX_APPWINDOW) return FALSE;
+
+    /* ── Accept if it's a recognized "panel" style ──────────────────
+     * Toolwindow style (WS_EX_TOOLWINDOW) — the original fix target.
+     * Also catch plain popups that are NOT dialogs: no caption bar,
+     * no dialog frame, no modal frame.  This picks up docked panels
+     * Fusion creates as bare WS_POPUP without WS_EX_TOOLWINDOW.      */
+    if (!(ex & WS_EX_TOOLWINDOW))
+    {
+        /* Dialog exclusion — windows with a frame or caption are managed
+         * by Wine X11 already.  Fixing them would break file dialogs.  */
+        if (style & (WS_CAPTION | WS_DLGFRAME))   return FALSE;
+        if (ex   & WS_EX_DLGMODALFRAME)            return FALSE;
+        /* Exclude windows with a visible menu bar — these are real apps. */
+        if (style & WS_SYSMENU)                    return FALSE;
+    }
 
     /* Skip invisible windows — hidden helper windows promoted to        */
     /* managed would create phantom white boxes.                          */

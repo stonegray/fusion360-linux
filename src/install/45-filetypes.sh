@@ -167,13 +167,14 @@ local user_reg="$PFX_DIR/pfx/user.reg"
 if [[ -f "$user_reg" ]] && ! grep -q '^"Personal"="Z:' "$user_reg" 2>/dev/null; then
   # Remove any existing Personal/Desktop/Downloads entries
   sed -i '/^"Personal"=/d; /^"Desktop"=/d; /^"Downloads"=/d' "$user_reg" 2>/dev/null || true
-  # Append correct entries — use short pattern match because full
-  # Windows path escaping is unreliable across sed versions
+  # Append correct entries.
+  # Wine Z: paths use forward slashes for Unix paths (e.g. Z:/home/user/Documents).
+  # Forward slashes don't need INI escaping in .reg files — just write them directly.
   sed -i \
     -e '/User Shell Folders\]/a ""' \
-    -e '/User Shell Folders\]/a "Personal"="Z:\\'"$HOME"'\\Documents"' \
-    -e '/User Shell Folders\]/a "Desktop"="Z:\\'"$HOME"'\\Desktop"' \
-    -e '/User Shell Folders\]/a "Downloads"="Z:\\'"$HOME"'\\Downloads"' \
+    -e '/User Shell Folders\]/a "Personal"="Z:'"$HOME"'/Documents"' \
+    -e '/User Shell Folders\]/a "Desktop"="Z:'"$HOME"'/Desktop"' \
+    -e '/User Shell Folders\]/a "Downloads"="Z:'"$HOME"'/Downloads"' \
     "$user_reg" 2>/dev/null || true
   log_info " Wine shell folders set to $HOME/Documents, $HOME/Desktop, $HOME/Downloads."
 fi
