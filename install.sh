@@ -25,7 +25,7 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   echo "ERROR: Another install is already running (lock at $LOCK_DIR)." >&2
   exit 1
 fi
-trap 'rm -rf "$LOCK_DIR"' EXIT
+trap 'rm -rf "$LOCK_DIR"' EXIT INT TERM INT TERM
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODE="${1:-}"
