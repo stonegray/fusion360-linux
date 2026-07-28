@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Research: Cryinkfly Autodesk-Fusion-360-on-Linux</title>
+<style>
+body { font-family: system-ui, sans-serif; max-width: 960px; margin: 2em auto; padding: 0 1em; line-height: 1.6; color: #1a1a1a; }
+h1 { border-bottom: 2px solid #ddd; padding-bottom: .3em; }
+h2 { margin-top: 1.5em; border-bottom: 1px solid #eee; padding-bottom: .2em; }
+h3 { margin-top: 1.2em; }
+.good { border-left: 4px solid #2da44e; padding: .5em 1em; background: #e8f5e9; margin: .5em 0; }
+.bad { border-left: 4px solid #da3633; padding: .5em 1em; background: #fdecea; margin: .5em 0; }
+.neutral { border-left: 4px solid #d4920b; padding: .5em 1em; background: #fff8e1; margin: .5em 0; }
+pre { background: #f6f8fa; padding: .8em; border-radius: 6px; overflow-x: auto; font-size: .9em; }
+code { background: #f6f8fa; padding: .15em .3em; border-radius: 3px; font-size: .9em; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+th, td { border: 1px solid #ddd; padding: .5em; text-align: left; }
+th { background: #f6f8fa; }
+</style>
+</head>
+<body>
+
+<h1>Research: Cryinkfly vs Fusion360 Linux — Comparative Analysis</h1>
+<p><strong>Source:</strong> <a href="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux">codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux</a></p>
+<p><strong>Date:</strong> 2026-07-28</p>
+<p><strong>Note:</strong> Cryinkfly's core is a single ~1880-line monolithic bash script (<code>files/setup/autodesk_fusion_installer_x86-64.sh</code>) plus supporting launcher/desktop scripts. Our repo is modular with separate install steps, runtime functions, doctor, and a Python config UI. This review compares approaches and identifies actionable items.</p>
+
+<h2>Architecture Comparison</h2>
+
+<table>
+<tr><th>Aspect</th><th>Them (Cryinkfly)</th><th>Us (F360 Linux)</th><th>Verdict</th></tr>
+<tr><td>Structure</td><td>Monolithic 1880-line installer</td><td>Modular: src/install/{10..40}-*.sh</td><td>We win</td></tr>
+<tr><td>Config</td><td>No formal config file; hardcoded paths</td><td>XDG-compliant config file + Python UI</td><td>We win</td></tr>
+<tr><td>DPI</td><td>Single-mode: gsettings or winecfg</td><td>KDE/Cinnamon/GNOME/xrdb multi-source</td><td>We win</td></tr>
+<tr><td>Distro coverage</td><td>18+ distros</td><td>7 distros</td><td>They win</td></tr>
+<tr><td>Process killing</td><td><code>wineserver -k</code> only</td><td>pgrep + /proc/PID/exe + TERM→KILL</td><td>We win</td></tr>
+<tr><td>Prefix setup</td><td>extensive winetricks + registry tweaks</td><td>minimal (vcrun2022 only)</td><td>They win</td></tr>
+<tr><td>Multi-install</td><td>Numbered dirs + installs.log</td><td>Single install only</td><td>They win</td></tr>
+</table>
+
+<h2>Notable Findings</h2>
+
+<h3>Patterns We Should Adopt</h3>
+
+<div class="good">
+<strong>1. Broader distro coverage (Cryinkfly ~18+ vs our 7)</strong>
+<p>Cryinkfly covers Alpine, CentOS, Clear Linux, Deepin, Devuan, EL, Gentoo, Mageia, NixOS, OpenMandriva, RHEL, Rocky, Slackware, Solus, Tumbleweed, Void, and more. Many use identical package names (icoutils, zenity, cabextract, etc.). Could add detection for these with minimal effort since our <code>distro/*.txt</code> pattern makes adding new distros trivial.</p>
+</div>
+
+<div class="good">
+<strong>2. More comprehensive wine prefix initialization</strong>
+<p>Cryinkfly's prefix setup (lines ~1680-1820) includes more winetricks verbs:</p>
+<ul>
+  <li><code>sandbox</code>, <code>corefonts</code>, <code>cjkfonts</code>, <code>dotnet20</code>, <code>dotnet48</code>, <code>vcrun2022</code></li>
+  <li><code>atmlib</code>, <code>gdiplus</code>, <code>msxml4</code>, <code>msxml6</code>, <code>fontsmooth=rgb</code>, <code>winhttp</code></li>
+  <li>Registry tweaks: Windows 11 version, disabled <code>adpclientservice.exe</code> tracking</li>
+  <li>Symlinks <code>DeviceSettingsProvider.dll</code> → <code>fabricapplication.dll</code> (workaround for Fusion crash)</li>
+</ul>
+<p><strong>Recommendation:</strong> Add <code>atmlib gdiplus corefonts winhttp fontsmooth=rgb</code> to our winetricks invocation, and the <code>DeviceSettingsProvider.dll</code> symlink.</p>
+</div>
+
+<div class="good">
+<strong>3. GPU / VRAM / RAM pre-flight checks</strong>
+<p>Cryinkfly (lines ~730-850) checks GPU driver vendor, deduces correct Vulkan ICD, and skips DXVK on NVIDIA. They also check available RAM/disk before installing.</p>
+<p><strong>Recommendation:</strong> Add GPU detection to our <code>doctor</code> module. We already check disk space in <code>pre_flight()</code> — keep that.</p>
+</div>
+
+<div class="good">
+<strong>4. GNOME "not responding" dialog workaround</strong>
+<p>Cryinkfly sets <code>G_MESSAGES_DEBUG=none</code> and tweaks GNOME's <code>org.gnome.mutter check-alive-timeout</code>. Fusion under Wine often appears hung to GNOME's watchdog.</p>
+<p><strong>Recommendation:</strong> Add environment variable to our <code>apply_launch_environment()</code> in <code>launcher-functions.sh</code>.</p>
+</div>
+
+<div class="good">
+<strong>5. Multi-install tracking</strong>
+<p>Cryinkfly numbers install directories (<code>~/.local/share/applications/wine/Programs/Autodesk/&lt;N&gt;/</code>) and logs each install in <code>installs.log</code>. Their <code>swap_desktop_files.sh</code> cycles between active installs.</p>
+<p><strong>Recommendation:</strong> Consider for future feature, but lower priority than the prefix/driver improvements.</p>
+</div>
+
+<div class="good">
+<strong>6. Online version check in launcher</strong>
+<p>Cryinkfly's <code>autodesk_fusion_launcher.sh</code> fetches <code>build-versions.txt</code> from Autodesk and warns if the local Fusion version is stale. Useful power-user feature.</p>
+</div>
+
+<h3>Anti-patterns / Things to Avoid</h3>
+
+<div class="bad">
+<strong>1. Monolithic script</strong>
+<p>Their single 1880-line file is hard to maintain, review, or parallelize work on. Our modular approach is strictly better.</p>
+</div>
+
+<div class="bad">
+<strong>2. Hardcoded paths</strong>
+<p>Cryinkfly hardcodes <code>$HOME/.wineprefixes/fusion360</code> and other paths throughout the script. Our XDG-based <code>00-defaults.sh</code> is more standards-compliant.</p>
+</div>
+
+<div class="bad">
+<strong>3. Silent winetricks failures</strong>
+<p>Cryinkfly runs winetricks with <code>2>/dev/null || true</code>, silently swallowing all errors. Our <code>winetricks -q vcrun2022 2>/dev/null || true</code> is similarly silent — we should at least log warnings.</p>
+</div>
+
+<div class="bad">
+<strong>4. No formal error handling</strong>
+<p>Cryinkfly has almost no <code>set -euo pipefail</code> guards or error handling on critical operations.</p>
+</div>
+
+<h3>Interesting / Neutral Differences</h3>
+
+<div class="neutral">
+<strong>Desktop file management</strong>
+<p>Cryinkfly adds extra <code>StartupWMClass=fusion360.exe</code> and <code>Actions=NewWindow;</code> to desktop entries. Minor polish.</p>
+</div>
+
+<div class="neutral">
+<strong>Wine build management</strong>
+<p>Cryinkfly supports custom Wine builds (TKG, etc.) in addition to Proton. Our current approach is Proton-only which simplifies things significantly — keeping it simple is fine.</p>
+</div>
+
+<div class="neutral">
+<strong>WebView2</strong>
+<p>Cryinkfly doesn't install WebView2 separately (relies on Wine's built-in). Our <code>35-webview2.sh</code> goes further.</p>
+</div>
+
+<h2>Recommendations Ranked</h2>
+
+<ol>
+<li><strong>Expand distro coverage</strong> — Add Alpine, CentOS, Gentoo, Void, NixOS, Slackware, Mageia, OpenMandriva, Clear Linux, Deepin, Devuan to <code>detect_distro()</code> and create <code>distro/*.txt</code> files. Package names are nearly identical.</li>
+<li><strong>Add more winetricks verbs</strong> — <code>atmlib gdiplus corefonts winhttp fontsmooth=rgb</code> before or alongside <code>vcrun2022</code>. Add the <code>DeviceSettingsProvider.dll</code> → <code>fabricapplication.dll</code> symlink workaround.</li>
+<li><strong>Add GPU detection to doctor</strong> — Check <code>glxinfo</code>/<code>vulkaninfo</code> for driver vendor and version. Report issues with missing or outdated drivers.</li>
+<li><strong>Add GNOME watchdog workaround</strong> — Set <code>G_MESSAGES_DEBUG=none</code> in <code>apply_launch_environment()</code>, and optionally try to disable <code>check-alive-timeout</code>.</li>
+<li><strong>Add online version check</strong> — Optional feature for the launcher: check Autodesk's build-versions.txt and warn if outdated.</li>
+<li><strong>Upgrade silent <code>|| true</code> to warnings</strong> — Replace <code>winetricks -q ... 2>/dev/null || true</code> with <code>|| echo "Warning: ..."</code> so failures are visible.</li>
+</ol>
+
+</body>
+</html>
