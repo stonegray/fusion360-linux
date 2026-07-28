@@ -5,10 +5,33 @@ if [[ -z "$proton" ]]; then
   exit 1
 fi
 
-# ── Kill any leftover processes from a previous run ────────────────────
-echo "  [5/5] Cleaning up any leftover processes..."
-kill_installer
-sleep 1
+# ── Check for leftover processes, prompt to kill ──────────────────────
+user_id=$(id -u)
+if pgrep -u "$user_id" -f "wineserver\|/wine\|proton\|FusionClientDownloader\|Fusion360" &>/dev/null; then
+  echo "  [5/5] Wine/Proton processes from a previous run detected."
+  echo -n "  [5/5] Kill them? [Y/n] "
+  read -r response
+  case "$response" in
+    n|N|no|No)
+      echo "  [5/5] Aborted."
+      exit 1
+      ;;
+  esac
+  kill_installer
+  # Wait until all processes are confirmed dead
+  echo "  [5/5] Waiting for processes to exit..."
+  for ((i=0; i<30; i++)); do
+    if ! pgrep -u "$user_id" -f "wineserver\|/wine\|proton\|FusionClientDownloader\|Fusion360" &>/dev/null; then
+      echo "  [5/5] Done."
+      break
+    fi
+    sleep 1
+  done
+  # Final check — if still running, warn but continue
+  if pgrep -u "$user_id" -f "wineserver\|/wine\|proton\|FusionClientDownloader\|Fusion360" &>/dev/null; then
+    echo "  [5/5] Warning: some processes did not exit (continuing anyway)."
+  fi
+fi
 
 # ── Find or download installer ────────────────────────────────────────
 if [[ -n "${INSTALLER_PATH_OVERRIDE:-}" ]]; then
