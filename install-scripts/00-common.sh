@@ -86,11 +86,11 @@ kill_installer() {
   # Nuclear: kill ALL wine/proton/Fusion processes for this user
   # Safe because the prefix is dedicated — nothing else uses it
   local user; user=$(id -u)
-  pkill -9 -u "$user" -f "wineserver" 2>/dev/null || true
-  pkill -9 -u "$user" -f "/wine" 2>/dev/null || true
-  pkill -9 -u "$user" -f "proton" 2>/dev/null || true
-  pkill -9 -u "$user" -f "FusionClientDownloader" 2>/dev/null || true
-  pkill -9 -u "$user" -f "Fusion360\|AdskIdentity\|steam.exe" 2>/dev/null || true
+  for pattern in wineserver wine proton xalia \
+    Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
+    steam.exe node.exe fusion-gray-overlay; do
+    pkill -9 -u "$user" -f "$pattern" 2>/dev/null || true
+  done
 
   # Remove wineserver lock so next start is clean
   rm -f "$PFX_DIR/pfx/.wineserver.lock" 2>/dev/null || true
