@@ -17,7 +17,7 @@ run_scrollbox() {
 
     local -a buf=()
     local cols; cols=$(tput cols 2>/dev/null || echo 80)
-    local clean=0
+    local prev_lines=0  # lines printed in previous iteration
 
     while IFS= read -r line; do
         # Truncate
@@ -26,25 +26,25 @@ run_scrollbox() {
         buf+=("$line")
         buf=("${buf[@]: -$height}")
 
-        # Move cursor to start of output, overwrite with current buffer
-        # From below the box, go up by (buffer_size - 1) lines to reach first line
-        if (( ${#buf[@]} > 1 )); then
-            printf '\033[%dA\r' "$((${#buf[@]} - 1))"
+        # Move cursor up by number of lines from previous iteration
+        if (( prev_lines > 0 )); then
+            printf '\033[%dA\r' "$prev_lines"
         fi
+
+        # Print current buffer
         for l in "${buf[@]}"; do
             printf '\033[K%s\n' "$l"
         done
-        clean=${#buf[@]}
+        prev_lines=${#buf[@]}
 
         # Completion pattern
         if [[ -n "$until_pat" ]] && grep -q "$until_pat" <<< "$line"; then
             sleep 0.5
-            # Go to top of box, clear to bottom
-            printf '\033[%dA\033[J' "$clean"
+            printf '\033[%dA\033[J' "$prev_lines"
             return
         fi
     done
 
     # Remove the box from display
-    printf '\033[%dA\033[J' "$clean"
+    printf '\033[%dA\033[J' "$prev_lines"
 }
