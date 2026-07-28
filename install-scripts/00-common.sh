@@ -77,7 +77,7 @@ kill_installer() {
   local proton
   proton=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
 
-  # Kill the tracked installer PID if set
+  # Kill tracked installer PID
   if [[ -n "${INSTALLER_PID:-}" ]] && kill -0 "$INSTALLER_PID" 2>/dev/null; then
     echo ""
     echo "  [lifecycle] Killing installer (PID $INSTALLER_PID)..."
@@ -86,15 +86,19 @@ kill_installer() {
     kill -9 "$INSTALLER_PID" 2>/dev/null || true
   fi
 
-  # Kill any remaining Proton/wine processes for our prefix
+  # Kill wineserver directly by name (works even if GE-Proton is removed)
+  pkill -f wineserver 2>/dev/null || true
+
+  # Kill Fusion installer processes
+  pkill -f "FusionClientDownloader" 2>/dev/null || true
+  pkill -f "proton.*run.*Fusion" 2>/dev/null || true
+
+  # Also try through Proton if available (cleaner shutdown)
   if [[ -n "$proton" && -d "$PFX_DIR" ]]; then
     STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
     STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
     "$proton" run wineserver -k 2>/dev/null || true
   fi
-
-  # Kill any FusionClientDownloader processes
-  pkill -f "FusionClientDownloader" 2>/dev/null || true
 }
 
 installer_is_running() {

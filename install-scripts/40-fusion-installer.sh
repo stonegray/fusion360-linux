@@ -5,22 +5,10 @@ if [[ -z "$proton" ]]; then
   exit 1
 fi
 
-# ── Check for a running installer ─────────────────────────────────────
-if installer_is_running; then
-  echo "  [5/5] A previous Fusion installer appears to be running."
-  echo -n "  [5/5] Kill it and restart? [Y/n] "
-  read -r response
-  case "$response" in
-    n|N|no|No)
-      echo "  [5/5] Aborted."
-      exit 1
-      ;;
-    *)
-      kill_installer
-      sleep 1
-      ;;
-  esac
-fi
+# ── Kill any leftover processes from a previous run ────────────────────
+echo "  [5/5] Cleaning up any leftover processes..."
+kill_installer
+sleep 1
 
 # ── Find or download installer ────────────────────────────────────────
 if [[ -n "${INSTALLER_PATH_OVERRIDE:-}" ]]; then
