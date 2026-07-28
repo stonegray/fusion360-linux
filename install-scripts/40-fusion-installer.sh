@@ -75,11 +75,11 @@ echo "  └───────────────────────
 echo ""
 
 mkdir -p "$PFX_DIR"
-STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
-STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
-"$proton" run "$INSTALLER_PATH" &
-INSTALLER_PID=$!
-wait $INSTALLER_PID || true
+source "$SCRIPT_DIR/helpers/run_scrollbox.sh"
+run_scrollbox --pid INSTALLER_PID 10 \
+  "STEAM_COMPAT_DATA_PATH='$PFX_DIR' \
+   STEAM_COMPAT_CLIENT_INSTALL_PATH='$HOME/.local/share/Steam' \
+   '$proton' run '$INSTALLER_PATH' 2>&1" || true
 
 # ── Check result ──────────────────────────────────────────────────────
 echo ""
