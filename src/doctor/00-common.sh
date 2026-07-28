@@ -15,15 +15,19 @@ parse_args() {
   case "$SAVE" in
     --save)
       REPORT_FILE="/tmp/fusion360-doctor-$(date +%Y%m%d-%H%M%S).txt"
-      exec > >(tee "$REPORT_FILE") 2>&1
+      exec > >(tee "$REPORT_FILE") 2>&1 || exec > "$REPORT_FILE" 2>&1
       ;;
     --quick)
       QUICK=true
       ;;
+    *)
+      echo "Unknown option: $SAVE"
+      echo "Usage: doctor.sh [--save] [--quick]"
+      exit 1
+      ;;
   esac
 }
 
-emit()     { echo -e "$*"; }
 header()   { echo ""; echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; echo "  $*"; echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; }
 pass()     { echo "  [PASS] $*"; ((SECTION_PASS++)); }
 fail()     { echo "  [FAIL] $*"; ((SECTION_FAIL++)); RECOMMENDATIONS+=("$*"); }
