@@ -21,6 +21,17 @@ fi
 # Extracts Fusion's icon from the Wine prefix and installs it at
 # standard sizes in the hicolor theme so file managers show a
 # Fusion icon for .f3d files instead of a generic one.
+_resize_icon() {
+  local src="$1" dst="$2" size="$3"
+  if command -v convert &>/dev/null; then
+    convert "$src" -resize "${size}x${size}" "$dst" 2>/dev/null && return 0
+  fi
+  if command -v ffmpeg &>/dev/null; then
+    ffmpeg -y -i "$src" -vf "scale=${size}:${size}:flags=lanczos" "$dst" 2>/dev/null && return 0
+  fi
+  return 1
+}
+
 _install_fusion_mime_icon() {
   local sizes="16 22 24 32 48 64 128 256"
   local hicolor="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"
@@ -62,7 +73,7 @@ _install_fusion_mime_icon() {
   for s in $sizes; do
     d="$hicolor/${s}x${s}/mimetypes"
     mkdir -p "$d"
-    convert "$master" -resize "${s}x${s}" "$d/application-vnd.autodesk.fusion360.png" 2>/dev/null || true
+    _resize_icon "$master" "$d/application-vnd.autodesk.fusion360.png" "$s" || true
   done
 
   # Ensure hicolor index.theme lists our mimetypes directories
@@ -94,6 +105,16 @@ _install_fusion_mime_icon() {
   elif command -v kbuildsycoca5 &>/dev/null; then
     kbuildsycoca5 --noincremental 2>/dev/null || true
   fi
+
+  # Also install App icon so the desktop entry (`Icon=fusion360`) resolves
+  for s in $sizes; do
+    local src_icon="$hicolor/${s}x${s}/mimetypes/application-vnd.autodesk.fusion360.png"
+    local dst_icon="$hicolor/${s}x${s}/apps/fusion360.png"
+    if [[ -f "$src_icon" ]] && [[ ! -f "$dst_icon" ]]; then
+      mkdir -p "$(dirname "$dst_icon")"
+      cp "$src_icon" "$dst_icon"
+    fi
+  done
 
   rm -f "$icondir"/*.ico 2>/dev/null || true
   log_info " Fusion 360 MIME icons installed."
@@ -163,21 +184,21 @@ fi
 # ── Set Wine shell folders to real Linux home directories ────────
 # Makes Fusion's file open/save dialog open the user's real Documents
 # and Desktop folders instead of the Wine prefix's virtual C: drive.
-# TEMPORARILY DISABLED — the Z: path entries break Fusion's native file
-# dialog under Wine.  Re-enable when we have a tested approach that
-# doesn't corrupt the open/save dialog.
-#
-#local user_reg="$PFX_DIR/pfx/user.reg"
-#if [[ -f "$user_reg" ]] && ! grep -q '^"Personal"="Z:' "$user_reg" 2>/dev/null; then
-#  sed -i '/^"Personal"=/d; /^"Desktop"=/d; /^"Downloads"=/d' "$user_reg" 2>/dev/null || true
-#  sed -i \
-#    -e '/User Shell Folders\]/a ""' \
-#    -e '/User Shell Folders\]/a "Personal"="Z:'"$HOME"'/Documents"' \
-#    -e '/User Shell Folders\]/a "Desktop"="Z:'"$HOME"'/Desktop"' \
-#    -e '/User Shell Folders\]/a "Downloads"="Z:'"$HOME"'/Downloads"' \
-#    "$user_reg" 2>/dev/null || true
-#  log_info " Wine shell folders set to $HOME/Documents, $HOME/Desktop, $HOME/Downloads."
-#fi
+local user_reg="$PFX_DIR/pfx/user.reg"
+if [[ -f "$user_reg" ]] && ! grep -q '^"Personal"="Z:' "$user_reg" 2>/dev/null; then
+  # Remove any existing Personal/Desktop/Downloads entries
+  sed -i '/^"Personal"=/d; /^"Desktop"=/d; /^"Downloads"=/d' "$user_reg" 2>/dev/null || true
+  # Append correct entries.
+  # Wine Z: paths use forward slashes for Unix paths (e.g. Z:/home/user/Documents).
+  # Forward slashes don't need INI escaping in .reg files — write them directly.
+  sed -i \
+    -e '/User Shell Folders\]/a ""' \
+    -e '/User Shell Folders\]/a "Personal"="Z:'"$HOME"'/Documents"' \
+    -e '/User Shell Folders\]/a "Desktop"="Z:'"$HOME"'/Desktop"' \
+    -e '/User Shell Folders\]/a "Downloads"="Z:'"$HOME"'/Downloads"' \
+    "$user_reg" 2>/dev/null || true
+  log_info " Wine shell folders set to $HOME/Documents, $HOME/Desktop, $HOME/Downloads."
+fi
 mkdir -p "$PFX_DIR/pfx/drive_c"
 local twf_src="$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.c"
 local twf_prebuilt="$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.exe"

@@ -6,3 +6,4 @@ wget
 xdg-utils
 desktop-file-utils
 winetricks
+imagemagick

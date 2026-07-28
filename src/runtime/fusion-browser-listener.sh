@@ -117,7 +117,11 @@ open_browser_url() {
     _try_open "xdg-open" "xdg-open" "$url" && { mv "$request_file" "$processed_file"; return 0; }
   fi
 
-  # 3 — kde-open5 (KDE native, bypasses xdg-utils)
+  # 3a — kde-open6 (KDE Plasma 6)
+  if command -v kde-open6 &>/dev/null; then
+    _try_open "kde-open6" "kde-open6" "$url" && { mv "$request_file" "$processed_file"; return 0; }
+  fi
+  # 3b — kde-open5 (KDE Plasma 5, or compat shim)
   if command -v kde-open5 &>/dev/null; then
     _try_open "kde-open5" "kde-open5" "$url" && { mv "$request_file" "$processed_file"; return 0; }
   fi

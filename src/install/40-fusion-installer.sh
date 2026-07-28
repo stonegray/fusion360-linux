@@ -27,7 +27,11 @@ StartupNotify=true
 StartupWMClass=fusion360.exe
 EOF
     update-desktop-database "$F360_APPS_DIR" 2>/dev/null || true
-    kbuildsycoca6 2>/dev/null || kbuildsycoca5 2>/dev/null || true
+    if command -v kbuildsycoca6 &>/dev/null; then
+      kbuildsycoca6 2>/dev/null || true
+    elif command -v kbuildsycoca5 &>/dev/null; then
+      kbuildsycoca5 2>/dev/null || true
+    fi
   fi
   return 0
 fi
