@@ -15,6 +15,15 @@ run_scrollbox() {
     # Not a terminal — pass through
     [[ -t 1 ]] || { cat -; return 0; }
 
+    # Redirect stdout directly to /dev/tty to bypass any shell buffering
+    exec >/dev/tty
+
+    # Hardcode ANSI sequences
+    local SAVE='\0337'
+    local REST='\0338'
+    local CLR='\033[K'
+    local CLRDN='\033[J'
+
     local -a buf=()
     local started=0
 
@@ -23,29 +32,28 @@ run_scrollbox() {
         buf=("${buf[@]: -$height}")
 
         if (( !started )); then
-            echo          # move to a fresh line so box starts below caller's output
-            tput sc
+            printf '\n'          # fresh line for the box
+            printf '%b' "$SAVE"
             started=1
         fi
 
-        # Go to saved position, overwrite each line (clearing it first)
-        tput rc
+        # Restore cursor to saved position, write each line
+        printf '%b' "$REST"
         for l in "${buf[@]}"; do
-            printf '\033[K%s\n' "$l"
+            printf '%b%s\n' "$CLR" "$l"
         done
 
         # Completion pattern
         if [[ -n "$until_pat" ]] && grep -q "$until_pat" <<< "$line"; then
             sleep 0.5
-            tput rc
-            tput ed
+            printf '%b' "$REST"
+            printf '%b' "$CLRDN"
             return 0
         fi
     done
 
-    # Clean up the box area
     if (( started )); then
-        tput rc
-        tput ed
+        printf '%b' "$REST"
+        printf '%b' "$CLRDN"
     fi
 }
