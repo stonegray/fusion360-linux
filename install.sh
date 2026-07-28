@@ -135,7 +135,7 @@ install_ge_proton() {
   echo "  [ge-proton] Done: $COMPAT_DIR/$GE_PROTON_VERSION/proton"
 }
 
-:# ── Step 3: run Fusion installer ──────────────────────────────────────
+# ── Step 3: run Fusion installer ──────────────────────────────────────
 run_fusion_installer() {
   local proton
   proton=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
