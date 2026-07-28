@@ -3,6 +3,13 @@ CONFIG_DIR="$F360_CONFIG_DIR"
 CONFIG_FILE="$F360_CONFIG_FILE"
 
 if [[ -f "$CONFIG_FILE" ]]; then
+  # Check if all fields are present; add missing ones
+  for key in FUSION_STAGING_WRITECOPY FUSION_HEAP_DELAY_FREE; do
+    if ! grep -q "^$key=" "$CONFIG_FILE" 2>/dev/null; then
+      echo "$key=1" >> "$CONFIG_FILE"
+      echo "  [config]  added missing $key"
+    fi
+  done
   echo "  [config]  already present"
 return 0
 fi
