@@ -359,14 +359,14 @@ apply_fusion_wine_dpi() {
 
   # Write LogPixels under [Software\\Wine\\Fonts]
   if grep -q '^\[Software\\\\Wine\\\\Fonts\]' "$user_reg" 2>/dev/null; then
-    sed -i -e '/^"LogPixels"/d' -e '/^\[Software\\\\Wine\\\\Fonts\]/a "LogPixels"='"$dpi_hex" "$user_reg" || { echo "warning: failed to write DPI registry" >&2; return 1; }
+    sed -i -e '/^\[Software\\\\Wine\\\\Fonts\]/,/^\[/{/^"LogPixels"/d;}' -e '/^\[Software\\\\Wine\\\\Fonts\]/a "LogPixels"='"$dpi_hex" "$user_reg" || { echo "warning: failed to write DPI registry" >&2; return 1; }
   else
   printf '\n[Software\\Wine\\Fonts]\n#time=1dd1c05750735e4\n"LogPixels"=%s\n' "$dpi_hex" >> "$user_reg"
   fi
 
   # Write LogPixels and Win8DpiScaling under [Control Panel\\Desktop]
   if grep -q '^\[Control Panel\\\\Desktop\]' "$user_reg" 2>/dev/null; then
-    sed -i -e '/^"LogPixels"/d' -e '/^"Win8DpiScaling"/d' -e '/^\[Control Panel\\\\Desktop\]/a "LogPixels"='"$dpi_hex"'\n"Win8DpiScaling"='"$win8_hex" "$user_reg" || { echo "warning: failed to write DPI registry" >&2; return 1; }
+    sed -i -e '/^\[Control Panel\\\\Desktop\]/,/^\[/{/^"LogPixels"/d;/^"Win8DpiScaling"/d;}' -e '/^\[Control Panel\\\\Desktop\]/a "LogPixels"='"$dpi_hex"'\n"Win8DpiScaling"='"$win8_hex" "$user_reg" || { echo "warning: failed to write DPI registry" >&2; return 1; }
   else
   printf '\n[Control Panel\\\\Desktop]\n"LogPixels"=%s\n"Win8DpiScaling"=%s\n' "$dpi_hex" "$win8_hex" >> "$user_reg"
   fi
