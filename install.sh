@@ -135,12 +135,44 @@ run_fusion_installer() {
     exit 1
   fi
 
+  mkdir -p "$HOME/Downloads/fusion360-linux-install"
+  find_installer || true
+
+  if [[ -z "$INSTALLER_PATH" ]]; then
+    echo "  [installer] Downloading Fusion installer..."
+    wget -O "$HOME/Downloads/fusion360-linux-install/FusionClientDownloader.exe" \
+      "https://dl.appstreaming.autodesk.com/production/installers/Fusion%20Client%20Downloader.exe"
+    find_installer || true
+    if [[ -z "$INSTALLER_PATH" ]]; then
+      echo "  [installer] Download failed. Try manually:"
+      echo "    https://dl.appstreaming.autodesk.com/production/installers/Fusion%20Client%20Downloader.exe"
+      exit 1
+    fi
+  fi
+  local proton
+  proton=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
+  if [[ -z "$proton" ]]; then
+    echo "  [installer] GE-Proton not found. Run install.sh (without flags) first."
+    exit 1
+  fi
+
   find_installer || true
   if [[ -z "$INSTALLER_PATH" ]]; then
-    echo "  [installer] FusionClientDownloader.exe not found in Downloads."
-    echo "  [installer] Download it from https://www.autodesk.com/products/fusion-360/free-trial"
-    echo "  [installer] Save as: $HOME/Downloads/fusion360-linux-install/FusionClientDownloader.exe"
-    echo "  [installer] Then re-run: ./install.sh --run-installer"
+    cat >&2 <<EOF
+
+  ┌─ Fusion installer not found ──────────────────────────────────┐
+  │                                                                │
+  │  1. Go to:  https://www.autodesk.com/products/fusion-360/     │
+  │             personal                                          │
+  │  2. Sign up for a free Autodesk account (or log in)           │
+  │  3. Download the Fusion 360 installer (FusionClientDownloader) │
+  │  4. Save it to:                                                │
+  │       $HOME/Downloads/fusion360-linux-install/                 │
+  │                                                                │
+  │  Then re-run:  ./install.sh --run-installer                    │
+  │                                                                │
+  └────────────────────────────────────────────────────────────────┘
+EOF
     exit 1
   fi
 
