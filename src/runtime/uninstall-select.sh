@@ -14,12 +14,21 @@ comp_sizes=()
 
 add_comp() {
   local name="$1" path="$2"
-  # Handle glob paths — expand with compgen
+  # Handle glob paths — collect ALL matches
   if [[ "$path" == *\** ]]; then
-    local expanded
-    expanded=$(compgen -G "$path" 2>/dev/null | head -1)
-    [[ -z "$expanded" ]] && return 0
-    path="$expanded"
+    local matches=()
+    while IFS= read -r -d '' match; do
+      matches+=("$match")
+    done < <(compgen -G "$path" 2>/dev/null || true)
+    (( ${#matches[@]} == 0 )) && return 0
+    for match in "${matches[@]}"; do
+      local size
+      size=$(du -sh "$match" 2>/dev/null | cut -f1)
+      components+=("$match")
+      comp_names+=("$name")
+      comp_sizes+=("$size")
+    done
+    return 0
   fi
   if [[ -e "$path" ]]; then
     local size
@@ -63,8 +72,8 @@ for ((i=0; i<${#components[@]}; i++)); do
   printf "  [%d] %-45s %s\n" "$((i+1))" "${comp_names[i]}" "${comp_sizes[i]}"
 done
 echo ""
-echo -n "  Enter numbers to remove (space-separated, or 'all'): "
-read -r selection
+printf '%s' "  Enter numbers to remove (space-separated, or 'all'): "
+read -r -t 120 selection
 
 # ── Parse selection ────────────────────────────────────────────────
 selected=()
@@ -75,6 +84,7 @@ if [[ "$selection" == "all" ]]; then
 else
   set -f
   for num in $selection; do
+    [[ "$num" =~ ^[0-9]+$ ]] || continue
     idx=$((num - 1))
     if (( idx >= 0 && idx < ${#components[@]} )); then
       selected+=("$idx")
@@ -95,8 +105,8 @@ for idx in "${selected[@]}"; do
   echo "    - ${comp_names[idx]} (${comp_sizes[idx]})"
 done
 echo ""
-echo -n "  Proceed? [y/N] "
-read -r confirm
+printf '%s' "  Proceed? [y/N] "
+read -r -t 120 confirm
 case "$confirm" in
   y|Y|yes|Yes)
     ;;
