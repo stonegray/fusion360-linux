@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # fusion-browser.sh: Fusion 360 browser bridge request writer.
+set -euo pipefail
 
 CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux/config"
 REQUEST_DIR="/tmp/fusion360-browser-requests"

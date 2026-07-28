@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # runtime-scripts/health-check.sh — Quick health check before launching Fusion.
 # Exits 0 if everything looks good, 1 otherwise.
+set -euo pipefail
 
 PFX_DIR="$HOME/.fusion360-proton2"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux"

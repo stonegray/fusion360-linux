@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 # fusion-gray-overlay-event-killer-parent-exit.sh:
 # Event-driven closer for Fusion 360's broken Wine grey modal overlay.
 #

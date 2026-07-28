@@ -1,5 +1,6 @@
 # src/install/99-uninstall.sh — Interactive selective uninstall
 # Sourced by install.sh --uninstall
+set -euo pipefail
 
 echo "╔══════════════════════════════════════════════════════════════╗"
 echo "║     Fusion360 Linux — Selective Uninstall                   ║"

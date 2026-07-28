@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # fusion-browser-listener.sh: Fusion 360 browser bridge Linux-side listener.
+set -euo pipefail
 
 CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux/config"
 
