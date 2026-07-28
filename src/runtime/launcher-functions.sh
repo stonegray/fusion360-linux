@@ -13,10 +13,12 @@ load_config() {
   [[ -f "$CONFIG_FILE" ]] || return 0
   source "$CONFIG_FILE"
 
-  BROWSER_LISTENER="${BROWSER_LISTENER:-$(cd "$SCRIPT_DIR/../runtime" 2>/dev/null && pwd)/fusion-browser-listener.sh}"
-  CALLBACK_HANDLER="${CALLBACK_HANDLER:-$(cd "$SCRIPT_DIR/../runtime" 2>/dev/null && pwd)/fusion-callback-handler.sh}"
-  FUSION_OVERLAY_KILLER="${FUSION_OVERLAY_KILLER:-$(cd "$SCRIPT_DIR/../runtime" 2>/dev/null && pwd)/fusion-gray-overlay-event-killer.sh}"
-  FUSION_WINE_RESTART_SCRIPT="${FUSION_WINE_RESTART_SCRIPT:-$(cd "$SCRIPT_DIR/../runtime" 2>/dev/null && pwd)/kill-wine-proton-fusion-nuclear.sh}"
+  local _run_dir
+  _run_dir=$(cd "${SCRIPT_DIR:+$SCRIPT_DIR/../runtime}" 2>/dev/null && pwd) || true
+  BROWSER_LISTENER="${BROWSER_LISTENER:-${_run_dir:+$_run_dir/fusion-browser-listener.sh}}"
+  CALLBACK_HANDLER="${CALLBACK_HANDLER:-${_run_dir:+$_run_dir/fusion-callback-handler.sh}}"
+  FUSION_OVERLAY_KILLER="${FUSION_OVERLAY_KILLER:-${_run_dir:+$_run_dir/fusion-gray-overlay-event-killer.sh}}"
+  FUSION_WINE_RESTART_SCRIPT="${FUSION_WINE_RESTART_SCRIPT:-${_run_dir:+$_run_dir/kill-wine-proton-fusion-nuclear.sh}}"
 
   FUSION_WINE_DPI="${FUSION_WINE_DPI:-auto}"
   FUSION_WINE_SCALE_PERCENT="${FUSION_WINE_SCALE_PERCENT:-auto}"
@@ -134,7 +136,7 @@ kill_fusion_processes() {
 
   if (( survivors == 0 )); then
     echo "  [lifecycle] Killed successfully."
-    return 1
+    return 0
   else
     echo "  [lifecycle] $survivors process(es) still running."
     return 1
@@ -170,7 +172,7 @@ configure_with_file_browsers() {
   FUSION_USE_INTEL_VK_ICD="$FUSION_USE_INTEL_VK_ICD" \
   FUSION_ENABLE_OVERLAY_KILLER="$FUSION_ENABLE_OVERLAY_KILLER" \
   FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="$FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT" \
-  python3 "$SCRIPT_DIR/runtime-scripts/launcher-config-user-interface.py" "$CONFIG_FILE" "$user_interface_mode"
+  python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/launcher-config-user-interface.py" "$CONFIG_FILE" "$user_interface_mode"
 
   local config_user_interface_status=$?
   [[ $config_user_interface_status -eq 0 ]] || return "$config_user_interface_status"
@@ -321,14 +323,14 @@ apply_fusion_wine_dpi() {
   if grep -q '^\[Software\\\\Wine\\\\Fonts\]' "$user_reg" 2>/dev/null; then
     sed -i -e '/^"LogPixels"/d' -e '/^\[Software\\\\Wine\\\\Fonts\]/a "LogPixels"='"$dpi_hex" "$user_reg" || { echo "warning: failed to write DPI registry" >&2; return 1; }
   else
-    echo -e "\n[Software\\\\Wine\\\\Fonts]\n#time=1dd1c05750735e4\n\"LogPixels\"=$dpi_hex" >> "$user_reg"
+  printf '\n[Software\\Wine\\Fonts]\n#time=1dd1c05750735e4\n"LogPixels"=%s\n' "$dpi_hex" >> "$user_reg"
   fi
 
   # Write LogPixels and Win8DpiScaling under [Control Panel\\Desktop]
   if grep -q '^\[Control\\\\ Panel\\\\Desktop\]' "$user_reg" 2>/dev/null; then
     sed -i -e '/^"LogPixels"/d' -e '/^"Win8DpiScaling"/d' -e '/^\[Control\\\\ Panel\\\\Desktop\]/a "LogPixels"='"$dpi_hex"'\n"Win8DpiScaling"='"$win8_hex" "$user_reg" || { echo "warning: failed to write DPI registry" >&2; return 1; }
   else
-    echo -e "\n[Control\\\\ Panel\\\\Desktop]\n\"LogPixels\"=$dpi_hex\n\"Win8DpiScaling\"=$win8_hex" >> "$user_reg"
+  printf '\n[Control\\ Panel\\Desktop]\n"LogPixels"=%s\n"Win8DpiScaling"=%s\n' "$dpi_hex" "$win8_hex" >> "$user_reg"
   fi
 
   # Log what we did
@@ -380,7 +382,7 @@ register_wine_browser_bridge() {
   grep -q '^\[Software\\\\Wine\\\\WineBrowser\]' "$user_reg" 2>/dev/null || return 0
   grep -qF "\"Browsers\"=\"$BROWSER\"" "$user_reg" 2>/dev/null && return 0
 
-  echo -e "\n[Software\\\\Wine\\\\WineBrowser]\n\"Browsers\"=\"$BROWSER\"" >> "$user_reg"
+  printf '\n[Software\\Wine\\WineBrowser]\n"Browsers"="%s"\n' "$BROWSER" >> "$user_reg"
 }
 
 start_browser_listener() {
