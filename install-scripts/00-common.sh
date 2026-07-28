@@ -1,13 +1,9 @@
 # install-scripts/00-common.sh — Shared functions and vars for install steps
 # Sourced by install.sh, not executed directly.
 
-GE_PROTON_VERSION="GE-Proton11-3"
-GE_PROTON_URL="https://github.com/GloriousEggroll/proton-ge-custom/releases/download/${GE_PROTON_VERSION}/${GE_PROTON_VERSION}.tar.gz"
-COMPAT_DIR="$HOME/.local/share/Steam/compatibilitytools.d"
-PFX_DIR="$HOME/.fusion360-proton2"
-INSTALLER_PATH=""
-INSTALL_CMD=""
-PKGS=""
+# Path defaults (XDG-compliant, single source of truth)
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+source "$SCRIPT_DIR/install-scripts/00-defaults.sh"
 
 find_installer() {
   local candidates=(

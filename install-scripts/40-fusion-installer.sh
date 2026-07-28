@@ -105,6 +105,7 @@ if [[ -n "$fusion_exe" ]]; then
 Name=Autodesk Fusion 360
 Comment=Fusion 360 CAD/CAM/CAE tool
 Exec=$SCRIPT_DIR/launch-fusion.sh
+Icon=fusion360
 Type=Application
 Categories=Graphics;Science;Engineering;
 StartupNotify=true

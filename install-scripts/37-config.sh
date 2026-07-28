@@ -1,6 +1,6 @@
 # install-scripts/37-config.sh — Write Fusion360 config
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux"
-CONFIG_FILE="$CONFIG_DIR/config"
+CONFIG_DIR="$F360_CONFIG_DIR"
+CONFIG_FILE="$F360_CONFIG_FILE"
 
 if [[ -f "$CONFIG_FILE" ]]; then
   echo "  [config]  already present"
