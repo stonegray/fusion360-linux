@@ -76,49 +76,18 @@ _install_fusion_mime_icon() {
     _resize_icon "$master" "$d/application-vnd.autodesk.fusion360.png" "$s" || true
   done
 
-  # Ensure hicolor/index.theme exists — without it gtk-update-icon-cache
-  # ignores the entire directory AND the local file shadows the system
-  # hicolor theme, hiding all apps/mimetypes icons from the cache.
+  # We do NOT create a local hicolor/index.theme — the system theme at
+  # /usr/share/icons/hicolor/index.theme already lists all standard
+  # directories (*/mimetypes, */apps, etc.) that our icons use.
+  # Creating a local one would shadow the system theme and potentially
+  # hide apps icons from Firefox, Dolphin, etc.
   #
-  # Symlink to the system hicolor index.theme which already lists every
-  # standard directory (*/apps, */mimetypes, */actions, etc.) — our
-  # icons go into exactly those standard subdirectories.
-  #
-  # If no system hicolor exists (unusual), create a minimal one that
-  # covers both our mimetypes AND apps directories.
-  local idx="$hicolor/index.theme"
-  local sys_idx="/usr/share/icons/hicolor/index.theme"
-  if [[ -f "$sys_idx" ]]; then
-    if [[ ! -L "$idx" ]] || [[ "$(readlink "$idx")" != "$sys_idx" ]]; then
-      ln -sf "$sys_idx" "$idx" 2>/dev/null || true
-    fi
-  elif [[ ! -f "$idx" ]]; then
-    # No system hicolor — create a comprehensive local one
-    local dirs="" sd
-    for sd in $sizes; do dirs="${dirs}${sd}x${sd}/mimetypes,${sd}x${sd}/apps,"; done
-    mkdir -p "$hicolor"
-    {
-      echo "[Icon Theme]"
-      echo "Name=Hicolor"
-      echo "Comment=Fallback icon theme"
-      echo "Directories=${dirs%,}"
-      for sd in $sizes; do
-        echo ""
-        echo "[${sd}x${sd}/mimetypes]"
-        echo "Size=${sd}"
-        echo "Context=MimeTypes"
-        echo "Type=Fixed"
-        echo ""
-        echo "[${sd}x${sd}/apps]"
-        echo "Size=${sd}"
-        echo "Context=Applications"
-        echo "Type=Fixed"
-      done
-    } > "$idx"
-  fi
-
-  # Refresh icon caches so file managers pick up the new icons immediately
-  command -v gtk-update-icon-cache &>/dev/null && gtk-update-icon-cache -f "$hicolor" 2>/dev/null || true
+  # gtk-update-icon-cache is NOT run on the local hicolor dir because
+  # the system cache at /usr/share/icons is authoritative and GTK's
+  # fallback directory scanning picks up local additions.  KDE's
+  # kbuildsycoca scans the full filesystem natively.
+  # Refresh icon caches for KDE — kbuildsycoca scans $HOME/.local/share
+  # natively so local additions are picked up without a full rebuild.
   if command -v kbuildsycoca6 &>/dev/null; then
     kbuildsycoca6 --noincremental 2>/dev/null || true
   elif command -v kbuildsycoca5 &>/dev/null; then
