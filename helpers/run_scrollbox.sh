@@ -7,15 +7,30 @@ run_scrollbox() {
     [[ "${1:-}" == "--until" ]] && { until_pat="$2"; shift 2; }
     local height="${1:-5}"
 
-    # Determine the actual terminal device (check stdout, not stdin — stdin is the pipe)
+    # ── TTY self-test ──────────────────────────────────────────────────
     local tty_dev
     tty_dev=$(tty <&1 2>/dev/null) || tty_dev="/dev/tty"
-    [[ -c "$tty_dev" ]] || { cat -; return 0; }
 
-    # Redirect stdout to the terminal so all ANSI goes there directly
+    # Print diagnostics to the actual terminal (bypass any pipe)
+    # This tells us if the TTY device is correct
+    printf 'TTY=%s ' "$tty_dev" > "$tty_dev" 2>/dev/null || {
+        # Can't write to TTY at all — fall through to cat
+        cat -
+        return 0
+    }
+
+    # Verify by writing [OK] — if we see it, TTY works
+    printf '[' > "$tty_dev"
+    printf 'OK' > "$tty_dev"
+    printf ']\n' > "$tty_dev"
+
+    # Also print height and terminal info
+    printf 'height=%d cols=%d tput=%s\n' "$height" "$(tput cols 2>/dev/null || echo 80)" "$(command -v tput)" > "$tty_dev"
+
+    # Now redirect all subsequent output to the terminal
     exec > "$tty_dev"
+    # ────────────────────────────────────────────────────────────────────
 
-    # DEC sequences (work in tmux/screen)
     local SAVE='\0337'
     local REST='\0338'
     local CLR='\033[K'
@@ -30,11 +45,11 @@ run_scrollbox() {
 
         if (( !started )); then
             printf '\n'          # fresh line
-            printf '%b' "$SAVE"  # save cursor here
+            printf '%b' "$SAVE"
             started=1
         fi
 
-        printf '%b' "$REST"      # go to saved position
+        printf '%b' "$REST"
         for l in "${buf[@]}"; do
             printf '%b%s\n' "$CLR" "$l"
         done
