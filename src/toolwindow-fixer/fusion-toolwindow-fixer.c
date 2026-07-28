@@ -1,15 +1,18 @@
 /*
  * fusion-toolwindow-fixer.c
  *
- * Background daemon that finds Fusion 360's docked toolwindow popups
- * (WS_POPUP | WS_EX_TOOLWINDOW) and adds WS_EX_APPWINDOW to their
- * extended style.  This forces Wine's X11 driver to mark them as
- * *managed* instead of override-redirect, so the compositor stacks
- * them with their owner window and they can drop behind other apps.
+ * Background daemon that finds Fusion 360's unmanaged popup windows
+ * (WS_POPUP without WS_EX_APPWINDOW, owned by a parent) and adds
+ * WS_EX_APPWINDOW to their extended style.  This forces Wine's X11
+ * driver to make them *managed* instead of override-redirect, so the
+ * compositor stacks them correctly and they can drop behind other
+ * application windows.
  *
- * Without this fix those popups become override-redirect X11 windows
- * that the compositor keeps above every other application window
- * ("always on top" z-order bug).
+ * Fusion creates many sub-windows as WS_POPUP — docked panels (browser,
+ * data panel), toolbar areas, status bars — that Wine X11 would
+ * normally make override-redirect, causing them to float above every
+ * other window ("always on top" z-order bug).  Adding WS_EX_APPWINDOW
+ * makes them regular managed windows the compositor understands.
  *
  * Compile with:
  *   x86_64-w64-mingw32-gcc -Os -s -o fusion-toolwindow-fixer.exe \
@@ -92,22 +95,25 @@ static BOOL is_fusion_window(HWND hwnd)
 
 static BOOL needs_fix(HWND hwnd)
 {
-    LONG_PTR ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+    LONG style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+    LONG_PTR ex  = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
 
-    /* Must have TOOLWINDOW (the "floating palette" style)           */
-    if (!(ex & WS_EX_TOOLWINDOW)) return FALSE;
+    /* Only popup windows — WS_POPUP triggers Wine X11's override-redirect
+     * behaviour.  WS_OVERLAPPED / WS_CHILD windows are always managed.   */
+    if (!(style & WS_POPUP)) return FALSE;
 
-    /* Must have an owner — toolwindows that float belong to a parent */
+    /* Must have an owner (i.e. a parent window that owns this popup).
+     * Independent tooltop-level popups (splash, dialogs) should stay as-is. */
     if (!GetWindow(hwnd, GW_OWNER)) return FALSE;
 
-    /* Already done?  Skip so we don't keep calling SetWindowLong.    */
+    /* Already done — skip so we don't keep calling SetWindowLong.      */
     if (ex & WS_EX_APPWINDOW) return FALSE;
 
-    /* Skip invisible windows — hidden helper windows should not be   */
-    /* promoted to managed; showing them creates phantom white boxes. */
+    /* Skip invisible windows — hidden helper windows promoted to        */
+    /* managed would create phantom white boxes.                          */
     if (!IsWindowVisible(hwnd)) return FALSE;
 
-    /* Skip zero-size windows — Fusion creates 1x1 helper windows.    */
+    /* Skip zero-size / 1-pixel windows — Fusion creates tiny helpers.    */
     RECT r;
     GetWindowRect(hwnd, &r);
     if (r.right - r.left <= 1 && r.bottom - r.top <= 1) return FALSE;
