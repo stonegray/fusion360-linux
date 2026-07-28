@@ -42,6 +42,26 @@ case "$response" in
     ;;
 esac
 
+# Kill any running Fusion/Wine processes before removing files
+echo "  Stopping Fusion 360 processes..."
+fusion_pids=( $(pgrep -f "Fusion360\.exe" 2>/dev/null || true) )
+if [[ ${#fusion_pids[@]} -gt 0 ]]; then
+  echo "    Found Fusion running (PID ${fusion_pids[*]}) — sending SIGTERM..."
+  kill "${fusion_pids[@]}" 2>/dev/null || true
+  sleep 2
+  # Check if still alive and escalate
+  still_alive=( $(pgrep -f "Fusion360\.exe" 2>/dev/null || true) )
+  if [[ ${#still_alive[@]} -gt 0 ]]; then
+    echo "    SIGTERM did not stop Fusion — sending SIGKILL..."
+    kill -9 "${still_alive[@]}" 2>/dev/null || true
+    sleep 1
+  fi
+  # Also kill wineserver so prefix locks are released
+  pkill -f wineserver 2>/dev/null || true
+  echo "    Fusion processes stopped."
+else
+  echo "    No Fusion processes running."
+fi
 echo ""
 echo "Removing..."
 
