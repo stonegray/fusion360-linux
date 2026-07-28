@@ -233,6 +233,27 @@ read_kde_forced_dpi() {
   printf "%s" "$dpi"
 }
 
+# Detect primary monitor's scale factor via kscreen-doctor (KDE Plasma)
+# Returns DPI equivalent of the scale, e.g. 1.5 scale → 144 DPI
+read_kde_primary_scale() {
+  command -v kscreen-doctor &>/dev/null || return 1
+  local scale
+  scale=$(kscreen-doctor -o 2>/dev/null | grep -B5 'priority 1' | grep -i '^\tScale:' | head -1 | awk '{print $2}')
+  [[ -n "$scale" ]] || return 1
+  scale_to_dpi "$scale"
+}
+
+# Detect GNOME text scaling factor via gsettings
+read_gnome_text_scaling() {
+  command -v gsettings &>/dev/null || return 1
+  local scale
+  scale=$(gsettings get org.gnome.desktop.interface text-scaling-factor 2>/dev/null || true)
+  [[ -n "$scale" ]] || return 1
+  # GNOME default is 1.0 (no scaling)
+  awk -v value="$scale" 'BEGIN { exit !(value > 0 && value != 1) }' || return 1
+  scale_to_dpi "$scale"
+}
+
 scale_to_dpi() {
   local scale_value="$1"
 
@@ -264,6 +285,22 @@ resolve_fusion_wine_dpi() {
   kde_forced_dpi="$(read_kde_forced_dpi || true)"
   if [[ -n "$kde_forced_dpi" ]]; then
     printf "%s" "$kde_forced_dpi"
+    return 0
+  fi
+
+  # KDE Plasma: primary monitor scale factor
+  local kde_primary_dpi
+  kde_primary_dpi="$(read_kde_primary_scale || true)"
+  if [[ -n "$kde_primary_dpi" ]] && [[ "$kde_primary_dpi" =~ ^[0-9]+$ ]]; then
+    printf "%s" "$kde_primary_dpi"
+    return 0
+  fi
+
+  # GNOME: text scaling factor
+  local gnome_text_dpi
+  gnome_text_dpi="$(read_gnome_text_scaling || true)"
+  if [[ -n "$gnome_text_dpi" ]] && [[ "$gnome_text_dpi" =~ ^[0-9]+$ ]]; then
+    printf "%s" "$gnome_text_dpi"
     return 0
   fi
 

@@ -1,5 +1,4 @@
 # src/install/10-deps.sh — System dependencies
-detect_distro
 echo "  [1/5] Installing packages: $PKGS"
 
 if [[ -z "${PKGS:-}" ]]; then
