@@ -165,25 +165,22 @@ if [[ -f "$system_reg" ]]; then
     log_info " Warning: NLauncher.exe not found — skipping Wine prefix registration."
   fi
 fi
-
-# ── Set Wine shell folders to real Linux home directories ────────
-# Makes Fusion's file open/save dialog open the user's real Documents
-# and Desktop folders instead of the Wine prefix's virtual C: drive.
-local user_reg="$PFX_DIR/pfx/user.reg"
-if [[ -f "$user_reg" ]] && ! grep -q '^"Personal"="Z:' "$user_reg" 2>/dev/null; then
-  # Remove any existing Personal/Desktop/Downloads entries
-  sed -i '/^"Personal"=/d; /^"Desktop"=/d; /^"Downloads"=/d' "$user_reg" 2>/dev/null || true
-  # Append correct entries.
-  # Wine Z: paths use forward slashes for Unix paths (e.g. Z:/home/user/Documents).
-  # Forward slashes don't need INI escaping in .reg files — write them directly.
-  sed -i \
-    -e '/User Shell Folders\]/a ""' \
-    -e '/User Shell Folders\]/a "Personal"="Z:'"$HOME"'/Documents"' \
-    -e '/User Shell Folders\]/a "Desktop"="Z:'"$HOME"'/Desktop"' \
-    -e '/User Shell Folders\]/a "Downloads"="Z:'"$HOME"'/Downloads"' \
-    "$user_reg" 2>/dev/null || true
-  log_info " Wine shell folders set to $HOME/Documents, $HOME/Desktop, $HOME/Downloads."
-fi
+# Wine shell folders — DISABLED.  Setting Personal/Desktop/Downloads to
+# Z: paths causes the file open/save dialog to freeze and then crash
+# Fusion under GE-Proton 11-3.  The native file dialog (ComDlg32) does
+# not handle Z: paths correctly when asked to initialize to the default
+# folder location.
+#local user_reg="$PFX_DIR/pfx/user.reg"
+#if [[ -f "$user_reg" ]] && ! grep -q '^"Personal"="Z:' "$user_reg" 2>/dev/null; then
+#  sed -i '/^"Personal"=/d; /^"Desktop"=/d; /^"Downloads"=/d' "$user_reg" 2>/dev/null || true
+#  sed -i \
+#    -e '/User Shell Folders\]/a ""' \
+#    -e '/User Shell Folders\]/a "Personal"="Z:'"$HOME"'/Documents"' \
+#    -e '/User Shell Folders\]/a "Desktop"="Z:'"$HOME"'/Desktop"' \
+#    -e '/User Shell Folders\]/a "Downloads"="Z:'"$HOME"'/Downloads"' \
+#    "$user_reg" 2>/dev/null || true
+#  log_info " Wine shell folders set to $HOME/Documents, $HOME/Desktop, $HOME/Downloads."
+#fi
 mkdir -p "$PFX_DIR/pfx/drive_c"
 local twf_src="$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.c"
 local twf_prebuilt="$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.exe"
