@@ -20,6 +20,12 @@ ERROR: Do not run install.sh as root.
 EOF
   exit 1
 fi
+LOCK_DIR="/tmp/fusion360-install.lock"
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  echo "ERROR: Another install is already running (lock at $LOCK_DIR)." >&2
+  exit 1
+fi
+trap 'rm -rf "$LOCK_DIR"' EXIT
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODE="${1:-}"
@@ -60,7 +66,7 @@ case "$MODE" in
     ;;
   --uninstall)
     clear_traps
-    source "$SCRIPT_DIR/runtime-scripts/uninstall-select.sh"
+    source "$SCRIPT_DIR/src/runtime/uninstall-select.sh"
     exit 0
     ;;
   --run-installer)
@@ -74,6 +80,7 @@ echo "╔═══════════════════════�
 echo "║     Fusion360 Linux Installer                               ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo "── Step 1/8: System dependencies ──"
+pre_flight
 run_step 10-deps.sh
 echo ""
 
@@ -98,7 +105,7 @@ run_step 37-config.sh
 echo ""
 
 echo "── Step 7/8: Protocol handlers ──"
-"$SCRIPT_DIR/runtime-scripts/register-protocols.sh"
+"$SCRIPT_DIR/src/runtime/register-protocols.sh"
 echo ""
 
 echo "── Step 8/8: Fusion Installer ──"
