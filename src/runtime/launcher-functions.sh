@@ -565,6 +565,14 @@ apply_launch_environment() {
     unset WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
   fi
 
+  # DXVK tuning for UI rendering — reduces swapchain latency and
+  # sets optimal shader compiler threads (half of logical cores)
+  local dxvk_cfg="dxgi.syncInterval=0"
+  dxvk_cfg="${dxvk_cfg},dxvk.tearFree=1"
+  dxvk_cfg="${dxvk_cfg},dxgi.numBackBuffers=3"
+  dxvk_cfg="${dxvk_cfg},dxvk.numCompilerThreads=$(( $(nproc 2>/dev/null || echo 4) / 2 ))"
+  export DXVK_CONFIG="$dxvk_cfg"
+
   if is_enabled "$FUSION_USE_INTEL_VK_ICD"; then
     # Ubuntu/KDE Neon: intel_icd.json (64-bit). Fedora: intel_icd.x86_64.json + .i686.json
     if [[ -f /usr/share/vulkan/icd.d/intel_icd.x86_64.json && -f /usr/share/vulkan/icd.d/intel_icd.i686.json ]]; then
