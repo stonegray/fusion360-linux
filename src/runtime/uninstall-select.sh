@@ -59,6 +59,7 @@ done
 if (( found_icons )); then
   add_comp "Application icons" "$HOME/.local/share/icons/hicolor/*/apps/fusion360.png"
 fi
+add_comp "MIME type definitions" "${XDG_DATA_HOME:-$HOME/.local/share}/mime/packages/fusion360.xml"
 add_comp "Bridge temp files" "/tmp/fusion360-*"
 
 if (( ${#components[@]} == 0 )); then

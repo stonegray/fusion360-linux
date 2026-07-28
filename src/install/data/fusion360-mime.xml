@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/vnd.autodesk.fusion360">
+    <comment>Fusion 360 Archive</comment>
+    <glob pattern="*.f3d"/>
+    <glob pattern="*.f3z"/>
+  </mime-type>
+  <mime-type type="model/step">
+    <comment>STEP 3D Model</comment>
+    <glob pattern="*.step"/>
+    <glob pattern="*.stp"/>
+  </mime-type>
+  <mime-type type="model/iges">
+    <comment>IGES 3D Model</comment>
+    <glob pattern="*.iges"/>
+    <glob pattern="*.igs"/>
+  </mime-type>
+  <mime-type type="model/stl">
+    <comment>STL 3D Model</comment>
+    <glob pattern="*.stl"/>
+  </mime-type>
+  <mime-type type="model/3mf">
+    <comment>3D Manufacturing Format</comment>
+    <glob pattern="*.3mf"/>
+  </mime-type>
+  <mime-type type="image/vnd.dxf">
+    <comment>AutoCAD DXF</comment>
+    <glob pattern="*.dxf"/>
+  </mime-type>
+  <mime-type type="model/x-obj">
+    <comment>Wavefront OBJ</comment>
+    <glob pattern="*.obj"/>
+  </mime-type>
+  <mime-type type="model/x-acis-sat">
+    <comment>ACIS SAT 3D Model</comment>
+    <glob pattern="*.sat"/>
+  </mime-type>
+  <mime-type type="model/x-fbx">
+    <comment>FBX 3D Model</comment>
+    <glob pattern="*.fbx"/>
+  </mime-type>
+  <mime-type type="application/x-inventor-assembly">
+    <comment>Inventor Assembly</comment>
+    <glob pattern="*.iam"/>
+  </mime-type>
+  <mime-type type="application/x-inventor-part">
+    <comment>Inventor Part</comment>
+    <glob pattern="*.ipt"/>
+  </mime-type>
+  <mime-type type="model/x-rhino-3dm">
+    <comment>Rhino 3D Model</comment>
+    <glob pattern="*.3dm"/>
+  </mime-type>
+  <mime-type type="application/x-solidworks-part">
+    <comment>SolidWorks Part</comment>
+    <glob pattern="*.sldprt"/>
+  </mime-type>
+  <mime-type type="application/x-solidworks-assembly">
+    <comment>SolidWorks Assembly</comment>
+    <glob pattern="*.sldasm"/>
+  </mime-type>
+  <mime-type type="model/x-parasolid">
+    <comment>Parasolid Model</comment>
+    <glob pattern="*.x_t"/>
+    <glob pattern="*.x_b"/>
+  </mime-type>
+</mime-info>

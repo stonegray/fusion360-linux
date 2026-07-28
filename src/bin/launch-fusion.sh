@@ -115,6 +115,18 @@ else
   echo "launch-fusion.sh warning: production config was not found: $PRODUCTION_CONFIG" >&2
 fi
 
+# Convert file arguments to Wine paths for Proton
+FUSION_ARGS=()
+if [[ $# -gt 0 ]] && [[ "${1:0:1}" != "-" ]]; then
+  for arg in "$@"; do
+    if [[ -f "$arg" || -d "$arg" ]]; then
+      FUSION_ARGS+=("Z:$(realpath "$arg")")
+    else
+      FUSION_ARGS+=("$arg")
+    fi
+  done
+fi
+
 trap cleanup EXIT INT TERM
 
 apply_fusion_wine_dpi
@@ -123,7 +135,11 @@ register_wine_browser_bridge
 start_browser_listener
 start_overlay_killer
 
-"$PROTON" run "$FUSION_EXE" "$@"
+if (( ${#FUSION_ARGS[@]} > 0 )); then
+  "$PROTON" run "$FUSION_EXE" "${FUSION_ARGS[@]}"
+else
+  "$PROTON" run "$FUSION_EXE" "$@"
+fi
 fusion_status=$?
 
 [[ $fusion_status -eq 0 ]] || fail "Fusion exited or crashed with status $fusion_status"

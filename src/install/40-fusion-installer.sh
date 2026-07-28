@@ -19,10 +19,11 @@ if [[ -f "$F360_LOG" ]] && grep -q "Configure app complete" "$F360_LOG" 2>/dev/n
 [Desktop Entry]
 Name=Autodesk Fusion 360
 Comment=Fusion 360 CAD/CAM/CAE tool
-Exec=$F360_DATA_DIR/launch-fusion.sh
+Exec=$F360_DATA_DIR/launch-fusion.sh %F
 Icon=fusion360
 Type=Application
 Categories=Graphics;Science;Engineering;
+MimeType=application/vnd.autodesk.fusion360;model/step;model/iges;model/stl;model/3mf;image/vnd.dxf;model/x-obj;model/x-acis-sat;model/x-fbx;application/x-inventor-assembly;application/x-inventor-part;model/x-rhino-3dm;application/x-solidworks-part;application/x-solidworks-assembly;model/x-parasolid;
 StartupNotify=true
 StartupWMClass=fusion360.exe
 EOF
@@ -131,10 +132,11 @@ if [[ -n "$fusion_exe" ]]; then
 [Desktop Entry]
 Name=Autodesk Fusion 360
 Comment=Fusion 360 CAD/CAM/CAE tool
-Exec=$F360_DATA_DIR/launch-fusion.sh
+Exec=$F360_DATA_DIR/launch-fusion.sh %F
 Icon=fusion360
 Type=Application
 Categories=Graphics;Science;Engineering;
+MimeType=application/vnd.autodesk.fusion360;model/step;model/iges;model/stl;model/3mf;image/vnd.dxf;model/x-obj;model/x-acis-sat;model/x-fbx;application/x-inventor-assembly;application/x-inventor-part;model/x-rhino-3dm;application/x-solidworks-part;application/x-solidworks-assembly;model/x-parasolid;
 StartupNotify=true
 StartupWMClass=fusion360.exe
 EOF

@@ -127,7 +127,20 @@ if [[ -f "/tmp/fusion360-dpi.log" ]]; then
   echo "    Removed: DPI log"
 fi
 
-# 10. Refresh KDE menu if available
+# 10. MIME type definitions
+MIME_FILE="${XDG_DATA_HOME:-$HOME/.local/share}/mime/packages/fusion360.xml"
+if [[ -f "$MIME_FILE" ]]; then
+  rm -f "$MIME_FILE"
+  echo "    Removed: MIME type definitions for Fusion 360"
+  MIME_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/mime"
+  if command -v update-mime-database &>/dev/null; then
+    update-mime-database "$MIME_DIR" 2>/dev/null || true
+  fi
+else
+  echo "  [SKIP] MIME types not found."
+fi
+
+# 11. Refresh KDE menu if available
 if command -v kbuildsycoca6 &>/dev/null; then
   kbuildsycoca6 2>/dev/null || true
 elif command -v kbuildsycoca5 &>/dev/null; then
