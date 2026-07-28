@@ -47,11 +47,46 @@ find_identity_manager_executable() {
   printf "%s" "$identity_manager_executable"
 }
 
+# Build a clean environment for browser launches — preserves only what
+# browsers actually need under Wayland/X11, strips the rest.
+_browser_env() {
+  printf "HOME=%s\n" "$HOME"
+  printf "USER=%s\n" "${USER:-$(id -un)}"
+  printf "DISPLAY=%s\n" "${DISPLAY:-:0}"
+  printf "WAYLAND_DISPLAY=%s\n" "${WAYLAND_DISPLAY:-}"
+  printf "XAUTHORITY=%s\n" "${XAUTHORITY:-$HOME/.Xauthority}"
+  printf "DBUS_SESSION_BUS_ADDRESS=%s\n" "${DBUS_SESSION_BUS_ADDRESS:-}"
+  printf "XDG_CURRENT_DESKTOP=%s\n" "${XDG_CURRENT_DESKTOP:-}"
+  printf "XDG_SESSION_TYPE=%s\n" "${XDG_SESSION_TYPE:-}"
+  printf "XDG_RUNTIME_DIR=%s\n" "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+  printf "LANG=%s\n" "${LANG:-en_US.UTF-8}"
+  printf "PATH=%s\n" "/usr/local/bin:/usr/bin:/bin"
+  printf "LIBGL_ALWAYS_SOFTWARE=%s\n" "${LIBGL_ALWAYS_SOFTWARE:-}"
+}
+
+_try_open() {
+  local label="$1" bin="$2" url="$3"
+  {
+    echo "--- attempt: $label ---"
+    echo "bin=$bin"
+  } >> "$LOG_FILE" 2>&1
+  env -i $(_browser_env) "$bin" "$url" >> "$LOG_FILE" 2>&1 &
+  local pid=$!
+  disown 2>/dev/null || true
+  sleep 0.5
+  if kill -0 "$pid" 2>/dev/null; then
+    log_message "  $label OK (pid=$pid)"
+    return 0
+  fi
+  wait "$pid" 2>/dev/null || true
+  log_message "  $label FAILED"
+  return 1
+}
+
 open_browser_url() {
   local request_file="$1"
   local url
   local processed_file
-  local open_status
 
   url="$(cat "$request_file")"
   processed_file="$BROWSER_PROCESSED_DIR/$(basename "$request_file")"
@@ -67,62 +102,48 @@ open_browser_url() {
     echo "url_last300=${url: -300}"
   } >> "$LOG_FILE" 2>&1
 
-  cd "$HOME" || return 1
+  cd "$HOME" || { log_message "ERROR: cd $HOME failed"; mv "$request_file" "$processed_file"; return 1; }
 
-  {
-    echo "--- env passed to xdg-open ---"
-    echo "HOME=$HOME"
-    echo "USER=$USER"
-    echo "DISPLAY=${DISPLAY:-:0}"
-    echo "DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS:-}"
-    echo "XDG_CURRENT_DESKTOP=${XDG_CURRENT_DESKTOP:-}"
-    echo "XDG_SESSION_DESKTOP=${XDG_SESSION_DESKTOP:-}"
-    echo "XDG_SESSION_TYPE=${XDG_SESSION_TYPE:-}"
-    echo "XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
-    echo "KDE_SESSION_VERSION=${KDE_SESSION_VERSION:-6}"
-    echo "WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}"
-    echo "LANG=${LANG:-en_CA.UTF-8}"
-  } >> "$LOG_FILE" 2>&1
+  # Stratified fallback chain — each attempt must stay alive >0.5s
+  # to be considered successful (avoids racing with browser startup).
 
-  # Determine browser binary: prefer CHROME from config, fallback to firefox
-  browser_bin="${CHROME:-}"
-  if [[ -z "$browser_bin" || ! -x "$browser_bin" ]]; then
-    browser_bin="$(command -v firefox 2>/dev/null || echo "/usr/sbin/firefox")"
+  # 1 — Configured CHROME (fastest path)
+  if [[ -n "${CHROME:-}" ]] && [[ -x "$CHROME" ]]; then
+    _try_open "CHROME" "$CHROME" "$url" && { mv "$request_file" "$processed_file"; return 0; }
   fi
 
+  # 2 — xdg-open (universal, handles Snap Firefox correctly)
+  if command -v xdg-open &>/dev/null; then
+    _try_open "xdg-open" "xdg-open" "$url" && { mv "$request_file" "$processed_file"; return 0; }
+  fi
+
+  # 3 — kde-open5 (KDE native, bypasses xdg-utils)
+  if command -v kde-open5 &>/dev/null; then
+    _try_open "kde-open5" "kde-open5" "$url" && { mv "$request_file" "$processed_file"; return 0; }
+  fi
+
+  # 4 — Known browser binaries (last resort)
+  local known=( google-chrome google-chrome-stable chromium-browser chromium firefox firefox-esr )
+  local browser
+  for browser in "${known[@]}"; do
+    local path; path="$(command -v "$browser" 2>/dev/null || true)"
+    [[ -n "$path" ]] && [[ -x "$path" ]] || continue
+    _try_open "$browser" "$path" "$url" && { mv "$request_file" "$processed_file"; return 0; }
+  done
+
+  # ── All attempts exhausted ───────────────────────────────────────
   {
-    echo "--- launching browser directly ---"
-    echo "browser_bin=$browser_bin"
-    echo "url_len=${#url}"
+    echo "--- ALL BROWSER ATTEMPTS FAILED ---"
+    echo "url=$url"
+    echo "CHROME=${CHROME:-}"
+    echo "xdg-open=$(command -v xdg-open 2>/dev/null || echo 'not found')"
+    echo "firefox=$(command -v firefox 2>/dev/null || echo 'not found')"
+    echo "PATH=$PATH"
   } >> "$LOG_FILE" 2>&1
-
-  # Launch browser directly, backgrounded - bypasses kde-open/kioexec
-  env -i \
-    HOME="$HOME" \
-    DISPLAY="${DISPLAY:-:0}" \
-    XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}" \
-    DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-}" \
-    XDG_CURRENT_DESKTOP="${XDG_CURRENT_DESKTOP:-}" \
-    XDG_SESSION_DESKTOP="${XDG_SESSION_DESKTOP:-}" \
-    XDG_SESSION_TYPE="${XDG_SESSION_TYPE:-}" \
-    XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}" \
-    KDE_SESSION_VERSION="${KDE_SESSION_VERSION:-6}" \
-    WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-}" \
-    LANG="${LANG:-en_CA.UTF-8}" \
-    "$browser_bin" "$url" >> "$LOG_FILE" 2>&1 &
-  open_status=$?
-  disown 2>/dev/null || true
-
-  {
-    echo "open_status=$open_status (backgrounded direct browser)"
-    echo "processed_file=$processed_file"
-    echo "============================================================"
-    echo
-  } >> "$LOG_FILE" 2>&1
-
+  log_message "ERROR: no browser could open the URL"
   mv "$request_file" "$processed_file"
+  return 1
 }
-
 send_callback_to_identity_manager() {
   local request_file="$1"
   local callback_url

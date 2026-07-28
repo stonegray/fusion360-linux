@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# fusion-browser.sh: Fusion 360 browser bridge request writer.
+# fusion-browser.sh: Fusion 360 browser bridge — writes URL requests
+# for the listener to process.  Called by Fusion via the BROWSER env var.
 set -euo pipefail
 
 CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux/config"
@@ -31,13 +32,13 @@ mkdir -p "$REQUEST_DIR"
   done
 
   echo "--- env dump ---"
-  echo "KDE_SESSION_VERSION=$KDE_SESSION_VERSION"
-  echo "WAYLAND_DISPLAY=$WAYLAND_DISPLAY"
-  echo "DISPLAY=$DISPLAY"
-  echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR"
-  echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS"
-  echo "XDG_CURRENT_DESKTOP=$XDG_CURRENT_DESKTOP"
-  echo "XDG_SESSION_TYPE=$XDG_SESSION_TYPE"
+  echo "KDE_SESSION_VERSION=${KDE_SESSION_VERSION:-}"
+  echo "WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}"
+  echo "DISPLAY=${DISPLAY:-}"
+  echo "XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-}"
+  echo "DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS:-}"
+  echo "XDG_CURRENT_DESKTOP=${XDG_CURRENT_DESKTOP:-}"
+  echo "XDG_SESSION_TYPE=${XDG_SESSION_TYPE:-}"
   echo "============================================================"
   echo
 } >> "$LOG_FILE" 2>&1
