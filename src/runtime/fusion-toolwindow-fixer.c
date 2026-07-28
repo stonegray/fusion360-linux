@@ -25,7 +25,7 @@
 /* ------------------------------------------------------------------ */
 /* Constants                                                          */
 /* ------------------------------------------------------------------ */
-#define IDLE_SLEEP_MS     2000   /* pause between scans (ms)          */
+#define IDLE_SLEEP_MS     5000   /* pause between scans (ms)          */
 #define LOG_FILE          L"/tmp/fusion-toolwindow-fixer.log"
 
 /* ------------------------------------------------------------------ */
