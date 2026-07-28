@@ -22,17 +22,15 @@ run_scrollbox() {
         buf+=("$line")
         buf=("${buf[@]: -$height}")
 
-        # On first content, save cursor and print box
         if (( !started )); then
             tput sc
             started=1
         fi
 
-        # Go to saved position, clear below it, print buffer
+        # Go to saved position, overwrite each line (clearing it first)
         tput rc
-        tput ed
         for l in "${buf[@]}"; do
-            printf '%s\n' "$l"
+            printf '\033[K%s\n' "$l"
         done
 
         # Completion pattern
