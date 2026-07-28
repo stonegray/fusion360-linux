@@ -20,9 +20,9 @@ PROTON="${PROTON:-$HOME/.local/share/Steam/compatibilitytools.d/GE-Proton11-3/pr
 STEAM_COMPAT_DATA_PATH="${STEAM_COMPAT_DATA_PATH:-$HOME/.fusion360-proton2}"
 STEAM_COMPAT_CLIENT_INSTALL_PATH="${STEAM_COMPAT_CLIENT_INSTALL_PATH:-$HOME/.local/share/Steam}"
 FUSION_ROOT="${FUSION_ROOT:-$STEAM_COMPAT_DATA_PATH/pfx/drive_c/users/steamuser/AppData/Local/Autodesk/webdeploy/production}"
-BROWSER="${BROWSER:-$SCRIPT_DIR/scripts/fusion-browser.sh}"
-BROWSER_LISTENER="${BROWSER_LISTENER:-$SCRIPT_DIR/scripts/fusion-browser-listener.sh}"
-CALLBACK_HANDLER="${CALLBACK_HANDLER:-$SCRIPT_DIR/scripts/fusion-callback-handler.sh}"
+BROWSER="${BROWSER:-$SCRIPT_DIR/runtime-scripts/fusion-browser.sh}"
+BROWSER_LISTENER="${BROWSER_LISTENER:-$SCRIPT_DIR/runtime-scripts/fusion-browser-listener.sh}"
+CALLBACK_HANDLER="${CALLBACK_HANDLER:-$SCRIPT_DIR/runtime-scripts/fusion-callback-handler.sh}"
 # Auto-detect browser: google-chrome > chromium-browser > chromium > firefox
 _detected_chrome=""
 for _c in /usr/bin/google-chrome /usr/bin/chromium-browser /usr/bin/chromium /usr/sbin/firefox; do
@@ -30,8 +30,8 @@ for _c in /usr/bin/google-chrome /usr/bin/chromium-browser /usr/bin/chromium /us
 done
 CHROME="${CHROME:-$_detected_chrome}"
 unset _detected_chrome _c
-FUSION_OVERLAY_KILLER="${FUSION_OVERLAY_KILLER:-$SCRIPT_DIR/scripts/fusion-gray-overlay-event-killer.sh}"
-FUSION_WINE_RESTART_SCRIPT="${FUSION_WINE_RESTART_SCRIPT:-$SCRIPT_DIR/scripts/kill-wine-proton-fusion-nuclear.sh}"
+FUSION_OVERLAY_KILLER="${FUSION_OVERLAY_KILLER:-$SCRIPT_DIR/runtime-scripts/fusion-gray-overlay-event-killer.sh}"
+FUSION_WINE_RESTART_SCRIPT="${FUSION_WINE_RESTART_SCRIPT:-$SCRIPT_DIR/runtime-scripts/kill-wine-proton-fusion-nuclear.sh}"
 
 FUSION_WINE_DPI="${FUSION_WINE_DPI:-auto}"
 FUSION_WINE_SCALE_PERCENT="${FUSION_WINE_SCALE_PERCENT:-auto}"
@@ -57,7 +57,7 @@ BRIDGE_CALLBACK_PROCESSED_DIR="/tmp/fusion360-callback-processed"
 BRIDGE_LISTENER_PID=""
 OVERLAY_KILLER_PID=""
 
-source "$SCRIPT_DIR/scripts/launcher-functions.sh"
+source "$SCRIPT_DIR/runtime-scripts/launcher-functions.sh"
 load_config
 
 if [[ "${1:-}" == "--configure" ]]; then

@@ -80,12 +80,12 @@ PROTON=$GE_PROTON
 STEAM_COMPAT_DATA_PATH=$HOME/.fusion360-proton2
 STEAM_COMPAT_CLIENT_INSTALL_PATH=$HOME/.local/share/Steam
 FUSION_ROOT=$fusion_root
-BROWSER=$SCRIPT_DIR/scripts/fusion-browser.sh
-BROWSER_LISTENER=$SCRIPT_DIR/scripts/fusion-browser-listener.sh
-CALLBACK_HANDLER=$SCRIPT_DIR/scripts/fusion-callback-handler.sh
+BROWSER=$SCRIPT_DIR/runtime-scripts/fusion-browser.sh
+BROWSER_LISTENER=$SCRIPT_DIR/runtime-scripts/fusion-browser-listener.sh
+CALLBACK_HANDLER=$SCRIPT_DIR/runtime-scripts/fusion-callback-handler.sh
 CHROME=${BROWSER:-/usr/bin/firefox}
-FUSION_OVERLAY_KILLER=$SCRIPT_DIR/scripts/fusion-gray-overlay-event-killer.sh
-FUSION_WINE_RESTART_SCRIPT=$SCRIPT_DIR/scripts/kill-wine-proton-fusion-nuclear.sh
+FUSION_OVERLAY_KILLER=$SCRIPT_DIR/runtime-scripts/fusion-gray-overlay-event-killer.sh
+FUSION_WINE_RESTART_SCRIPT=$SCRIPT_DIR/runtime-scripts/kill-wine-proton-fusion-nuclear.sh
 FUSION_WINE_DPI=auto
 FUSION_WINE_SCALE_PERCENT=auto
 FUSION_WINE_DPI_FALLBACK=144
@@ -116,7 +116,7 @@ register_protocols() {
   cat > "$desktop" <<EOF
 [Desktop Entry]
 Name=Fusion 360 Autodesk Callback Handler
-Exec=$SCRIPT_DIR/scripts/fusion-callback-handler.sh %u
+Exec=$SCRIPT_DIR/runtime-scripts/fusion-callback-handler.sh %u
 Type=Application
 NoDisplay=true
 MimeType=x-scheme-handler/adsk;x-scheme-handler/adskidmgr;

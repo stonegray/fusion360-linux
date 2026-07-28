@@ -13,10 +13,10 @@ load_config() {
   [[ -f "$CONFIG_FILE" ]] || return 0
   source "$CONFIG_FILE"
 
-  BROWSER_LISTENER="${BROWSER_LISTENER:-$SCRIPT_DIR/scripts/fusion-browser-listener.sh}"
-  CALLBACK_HANDLER="${CALLBACK_HANDLER:-$SCRIPT_DIR/scripts/fusion-callback-handler.sh}"
-  FUSION_OVERLAY_KILLER="${FUSION_OVERLAY_KILLER:-$SCRIPT_DIR/scripts/fusion-gray-overlay-event-killer.sh}"
-  FUSION_WINE_RESTART_SCRIPT="${FUSION_WINE_RESTART_SCRIPT:-$SCRIPT_DIR/scripts/kill-wine-proton-fusion-nuclear.sh}"
+  BROWSER_LISTENER="${BROWSER_LISTENER:-$SCRIPT_DIR/runtime-scripts/fusion-browser-listener.sh}"
+  CALLBACK_HANDLER="${CALLBACK_HANDLER:-$SCRIPT_DIR/runtime-scripts/fusion-callback-handler.sh}"
+  FUSION_OVERLAY_KILLER="${FUSION_OVERLAY_KILLER:-$SCRIPT_DIR/runtime-scripts/fusion-gray-overlay-event-killer.sh}"
+  FUSION_WINE_RESTART_SCRIPT="${FUSION_WINE_RESTART_SCRIPT:-$SCRIPT_DIR/runtime-scripts/kill-wine-proton-fusion-nuclear.sh}"
 
   FUSION_WINE_DPI="${FUSION_WINE_DPI:-auto}"
   FUSION_WINE_SCALE_PERCENT="${FUSION_WINE_SCALE_PERCENT:-auto}"
@@ -95,7 +95,7 @@ configure_with_file_browsers() {
   FUSION_USE_INTEL_VK_ICD="$FUSION_USE_INTEL_VK_ICD" \
   FUSION_ENABLE_OVERLAY_KILLER="$FUSION_ENABLE_OVERLAY_KILLER" \
   FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="$FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT" \
-  python3 "$SCRIPT_DIR/scripts/launcher-config-user-interface.py" "$CONFIG_FILE" "$user_interface_mode"
+  python3 "$SCRIPT_DIR/runtime-scripts/launcher-config-user-interface.py" "$CONFIG_FILE" "$user_interface_mode"
 
   local config_user_interface_status=$?
   [[ $config_user_interface_status -eq 0 ]] || return "$config_user_interface_status"
