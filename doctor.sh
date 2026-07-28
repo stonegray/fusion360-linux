@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # doctor.sh — Comprehensive diagnostic for Fusion360 on Linux
 #
-# Splits into modules under doctor/*.sh. Run from anywhere in the repo.
+# Splits into modules under src/doctor/*.sh. Run from anywhere in the repo.
 #
 # Usage:
 #   ./doctor.sh              # full report
@@ -18,11 +18,11 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-source "$SCRIPT_DIR/doctor/00-common.sh"
+source "$SCRIPT_DIR/src/doctor/00-common.sh"
 parse_args "$@"
 print_banner
 
-for module in "$SCRIPT_DIR"/doctor/[0-9][0-9]-*.sh; do
+for module in "$SCRIPT_DIR"/src/doctor/[0-9][0-9]-*.sh; do
   source "$module"
 done
 

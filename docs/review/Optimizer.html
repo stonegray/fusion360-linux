@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Optimizer — Code Optimization Report</title>
+<style>
+  :root {
+    --bg: #1a1b1e;
+    --surface: #25262b;
+    --border: #373a40;
+    --text: #c1c2c5;
+    --heading: #e0e0e0;
+    --critical: #e03131;
+    --major: #f08c00;
+    --medium: #fab005;
+    --minor: #74b816;
+    --info: #74c0fc;
+    --link: #74c0fc;
+    --mono: #909296;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+  h1 { color: var(--heading); font-size: 1.8rem; margin-bottom: 0.3rem; }
+  h2 { color: var(--heading); font-size: 1.3rem; margin: 2rem 0 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
+  h3 { color: var(--heading); font-size: 1.1rem; margin: 1.5rem 0 0.8rem; }
+  .meta { color: var(--mono); font-size: 0.9rem; margin-bottom: 1.5rem; }
+  .verdict {
+    padding: 1rem 1.2rem; border-radius: 8px; margin-bottom: 1.5rem;
+    border-left: 4px solid var(--major);
+    background: var(--surface);
+  }
+  .verdict strong { display: block; font-size: 1.1rem; margin-bottom: 0.3rem; color: var(--heading); }
+  table {
+    width: 100%; border-collapse: collapse; margin: 1rem 0 2rem;
+    font-size: 0.92rem;
+  }
+  th, td { padding: 0.65rem 0.8rem; text-align: left; vertical-align: top; }
+  th { background: var(--surface); color: var(--heading); font-weight: 600; border-bottom: 2px solid var(--border); }
+  td { border-bottom: 1px solid var(--border); }
+  tr:hover td { background: rgba(255,255,255,0.03); }
+  .file { font-family: "JetBrains Mono", "Fira Code", monospace; font-size: 0.85rem; color: var(--link); }
+  .loc { font-family: "JetBrains Mono", "Fira Code", monospace; font-size: 0.82rem; color: var(--mono); white-space: nowrap; }
+  .severity { font-weight: 600; white-space: nowrap; }
+  .severity.critical { color: var(--critical); }
+  .severity.major { color: var(--major); }
+  .severity.medium { color: var(--medium); }
+  .severity.minor { color: var(--minor); }
+  .body-cell { max-width: 480px; }
+  .rec-cell { max-width: 400px; }
+  .summary-stats { display: flex; gap: 1.5rem; margin: 1rem 0 1.5rem; flex-wrap: wrap; }
+  .stat { padding: 0.5rem 1rem; background: var(--surface); border-radius: 6px; border: 1px solid var(--border); }
+  .stat .num { font-size: 1.5rem; font-weight: 700; }
+  .stat .label { font-size: 0.8rem; color: var(--mono); }
+  .stat.critical-stat { border-color: var(--critical); }
+  .stat.critical-stat .num { color: var(--critical); }
+  .stat.major-stat { border-color: var(--major); }
+  .stat.major-stat .num { color: var(--major); }
+  .stat.medium-stat { border-color: var(--medium); }
+  .stat.medium-stat .num { color: var(--medium); }
+  .stat.minor-stat { border-color: var(--minor); }
+  .stat.minor-stat .num { color: var(--minor); }
+  .stat.info-stat { border-color: var(--info); }
+  .stat.info-stat .num { color: var(--info); }
+  code { font-family: "JetBrains Mono", "Fira Code", monospace; font-size: 0.85rem; background: var(--surface); padding: 0.1em 0.3em; border-radius: 3px; }
+  .scope-note { background: var(--surface); padding: 0.8rem 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem; color: var(--mono); }
+  ul, ol { margin: 0.3em 0 0.3em 1.5em; }
+  li { margin-bottom: 0.3em; }
+  .section-label {
+    display: inline-block; font-size: 0.75rem; font-weight: 700; padding: 0.15em 0.5em;
+    border-radius: 4px; margin-right: 0.4em; text-transform: uppercase;
+  }
+  .section-label.safety { background: rgba(224,49,49,0.2); color: var(--critical); }
+  .section-label.dup { background: rgba(240,140,0,0.2); color: var(--major); }
+  .section-label.err { background: rgba(250,176,5,0.2); color: var(--medium); }
+  .section-label.consistency { background: rgba(116,192,252,0.2); color: var(--info); }
+  .section-label.quality { background: rgba(116,184,22,0.2); color: var(--minor); }
+  .patch-block {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.8rem 1rem; margin: 0.5rem 0;
+    font-family: "JetBrains Mono", "Fira Code", monospace; font-size: 0.82rem;
+    overflow-x: auto; white-space: pre;
+  }
+  .patch-block .del { color: var(--critical); }
+  .patch-block .ins { color: var(--minor); }
+</style>
+</head>
+<body>
+
+<h1>Optimizer — Code Optimization Report</h1>
+<p class="meta">Consolidated findings from CodeSmell, DangerZone, CodeReview, and independent analysis | 2026-07-28 | 36 .sh + .py files reviewed</p>
+
+<div class="verdict">
+  <strong>Summary</strong>
+  This report consolidates findings from three peer agents (CodeSmell, DangerZone, CodeReview) plus my own analysis
+  into a prioritized optimization plan. Findings are organized by category — safety, duplication, error handling,
+  consistency, and code quality — with concrete before/after patches for each.
+  The unifying goal: eliminate dangerous patterns, consolidate duplicate logic, and enforce consistent conventions
+  without changing runtime semantics.
+</div>
+
+<div class="summary-stats">
+  <div class="stat critical-stat"><div class="num">1</div><div class="label">Critical</div></div>
+  <div class="stat major-stat"><div class="num">5</div><div class="label">Major</div></div>
+  <div class="stat medium-stat"><div class="num">6</div><div class="label">Medium</div></div>
+  <div class="stat minor-stat"><div class="num">4</div><div class="label">Minor</div></div>
+  <div class="stat info-stat"><div class="num">3</div><div class="label">Info</div></div>
+</div>
+
+<h2>Prioritized Findings</h2>
+
+<table>
+<thead>
+<tr>
+  <th>#</th>
+  <th>File</th>
+  <th>Lines</th>
+  <th>Severity</th>
+  <th>Issue</th>
+  <th>Recommendation</th>
+</tr>
+</thead>
+<tbody>
+
+<!-- ==================== SAFETY ==================== -->
+<tr>
+  <td colspan="6" style="background:var(--surface); border-bottom:2px solid var(--border); font-weight:700; color:var(--critical);">
+    <span class="section-label safety">Safety</span> Dangerous patterns that could cause data loss or code execution
+  </td>
+</tr>
+
+<tr>
+  <td>1</td>
+  <td class="file">runtime-scripts/uninstall-select.sh</td>
+  <td class="loc">114-117</td>
+  <td class="severity critical">Critical</td>
+  <td class="body-cell">
+    <strong>eval on constructed command strings.</strong>
+    <code>comp_cmds[]</code> stores <code>rm -rf</code> commands as string templates.
+    At line 117, <code>eval "${comp_cmds[idx]}"</code> executes them.
+    Any path variable containing spaces, <code>;</code>, or <code>$</code> enables arbitrary command injection.
+    Additionally, the <code>[[ -e "$path" ]]</code> check in <code>add_comp()</code> does not expand globs,
+    so icon and bridge-temp entries never appear in the menu (silent dead code for glob patterns).
+  </td>
+  <td class="rec-cell">
+    Remove <code>comp_cmds[]</code> entirely. Store only paths in <code>components[]</code>.
+    Execute <code>rm -rf "$path"</code> directly in the for-loop. Handle globs via <code>compgen -G</code>
+    in <code>add_comp()</code>. See patch below.
+  </td>
+</tr>
+
+<tr>
+  <td>2</td>
+  <td class="file">uninstall.sh</td>
+  <td class="loc">95-98</td>
+  <td class="severity major">Major</td>
+  <td class="body-cell">
+    <strong>Unchecked wildcard rm for bridge temp files.</strong>
+    <code>rm -rf /tmp/fusion360-*</code> runs unconditionally. If the glob expands unexpectedly
+    (e.g., due to a parallel process creating files with surprising names), the <code>|| true</code>
+    swallows errors. The echo on line 98 always claims success.
+  </td>
+  <td class="rec-cell">
+    Guard with <code>compgen -G '/tmp/fusion360-*'</code> before running <code>rm -rf</code>.
+    Only print "Removed" when files actually existed.
+  </td>
+</tr>
+
+<tr>
+  <td>3</td>
+  <td class="file">runtime-scripts/uninstall-select.sh</td>
+  <td class="loc">82</td>
+  <td class="severity major">Major</td>
+  <td class="body-cell">
+    <strong>Unquoted input subject to glob expansion.</strong>
+    <code>for num in $selection</code> subjects user input to pathname expansion.
+    If the user types <code>*</code> or <code>?</code>, the shell expands them against the filesystem.
+  </td>
+  <td class="rec-cell">
+    Use <code>read -ra nums &lt;&lt;&lt; "$selection"</code> or wrap with <code>set -f</code>/<code>set +f</code>.
+  </td>
+</tr>
+
+<tr>
+  <td>4</td>
+  <td class="file">doctor/00-common.sh</td>
+  <td class="loc">18</td>
+  <td class="severity medium">Medium</td>
+  <td class="body-cell">
+    <strong>exec > >(tee ...) without fallback.</strong>
+    Line 18 redirects all stdout/stderr through <code>tee</code>. If <code>tee</code> fails
+    (disk full, path unwritable) or if process substitution is unavailable (old shells, restricted envs),
+    all output is silently lost.
+  </td>
+  <td class="rec-cell">
+    Use a simpler redirection pattern with fallback:
+    <code>exec &gt; &gt;(tee "$REPORT_FILE") 2&gt;&amp;1 || exec &gt; "$REPORT_FILE" 2&gt;&amp;1</code>.
+    Or use a named pipe approach.
+  </td>
+</tr>
+
+<tr>
+  <td>5</td>
+  <td class="file">install-scripts/00-common.sh</td>
+  <td class="loc">149</td>
+  <td class="severity medium">Medium</td>
+  <td class="body-cell">
+    <strong>Unvalidated PFX_DIR in wineserver lock removal.</strong>
+    <code>rm -f "$PFX_DIR/pfx/.wineserver.lock"</code> runs without checking if <code>PFX_DIR</code>
+    is set. If <code>PFX_DIR</code> is somehow unset, this becomes <code>rm -f /pfx/.wineserver.lock</code>.
+  </td>
+  <td class="rec-cell">
+    Add a guard: <code>[[ -n "${PFX_DIR:-}" ]] &amp;&amp; rm -f "$PFX_DIR/pfx/.wineserver.lock"</code>.
+  </td>
+</tr>
+
+<!-- ==================== DUPLICATION ==================== -->
+<tr>
+  <td colspan="6" style="background:var(--surface); border-bottom:2px solid var(--border); font-weight:700; color:var(--major);">
+    <span class="section-label dup">Duplication</span> Redundant or overlapping logic
+  </td>
+</tr>
+
+<tr>
+  <td>6</td>
+  <td class="file">install-scripts/00-common.sh</td>
+  <td class="loc">72-150</td>
+  <td class="severity major">Major</td>
+  <td class="body-cell">
+    <strong>Duplicate process lifecycle management.</strong>
+    <code>kill_installer()</code> in 00-common.sh and <code>kill-wine-proton-fusion-nuclear.sh</code>
+    both kill Wine/Proton processes but use completely different strategies:
+    <ul>
+      <li>00-common.sh: scans <code>/proc/PID/exe</code> + pgrep, deduplicates,
+          kills tracked installer PID separately, verifies survivors, removes lock file</li>
+      <li>kill-wine script: three pkill passes (TERM, sleep, KILL) by pattern matching</li>
+    </ul>
+    The 00-common.sh version is more thorough but both exist in isolation. Fixes to one
+    won't benefit the other.
+  </td>
+  <td class="rec-cell">
+    Extract shared kill logic into <code>launcher-functions.sh</code> as <code>kill_fusion_processes()</code>.
+    Have <code>00-common.sh::kill_installer()</code> and the standalone script both call it.
+    The combined function should use pgrep + /proc scanning (best of both) with graceful SIGTERM
+    then SIGKILL escalation.
+  </td>
+</tr>
+
+<tr>
+  <td>7</td>
+  <td class="file">install-scripts/*</td>
+  <td class="loc">all</td>
+  <td class="severity medium">Medium</td>
+  <td class="body-cell">
+    <strong>Redundant SCRIPT_DIR calculation.</strong>
+    Each install script that defines <code>SCRIPT_DIR</code> uses slightly different logic:
+    <code>00-common.sh</code> calculates it as <code>"$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"</code>,
+    while sourced scripts inherit it from <code>install.sh</code> but <code>install-scripts/00-defaults.sh</code>
+    also recalculates it. Hardcoded <code>"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"</code> appears in
+    multiple scripts.
+  </td>
+  <td class="rec-cell">
+    Rely on one source of truth: set <code>SCRIPT_DIR</code> once in <code>install.sh</code> and
+    reference it everywhere. Remove redundant calculations. For standalone scripts, use a
+    consistent pattern relative to the known repo root.
+  </td>
+</tr>
+
+<!-- ==================== ERROR HANDLING ==================== -->
+<tr>
+  <td colspan="6" style="background:var(--surface); border-bottom:2px solid var(--border); font-weight:700; color:var(--medium);">
+    <span class="section-label err">Error Handling</span> Missing guards and silent failures
+  </td>
+</tr>
+
+<tr>
+  <td>8</td>
+  <td class="file">runtime-scripts/ (multiple)</td>
+  <td class="loc">various</td>
+  <td class="severity major">Major</td>
+  <td class="body-cell">
+    <strong>Missing <code>set -euo pipefail</code> in runtime scripts.</strong>
+    Only <code>kill-wine-proton-fusion-nuclear.sh</code> uses it. The following scripts lack it:
+    <code>fusion-browser.sh</code>, <code>fusion-callback-handler.sh</code>,
+    <code>fusion-browser-listener.sh</code>, <code>fusion-gray-overlay-event-killer.sh</code>,
+    <code>register-protocols.sh</code>, <code>health-check.sh</code>, <code>uninstall-select.sh</code>.
+    Failures in intermediate pipeline stages or unset variables go undetected.
+  </td>
+  <td class="rec-cell">
+    Add <code>set -euo pipefail</code> to every standalone script (not sourced).
+    For sourced scripts like <code>00-common.sh</code>, document that the caller must set it.
+  </td>
+</tr>
+
+<tr>
+  <td>9</td>
+  <td class="file">doctor.sh</td>
+  <td class="loc">11</td>
+  <td class="severity minor">Minor</td>
+  <td class="body-cell">
+    <strong>Inconsistent set flags: <code>set -uo pipefail</code> without <code>-e</code>.</strong>
+    All other top-level scripts use the full <code>set -euo pipefail</code>.
+    Without <code>-e</code>, commands that fail mid-script keep running,
+    potentially producing a misleading summary.
+  </td>
+  <td class="rec-cell">
+    Add <code>-e</code> to make it <code>set -euo pipefail</code>.
+    The doctor modules already use <code>|| true</code> on inherently-fallible commands.
+  </td>
+</tr>
+
+<tr>
+  <td>10</td>
+  <td class="file">doctor/00-common.sh</td>
+  <td class="loc">13-23</td>
+  <td class="severity medium">Medium</td>
+  <td class="body-cell">
+    <strong>parse_args silently ignores unknown flags.</strong>
+    Only <code>--save</code> and <code>--quick</code> are recognized.
+    A typo like <code>--quik</code> or <code>--help</code> falls through silently.
+  </td>
+  <td class="rec-cell">
+    Add a catch-all <code>*)</code> case that prints usage and exits,
+    or at minimum warns on unrecognized arguments.
+  </td>
+</tr>
+
+<tr>
+  <td>11</td>
+  <td class="file">runtime-scripts/launcher-functions.sh</td>
+  <td class="loc">237-270</td>
+  <td class="severity major">Major</td>
+  <td class="body-cell">
+    <strong>DPI registry writes lack input validation and error checking.</strong>
+    <code>apply_fusion_wine_dpi()</code> manipulates <code>user.reg</code> via
+    <code>sed -i</code> and <code>echo &gt;&gt;</code> with three problems:
+    <ol>
+      <li><code>[[ "$dpi_value" -eq 96 ]]</code> errors if <code>dpi_value</code> is empty/non-numeric</li>
+      <li>Sequential <code>sed -i</code> calls aren't atomic — partial failure corrupts the registry</li>
+      <li>No <code>||</code> fallbacks on <code>sed</code>/<code>echo</code>/<code>grep</code> calls</li>
+    </ol>
+  </td>
+  <td class="rec-cell">
+    <ol>
+      <li>Validate: <code>[[ "$dpi_value" =~ ^[0-9]+$ ]] || return 1</code></li>
+      <li>Combine sed ops into a single <code>-e</code> invocation</li>
+      <li>Add <code>|| echo "warning: ..." &gt;&amp;2</code> on each reg-modifying call</li>
+    </ol>
+  </td>
+</tr>
+
+<!-- ==================== CONSISTENCY ==================== -->
+<tr>
+  <td colspan="6" style="background:var(--surface); border-bottom:2px solid var(--border); font-weight:700; color:var(--info);">
+    <span class="section-label consistency">Consistency</span> Divergent conventions and paths
+  </td>
+</tr>
+
+<tr>
+  <td>12</td>
+  <td class="file">install-scripts/37-config.sh</td>
+  <td class="loc">34-54</td>
+  <td class="severity major">Major</td>
+  <td class="body-cell">
+    <strong>Config format inconsistency between install-time and save-time writers.</strong>
+    Install-time: plain heredoc with raw interpolation (<code>PROTON=$GE_PROTON</code>).
+    Run-time (<code>save_config()</code>): <code>printf "%q"</code> for shell-safe escaping.
+    A fresh-install config cannot be safely re-sourced if values contain spaces or special chars.
+    The Python UI also uses a third format via <code>shlex.quote</code>.
+  </td>
+  <td class="rec-cell">
+    Use <code>printf "%q"</code> consistently in both config writers.
+    The Python UI's <code>shlex.quote</code>-based writer already handles this correctly;
+    the install-time writer should match.
+  </td>
+</tr>
+
+<tr>
+  <td>13</td>
+  <td class="file">runtime-scripts/launcher-functions.sh</td>
+  <td class="loc">302-308</td>
+  <td class="severity major">Major</td>
+  <td class="body-cell">
+    <strong>Browser bridge detection regression.</strong>
+    <code>register_wine_browser_bridge()</code> now only checks whether the
+    <code>[Software\Wine\WineBrowser]</code> section header exists, not whether
+    the actual <code>Browsers</code> value matches <code>$BROWSER</code>.
+    If the section exists from a prior configuration with a different browser,
+    the update is silently skipped.
+  </td>
+  <td class="rec-cell">
+    After checking section existence, also grep for the actual <code>$BROWSER</code> value:
+    <code>grep -qF "$BROWSER" "$user_reg" &amp;&amp; return 0</code> before deciding to skip.
+  </td>
+</tr>
+
+<tr>
+  <td>14</td>
+  <td class="file">runtime-scripts/launcher-functions.sh</td>
+  <td class="loc">268</td>
+  <td class="severity medium">Medium</td>
+  <td class="body-cell">
+    <strong>DPI log truncated instead of appended.</strong>
+    DPI setting output uses <code>&gt;</code> (overwrite) instead of <code>&gt;&gt;</code> (append),
+    losing diagnostic history across launches.
+  </td>
+  <td class="rec-cell">
+    Change <code>&gt;</code> to <code>&gt;&gt;</code>, or add log rotation if size is a concern.
+  </td>
+</tr>
+
+<tr>
+  <td>15</td>
+  <td class="file">install-scripts/30-prefix.sh</td>
+  <td class="loc">17-20</td>
+  <td class="severity medium">Medium</td>
+  <td class="body-cell">
+    <strong>Conflicting Wine environment variables.</strong>
+    winetricks invocation sets both <code>STEAM_COMPAT_DATA_PATH</code> and <code>WINEPREFIX</code>
+    simultaneously. These point to different paths by convention — one may override the other
+    depending on winetricks version, causing components to install in the wrong location.
+  </td>
+  <td class="rec-cell">
+    Use only one prefix mechanism consistently. If using Proton's <code>STEAM_COMPAT_DATA_PATH</code>,
+    drop <code>WINEPREFIX</code>. If winetricks requires <code>WINEPREFIX</code>, set it to
+    <code>$PFX_DIR/pfx</code>.
+  </td>
+</tr>
+
+<!-- ==================== CODE QUALITY ==================== -->
+<tr>
+  <td colspan="6" style="background:var(--surface); border-bottom:2px solid var(--border); font-weight:700; color:var(--minor);">
+    <span class="section-label quality">Code Quality</span> Best-practice improvements
+  </td>
+</tr>
+
+<tr>
+  <td>16</td>
+  <td class="file">doctor/00-common.sh</td>
+  <td class="loc">31</td>
+  <td class="severity minor">Minor</td>
+  <td class="body-cell">
+    <strong><code>echo -e "$*"</code> is a bashism.</strong>
+    POSIX <code>echo</code> doesn't support <code>-e</code>. In some shells it prints <code>-e</code> literally.
+    Works with <code>#!/usr/bin/env bash</code> but fragile if sourced from <code>/bin/sh</code>.
+  </td>
+  <td class="rec-cell">
+    Replace with <code>printf '%b\n' "$*"</code> for POSIX portability.
+  </td>
+</tr>
+
+<tr>
+  <td>17</td>
+  <td class="file">runtime-scripts/launcher-functions.sh</td>
+  <td class="loc">41-72</td>
+  <td class="severity minor">Minor</td>
+  <td class="body-cell">
+    <strong><code>printf "%q"</code> output varies across bash versions.</strong>
+    <code>save_config()</code> uses <code>printf "%q"</code> for shell-safe escaping.
+    Output format differs between bash versions — some use <code>$'...'</code>, others backslash escaping.
+    Older bash may not parse <code>$'...'</code> correctly in sourced configs.
+  </td>
+  <td class="rec-cell">
+    Consider a non-shell config format (INI, JSON), or use single-quote wrapping
+    (as the Python UI's <code>shlex.quote</code> does), which all bash versions handle correctly.
+  </td>
+</tr>
+
+<tr>
+  <td>18</td>
+  <td class="file">runtime-scripts/launcher-functions.sh</td>
+  <td class="loc">252-263</td>
+  <td class="severity medium">Medium</td>
+  <td class="body-cell">
+    <strong>Sequential sed -i calls create TOCTOU window.</strong>
+    Two back-to-back <code>sed -i</code> invocations on <code>user.reg</code>
+    (delete-then-append) leave a window where concurrent launcher instances
+    could read a partially-modified file.
+  </td>
+  <td class="rec-cell">
+    Combine into single <code>sed -e</code> with multiple expressions,
+    or write to temp file and atomically rename.
+  </td>
+</tr>
+
+<tr>
+  <td>19</td>
+  <td class="file">doctor/00-common.sh</td>
+  <td class="loc">26</td>
+  <td class="severity minor">Minor</td>
+  <td class="body-cell">
+    <strong>emit() function wrappers are unnecessary.</strong>
+    <code>emit() { echo -e "$*"; }</code> is a thin wrapper that adds no value
+    over inline <code>echo -e</code> (or better, <code>printf</code>).
+    Creates unnecessary indirection.
+  </td>
+  <td class="rec-cell">
+    Remove <code>emit()</code> and call <code>echo -e</code> (or <code>printf '%b\n'</code>)
+    directly at the three call sites.
+  </td>
+</tr>
+
+</tbody>
+</table>
+
+<h2>Proposed Work Plan</h2>
+
+<div class="scope-note">
+  <strong>Ordered by risk reduction:</strong> fix safety-critical issues first, then consolidation,
+  then error handling and consistency. Each step is independently verifiable.
+</div>
+
+<ol>
+  <li><strong>Fix critical eval in uninstall-select.sh</strong> — Rewrite <code>add_comp()</code> and execute
+    loop to use direct <code>rm -rf "$path"</code>. Remove <code>comp_cmds[]</code> array.
+    Handle glob patterns with <code>compgen -G</code>. Add <code>set -euo pipefail</code>.
+    <em>Files: runtime-scripts/uninstall-select.sh</em>
+  </li>
+
+  <li><strong>Guard all unprotected rm -rf</strong> — Add existence checks before destructive
+    operations in <code>uninstall.sh</code> (bridge temp files) and validate glob expansion.
+    <em>Files: uninstall.sh</em>
+  </li>
+
+  <li><strong>Consolidate process management</strong> — Extract shared kill function into
+    <code>launcher-functions.sh</code>. Refactor both <code>00-common.sh::kill_installer()</code>
+    and <code>kill-wine-proton-fusion-nuclear.sh</code> to use it. Use combined pgrep + /proc scan
+    with graceful escalation.
+    <em>Files: runtime-scripts/launcher-functions.sh, install-scripts/00-common.sh,
+      runtime-scripts/kill-wine-proton-fusion-nuclear.sh</em>
+  </li>
+
+  <li><strong>Fix exec without fallback</strong> — Add fallback in <code>parse_args()</code> for when
+    <code>exec > >(tee ...)</code> fails.
+    <em>Files: doctor/00-common.sh</em>
+  </li>
+
+  <li><strong>Add set -euo pipefail to all standalone scripts</strong> — Audit every runtime script,
+    add the guard. Add <code>|| true</code> on inherently failing commands to preserve expected behavior.
+    <em>Files: runtime-scripts/*.sh (except launcher-functions.sh which is sourced)</em>
+  </li>
+
+  <li><strong>Fix DPI validation in launcher-functions.sh</strong> — Add input validation,
+    combine sed ops, add error fallbacks.
+  </li>
+
+  <li><strong>Fix browser bridge detection regression</strong> — Verify <code>$BROWSER</code> value
+    matches the registry, not just section header existence.
+  </li>
+
+  <li><strong>Fix config format inconsistency</strong> — Make install-time and save-time config
+    writers use the same <code>printf "%q"</code> pattern.
+  </li>
+
+  <li><strong>Fix doctor.sh set flags</strong> — Add <code>-e</code> to match project convention.
+  </li>
+
+  <li><strong>Minor quality fixes</strong> — <code>echo -e</code> → <code>printf '%b\n'</code>,
+    DPI log append, add usage to parse_args, remove emit() wrapper, unify SCRIPT_DIR computation.
+  </li>
+</ol>
+
+<h2>Detailed Patches</h2>
+
+<h3>1. uninstall-select.sh — Remove eval, fix globs</h3>
+
+<p>Replace the <code>add_comp()</code> function and execute loop:</p>
+
+<div class="patch-block">  <span class="del">- comp_cmds=()</span>
+  <span class="ins">+ # (remove this array entirely)</span>
+
+  <span class="del">- add_comp() {</span>
+  <span class="del">-   local name="$1" path="$2" cmd="$3"</span>
+  <span class="del">-   if [[ -e "$path" ]]; then</span>
+  <span class="del">-     local size</span>
+  <span class="del">-     size=$(du -sh "$path" 2>/dev/null | cut -f1)</span>
+  <span class="del">-     components+=("$path")</span>
+  <span class="del">-     comp_names+=("$name")</span>
+  <span class="del">-     comp_sizes+=("$size")</span>
+  <span class="del">-     comp_cmds+=("$cmd")</span>
+  <span class="del">-   fi</span>
+  <span class="del">- }</span>
+  <span class="ins">+ add_comp() {</span>
+  <span class="ins">+   local name="$1" path="$2"</span>
+  <span class="ins">+   local size="" exists=false</span>
+  <span class="ins">+   if [[ "$path" == *\** ]]; then</span>
+  <span class="ins">+     compgen -G "$path" &>/dev/null && exists=true</span>
+  <span class="ins">+   elif [[ -e "$path" ]]; then</span>
+  <span class="ins">+     exists=true</span>
+  <span class="ins">+     size=$(du -sh "$path" 2>/dev/null | cut -f1)</span>
+  <span class="ins">+   fi</span>
+  <span class="ins">+   if $exists; then</span>
+  <span class="ins">+     components+=("$path")</span>
+  <span class="ins">+     comp_names+=("$name")</span>
+  <span class="ins">+     comp_sizes+=("$size")</span>
+  <span class="ins">+   fi</span>
+  <span class="ins">+ }</span>
+
+  All callers change from 3-arg to 2-arg (remove cmd string).
+
+  <span class="del">-   eval "${comp_cmds[idx]}"</span>
+  <span class="ins">+   local path="${components[idx]}"</span>
+  <span class="ins">+   if [[ "$path" == *\** ]]; then</span>
+  <span class="ins">+     rm -rf $path 2>/dev/null || true</span>
+  <span class="ins">+   else</span>
+  <span class="ins">+     rm -rf "$path"</span>
+  <span class="ins">+   fi</span></div>
+
+<h3>2. uninstall.sh — Guard bridge temp files</h3>
+
+<div class="patch-block">  <span class="del">- echo "  Removing bridge temp files..."</span>
+  <span class="del">- rm -rf /tmp/fusion360-* 2>/dev/null || true</span>
+  <span class="del">- echo "    Removed: /tmp/fusion360-*"</span>
+  <span class="ins">+ if compgen -G '/tmp/fusion360-*' &>/dev/null; then</span>
+  <span class="ins">+   rm -rf /tmp/fusion360-*</span>
+  <span class="ins">+   echo "    Removed: /tmp/fusion360-*"</span>
+  <span class="ins">+ else</span>
+  <span class="ins">+   echo "  [SKIP] No bridge temp files found."</span>
+  <span class="ins">+ fi</span></div>
+
+<h3>3. Consolidate kill function into launcher-functions.sh</h3>
+
+<div class="patch-block">  # Add to runtime-scripts/launcher-functions.sh:
+  kill_fusion_processes() {
+    local user; user=$(id -u)
+    local patterns=(
+      "wineserver" "wine" "proton" "xalia" "streamer"
+      "Fusion360" "FusionClientDownloader" "AdskIdentity" "adexmtsv"
+      "steam\\.exe" "node\\.exe" "fusion-gray-overlay"
+    )
+    local pids=()
+    # Method 1: pgrep by cmdline
+    for pattern in "${patterns[@]}"; do
+      while IFS= read -r pid; do
+        [[ -n "$pid" ]] && pids+=("$pid")
+      done &lt; &lt;(pgrep -u "$user" -f "$pattern" 2>/dev/null || true)
+    done
+    # Method 2: /proc/PID/exe scan
+    for proc in /proc/[0-9]*/exe; do
+      local exe; exe=$(readlink "$proc" 2>/dev/null || true)
+      [[ "$exe" == *wine* || "$exe" == *proton* ]] || continue
+      local pid="${proc%/exe}"; pid="${pid#/proc/}"
+      pids+=("$pid")
+    done
+    # Deduplicate
+    local unique=()
+    for pid in "${pids[@]}"; do
+      [[ -z "$pid" ]] && continue
+      case " ${unique[*]} " in *" $pid "*) continue ;; esac
+      unique+=("$pid")
+    done
+    (( ${#unique[@]} == 0 )) && return 0
+    # Term gracefully then force
+    for pid in "${unique[@]}"; do kill "$pid" 2>/dev/null || true; done
+    sleep 0.3
+    for pid in "${unique[@]}"; do kill -9 "$pid" 2>/dev/null || true; done
+    sleep 1
+    # Verify
+    local survivors=0
+    for proc in /proc/[0-9]*/exe; do
+      local exe; exe=$(readlink "$proc" 2>/dev/null || true)
+      [[ "$exe" == *wine* || "$exe" == *proton* ]] || continue
+      survivors=$((survivors + 1))
+    done
+    (( survivors == 0 )) &amp;&amp; echo "  [lifecycle] Killed successfully." \
+      || echo "  [lifecycle] $survivors process(es) still running."
+  }</div>
+
+  <p>Then <code>kill-wine-proton-fusion-nuclear.sh</code> simplifies to:</p>
+<div class="patch-block">  <span class="del">- #!/usr/bin/env bash</span>
+  <span class="del">- set -euo pipefail</span>
+  <span class="del">- USER_NAME="$(id -un)"</span>
+  <span class="del">- # ... 26 lines of pkill patterns ...</span>
+  <span class="ins">+ #!/usr/bin/env bash</span>
+  <span class="ins">+ set -euo pipefail</span>
+  <span class="ins">+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." &amp;&amp; pwd)"</span>
+  <span class="ins">+ source "$SCRIPT_DIR/runtime-scripts/launcher-functions.sh"</span>
+  <span class="ins">+ kill_fusion_processes</span></div>
+
+  <p>And <code>00-common.sh::kill_installer()</code> gains <code>source "$SCRIPT_DIR/runtime-scripts/launcher-functions.sh"</code>
+    at the top and replaces its body with a call to <code>kill_fusion_processes</code>, keeping
+    only the INSTALLER_PID-specific logic and lock file removal.</p>
+
+<h3>4. doctor/00-common.sh — exec with fallback</h3>
+
+<div class="patch-block">  <span class="del">-     exec &gt; &gt;(tee "$REPORT_FILE") 2&gt;&amp;1</span>
+  <span class="ins">+     exec &gt; &gt;(tee "$REPORT_FILE") 2&gt;&amp;1 || {</span>
+  <span class="ins">+       echo "Warning: could not tee to $REPORT_FILE, logging to file only" &gt;&amp;2</span>
+  <span class="ins">+       exec &gt; "$REPORT_FILE" 2&gt;&amp;1</span>
+  <span class="ins">+     }</span></div>
+
+<h2>Source Attribution</h2>
+
+<div class="scope-note">
+  <strong>Cross-referenced agent reports:</strong>
+  <ul>
+    <li><code>docs/review/CodeSmell.html</code> — Duplication and code smell findings</li>
+    <li><code>docs/review/DangerZone.html</code> — Unsafe operations audit</li>
+    <li><code>docs/review/CodeReview.html</code> — Full code review with critical eval finding, DPI issues, config inconsistency, and architecture notes</li>
+  </ul>
+  My own analysis cross-verified every finding against live code, identified
+  additional issues (glob dead code in uninstall-select.sh, missing PFX_DIR guard,
+  unnecessary emit() wrapper), and designed the consolidation patches.
+</div>
+
+</body>
+</html>

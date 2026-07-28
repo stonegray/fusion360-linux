@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Code Review: CodeReview.PythonFile</title>
+<style>
+    body { font-family: sans-serif; margin: 2em; line-height: 1.5; color: #333; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+    th { background-color: #f4f4f4; }
+    .monospace { font-family: monospace; }
+    .sev-high { color: #d9534f; font-weight: bold; }
+    .sev-medium { color: #f0ad4e; font-weight: bold; }
+    .sev-low { color: #5bc0de; font-weight: bold; }
+</style>
+</head>
+<body>
+    <h1>Code Review: launcher-config-user-interface.py</h1>
+    <p><strong>Agent:</strong> CodeReview.PythonFile</p>
+    <table>
+        <tr>
+            <th>File</th>
+            <th>Issue</th>
+            <th>Severity</th>
+            <th>Recommendation</th>
+            <th>Line</th>
+        </tr>
+        <tr>
+            <td class="monospace">launcher-config-user-interface.py</td>
+            <td>Missing argument check for <code>sys.argv[1]</code></td>
+            <td class="sev-medium">Medium</td>
+            <td>Check <code>len(sys.argv)</code> before indexing.</td>
+            <td>10</td>
+        </tr>
+        <tr>
+            <td class="monospace">launcher-config-user-interface.py</td>
+            <td>Potential arbitrary script execution</td>
+            <td class="sev-high">High</td>
+            <td>Validate <code>FUSION_WINE_RESTART_SCRIPT</code> path.</td>
+            <td>569</td>
+        </tr>
+        <tr>
+            <td class="monospace">launcher-config-user-interface.py</td>
+            <td>Broad exception handling</td>
+            <td class="sev-low">Low</td>
+            <td>Catch specific exceptions (e.g., <code>subprocess.CalledProcessError</code>).</td>
+            <td>112, 137</td>
+        </tr>
+        <tr>
+            <td class="monospace">launcher-config-user-interface.py</td>
+            <td>No type annotations</td>
+            <td class="sev-low">Low</td>
+            <td>Add PEP 484 type hints.</td>
+            <td>All</td>
+        </tr>
+        <tr>
+            <td class="monospace">launcher-config-user-interface.py</td>
+            <td>Fragile GUI layout indices</td>
+            <td class="sev-low">Low</td>
+            <td>Use dynamic row calculation or object-oriented layout.</td>
+            <td>382</td>
+        </tr>
+    </table>
+</body>
+</html>

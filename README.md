@@ -77,37 +77,52 @@ No passwords are written to files. The bridge writes short-lived URLs only.
 ## Repository Structure
 
 ```
-├── install.sh                 # Thin wrapper over install-scripts/
-├── install-scripts/           # Numbered install steps
-│   ├── 00-common.sh           #   shared vars and helpers
-│   ├── 10-deps.sh             #   system packages
-│   ├── 20-ge-proton.sh        #   download/extract GE-Proton
-│   ├── 30-prefix.sh           #   init prefix + winetricks
-│   └── 40-fusion-installer.sh #   download + run Fusion installer
-├── setup-fusion.sh            # Re-runnable post-install config
-├── runtime-scripts/           # Scripts used by launch-fusion.sh
-│   ├── fusion-browser.sh
-│   ├── fusion-browser-listener.sh
-│   ├── fusion-callback-handler.sh
-│   ├── fusion-gray-overlay-event-killer.sh
-│   ├── kill-wine-proton-fusion-nuclear.sh
-│   ├── launcher-functions.sh
-│   └── launcher-config-user-interface.py
-├── doctor.sh                  # Thin wrapper over doctor/*.sh
-├── doctor/                    # Diagnostic modules
-│   ├── 00-common.sh
-│   ├── 10-env.sh
-│   ├── 20-deps.sh
-│   └── ...
-├── status.sh                  # Quick prerequisite check
+├── install.sh                 # Thin wrapper over src/install/
 ├── uninstall.sh               # Clean removal
-├── launch-fusion.sh           # Main launcher
+├── status.sh                  # Quick prerequisite check
+├── doctor.sh                  # Thin wrapper over src/doctor/
+├── src/
+│   ├── bin/
+│   │   └── launch-fusion.sh   # Main launcher
+│   ├── install/               # Numbered install steps
+│   │   ├── 00-common.sh       #   shared vars and helpers
+│   │   ├── 00-defaults.sh     #   XDG path constants
+│   │   ├── 10-deps.sh         #   system packages
+│   │   ├── 20-ge-proton.sh    #   download/extract GE-Proton
+│   │   ├── 25-install-to-location.sh  # copy to XDG dirs
+│   │   ├── 30-prefix.sh       #   init prefix + winetricks
+│   │   ├── 35-webview2.sh     #   WebView2 runtime
+│   │   ├── 37-config.sh       #   config file generation
+│   │   └── 40-fusion-installer.sh #   download + run Fusion installer
+│   ├── runtime/               # Scripts used by launch-fusion.sh
+│   │   ├── launcher-functions.sh
+│   │   ├── launcher-config-user-interface.py
+│   │   ├── fusion-browser.sh
+│   │   ├── fusion-browser-listener.sh
+│   │   ├── fusion-callback-handler.sh
+│   │   ├── fusion-gray-overlay-event-killer.sh
+│   │   ├── kill-wine-proton-fusion-nuclear.sh
+│   │   ├── health-check.sh
+│   │   ├── register-protocols.sh
+│   │   ├── uninstall-select.sh
+│   │   └── audit-fusion-prefix.sh
+│   └── doctor/                # Diagnostic modules
+│       ├── 00-common.sh
+│       ├── 10-env.sh
+│       ├── 20-deps.sh
+│       ├── 30-proton.sh
+│       ├── 40-fusion.sh
+│       ├── 50-config.sh
+│       ├── 60-bridge.sh
+│       ├── 70-processes.sh
+│       ├── 80-logs.sh
+│       ├── 90-install.sh
+│       └── 100-network.sh
 ├── Makefile                   # make run/kill/ps/log
 └── docs/
     ├── troubleshooting.md
-    ├── what-worked-what-didnt.md
-    ├── actions-log.md
-    └── fusion360-linux-install-guide.md
+    ├── review/                # Agent review reports
+    └── install-guide.md
 ```
 
 ## Troubleshooting

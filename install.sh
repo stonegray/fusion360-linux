@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # install.sh — Install Fusion360 on Linux.
-# Thin wrapper over install-scripts/*.sh (numbered steps).
+# Thin wrapper over src/install/*.sh (numbered steps).
 # Sets up cleanup traps to kill installer on Ctrl+C or unexpected exit.
 #
 # Usage:
@@ -31,11 +31,11 @@ if [[ "${1:-}" == "--installer-path" ]]; then
   MODE="--run-installer"
 fi
 
-source "$SCRIPT_DIR/install-scripts/00-common.sh"
+source "$SCRIPT_DIR/src/install/00-common.sh"
 setup_traps
 
 run_step() {
-  source "$SCRIPT_DIR/install-scripts/$1"
+  source "$SCRIPT_DIR/src/install/$1"
 }
 
 case "$MODE" in

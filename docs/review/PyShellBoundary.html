@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PyShellBoundary Analysis</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; }
+        h1 { color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #f8f9fa; font-weight: bold; }
+        .path { font-family: monospace; background: #f4f4f4; padding: 2px 4px; border-radius: 3px; }
+        .severity-high { color: #c0392b; font-weight: bold; }
+        .severity-med { color: #d35400; font-weight: bold; }
+        .severity-low { color: #27ae60; font-weight: bold; }
+        .rationale { font-size: 0.9em; color: #666; }
+    </style>
+</head>
+<body>
+    <h1>PyShellBoundary: Python / Shell Boundary Analysis</h1>
+    <p>This report analyzes the functional split between Python and Shell scripts in the Fusion360 Linux Launcher.</p>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>File:Function</th>
+                <th>Current</th>
+                <th>Recommended</th>
+                <th>Issue / Rationale</th>
+                <th>Severity</th>
+                <th>Effort</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="path">launcher-functions.sh:resolve_fusion_wine_dpi</span></td>
+                <td>Shell</td>
+                <td>Python</td>
+                <td><b>Logic Duplication.</b> Shell implementation is a manual rewrite of the Python logic. Shell is fragile for complex desktop config parsing (GSettings, KDE kreadconfig). Python has better error handling and libraries for this.</td>
+                <td><span class="severity-med">Medium</span></td>
+                <td>Low</td>
+            </tr>
+            <tr>
+                <td><span class="path">launcher-functions.sh:apply_fusion_wine_dpi</span></td>
+                <td>Shell</td>
+                <td>Python</td>
+                <td><b>Registry Patching.</b> Uses <code>sed</code> to patch <code>user.reg</code>. This is extremely fragile and can corrupt the registry if line breaks or sections differ. Python can handle registry file parsing/writing much more safely.</td>
+                <td><span class="severity-high">High</span></td>
+                <td>Med</td>
+            </tr>
+            <tr>
+                <td><span class="path">launcher-functions.sh:register_wine_browser_bridge</span></td>
+                <td>Shell</td>
+                <td>Python</td>
+                <td><b>Registry Patching.</b> Similar to DPI patching, it appends to the registry. Should be moved to a unified Python "Registry Manager" for consistency and safety.</td>
+                <td><span class="severity-high">High</span></td>
+                <td>Low</td>
+            </tr>
+            <tr>
+                <td><span class="path">health-check.sh</span></td>
+                <td>Shell</td>
+                <td>Python</td>
+                <td><b>Heuristic Blindness.</b> Currently only checks file existence. Python could perform deeper validation (e.g., checking if <code>Fusion360.exe</code> is the correct version, validating config keys, checking Proton version compatibility).</td>
+                <td><span class="severity-med">Medium</span></td>
+                <td>Med</td>
+            </tr>
+            <tr>
+                <td><span class="path">launcher-config-user-interface.py</span></td>
+                <td>Python</td>
+                <td>Python</td>
+                <td><b>GUI / Interaction.</b> Python + Tkinter is ideal here. Shell-based <code>zenity</code> or <code>dialog</code> is too limited for the complex configuration required.</td>
+                <td><span class="severity-low">Low</span></td>
+                <td>N/A</td>
+            </tr>
+             <tr>
+                <td><span class="path">launcher-functions.sh:apply_launch_environment</span></td>
+                <td>Shell</td>
+                <td>Shell</td>
+                <td><b>Environment Export.</b> Shell is the natural place for <code>export</code>. Calling Python to export env vars to a parent shell is unnecessarily complex.</td>
+                <td><span class="severity-low">Low</span></td>
+                <td>N/A</td>
+            </tr>
+            <tr>
+                <td><span class="path">00-common.sh:kill_installer</span></td>
+                <td>Shell</td>
+                <td>Python (Helper)</td>
+                <td><b>Process Management.</b> Complex grep/pgrep logic to find Wine processes. Python <code>psutil</code> (if available) or more robust parsing of <code>/proc</code> would be more reliable on various distros.</td>
+                <td><span class="severity-med">Medium</span></td>
+                <td>Med</td>
+            </tr>
+            <tr>
+                <td><span class="path">launcher-functions.sh:save_config</span></td>
+                <td>Shell</td>
+                <td>Python</td>
+                <td><b>Config Marshalling.</b> Shell uses heredocs. Moving to Python allows for JSON/YAML or more robust shell-safe escaping without manual <code>printf %q</code>.</td>
+                <td><span class="severity-low">Low</span></td>
+                <td>Low</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div style="margin-top: 30px; padding: 20px; background: #fdf2f2; border-left: 5px solid #d9534f;">
+        <h2>Strategic Recommendation</h2>
+        <p><b>Proposal:</b> Transition to a <b>Python-Driven Core</b> with <b>Shell Entrypoints</b>.</p>
+        <ul>
+            <li><b>Python:</b> Logic, Config Validation, Registry Patching, DPI Resolution, Health Checks.</li>
+            <li><b>Shell:</b> Process bootstrapping, Environment variable orchestration, and launching child processes.</li>
+        </ul>
+        <p><b>Benefit:</b> significantly simplifies testing (Python <code>unittest</code>), improves reliability for registry edits, and eliminates logic duplication.</p>
+        <p><b>Cost:</b> Hard dependency on <code>python3-tk</code> (already required for UI) and potentially <code>psutil</code> (optional but recommended).</p>
+    </div>
+</body>
+</html>

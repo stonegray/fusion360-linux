@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeReview — Fusion360 Linux Launcher Review</title>
+<style>
+  :root {
+    --bg: #1a1b1e;
+    --surface: #25262b;
+    --border: #373a40;
+    --text: #c1c2c5;
+    --heading: #e0e0e0;
+    --critical: #e03131;
+    --major: #f08c00;
+    --medium: #fab005;
+    --minor: #74b816;
+    --link: #74c0fc;
+    --mono: #909296;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+  h1 { color: var(--heading); font-size: 1.8rem; margin-bottom: 0.3rem; }
+  h2 { color: var(--heading); font-size: 1.3rem; margin: 2rem 0 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
+  .meta { color: var(--mono); font-size: 0.9rem; margin-bottom: 1.5rem; }
+  .verdict {
+    padding: 1rem 1.2rem; border-radius: 8px; margin-bottom: 1.5rem;
+    border-left: 4px solid var(--critical);
+    background: var(--surface);
+  }
+  .verdict.incorrect { border-left-color: var(--critical); }
+  .verdict.correct { border-left-color: var(--minor); }
+  .verdict strong { display: block; font-size: 1.1rem; margin-bottom: 0.3rem; color: var(--heading); }
+  table {
+    width: 100%; border-collapse: collapse; margin: 1rem 0 2rem;
+    font-size: 0.92rem;
+  }
+  th, td { padding: 0.65rem 0.8rem; text-align: left; vertical-align: top; }
+  th { background: var(--surface); color: var(--heading); font-weight: 600; border-bottom: 2px solid var(--border); }
+  td { border-bottom: 1px solid var(--border); }
+  tr:hover td { background: rgba(255,255,255,0.03); }
+  .file { font-family: "JetBrains Mono", "Fira Code", monospace; font-size: 0.85rem; color: var(--link); }
+  .loc { font-family: "JetBrains Mono", "Fira Code", monospace; font-size: 0.82rem; color: var(--mono); white-space: nowrap; }
+  .severity { font-weight: 600; white-space: nowrap; }
+  .severity.critical { color: var(--critical); }
+  .severity.major { color: var(--major); }
+  .severity.medium { color: var(--medium); }
+  .severity.minor { color: var(--minor); }
+  .body-cell { max-width: 480px; }
+  .rec-cell { max-width: 400px; }
+  .summary-stats { display: flex; gap: 1.5rem; margin: 1rem 0 1.5rem; }
+  .stat { padding: 0.5rem 1rem; background: var(--surface); border-radius: 6px; border: 1px solid var(--border); }
+  .stat .num { font-size: 1.5rem; font-weight: 700; }
+  .stat .label { font-size: 0.8rem; color: var(--mono); }
+  .stat.critical-stat { border-color: var(--critical); }
+  .stat.critical-stat .num { color: var(--critical); }
+  .stat.major-stat { border-color: var(--major); }
+  .stat.major-stat .num { color: var(--major); }
+  .stat.medium-stat { border-color: var(--medium); }
+  .stat.medium-stat .num { color: var(--medium); }
+  .stat.minor-stat { border-color: var(--minor); }
+  .stat.minor-stat .num { color: var(--minor); }
+  code { font-family: "JetBrains Mono", "Fira Code", monospace; font-size: 0.85rem; background: var(--surface); padding: 0.1em 0.3em; border-radius: 3px; }
+  .scope-note { background: var(--surface); padding: 0.8rem 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem; color: var(--mono); }
+</style>
+</head>
+<body>
+
+<h1>🔍 CodeReview — Fusion360 Linux Launcher</h1>
+<p class="meta">Review of all <code>.sh</code> and <code>.py</code> files | 2026-07-28 | 36 files analyzed</p>
+
+<div class="scope-note">
+  <strong>Scope:</strong> Full review covering the git diff (launcher-functions.sh DPI + browser bridge rewrite)
+  plus all shell scripts and the Python config UI across the repository.
+</div>
+
+<div class="verdict incorrect">
+  <strong>⚠ Verdict: INCORRECT — bugs found that block release</strong>
+  1 critical, 5 major, and several medium/minor issues identified. The critical finding is an <code>eval</code> on constructed
+  shell commands in the uninstaller. The major findings include missing error handling in the rewritten DPI registry code,
+  a regression in browser bridge detection, and format inconsistencies between install-time and save-time config writers.
+</div>
+
+<div class="summary-stats">
+  <div class="stat critical-stat"><div class="num">1</div><div class="label">Critical</div></div>
+  <div class="stat major-stat"><div class="num">5</div><div class="label">Major</div></div>
+  <div class="stat medium-stat"><div class="num">4</div><div class="label">Medium</div></div>
+  <div class="stat minor-stat"><div class="num">3</div><div class="label">Minor</div></div>
+</div>
+
+<h2>Findings</h2>
+
+<table>
+<thead>
+<tr>
+  <th>File</th>
+  <th>Lines</th>
+  <th>Severity</th>
+  <th>Issue</th>
+  <th>Recommendation</th>
+</tr>
+</thead>
+<tbody>
+
+<!-- FINDING 1: Critical -->
+<tr>
+  <td class="file">runtime-scripts/uninstall-select.sh</td>
+  <td class="loc">114–117</td>
+  <td class="severity critical">🔴 Critical</td>
+  <td class="body-cell">
+    <strong>eval on constructed command strings.</strong>
+    The <code>comp_cmds</code> array stores <code>rm -rf</code> command strings built from
+    hardcoded templates with <code>$HOME</code> expansion. At line 116 these are executed via
+    <code>eval "${comp_cmds[idx]}"</code>. If any path variable ever contains shell
+    metacharacters (spaces, <code>;</code>, <code>$</code>), arbitrary command execution is possible.
+    The unquoted <code>$HOME</code> in the templates compounds the risk.
+  </td>
+  <td class="rec-cell">
+    Replace <code>eval</code> with direct execution using properly quoted arrays:
+    <br><code>rm -rf "$path"</code> called inline, not through a string. Store paths, not shell code.
+  </td>
+</tr>
+
+<!-- FINDING 2: Major — DPI error handling -->
+<tr>
+  <td class="file">runtime-scripts/launcher-functions.sh</td>
+  <td class="loc">237–270</td>
+  <td class="severity major">🟠 Major</td>
+  <td class="body-cell">
+    <strong>DPI registry writes lack error handling and input validation.</strong>
+    The rewritten <code>apply_fusion_wine_dpi()</code> manipulates <code>user.reg</code> directly
+    via <code>sed -i</code> and <code>echo &gt;&gt;</code>. Three problems:
+    <ol style="margin:0.3em 0 0 1.2em; padding:0;">
+      <li><code>[[ "$dpi_value" -eq 96 ]]</code> at line 240 will emit a bash error if
+          <code>dpi_value</code> is empty or non-numeric (possible if config is misconfigured).</li>
+      <li>Multiple sequential <code>sed -i</code> calls on the same file are not atomic;
+          if the first succeeds but the second fails, the registry is left partially modified.</li>
+      <li>Unlike the old code which had <code>|| { echo warning... }</code> fallbacks,
+          none of the new <code>sed</code>/<code>echo</code>/<code>grep</code> calls check exit status.
+          Silent failures go undetected.</li>
+    </ol>
+  </td>
+  <td class="rec-cell">
+    <ol style="margin:0; padding:0 0 0 1.2em;">
+      <li>Validate that <code>dpi_value</code> is a positive integer before arithmetic comparisons:
+          <br><code>[[ "$dpi_value" =~ ^[0-9]+$ ]] || return 1</code></li>
+      <li>Combine the two <code>sed</code> operations into a single invocation, or use a temp-file +
+          atomic rename pattern.</li>
+      <li>Add <code>|| { echo "warning: ..." &gt;&amp;2; }</code> on each <code>sed</code> call,
+          or set <code>set -e</code> so failures halt. At minimum, log when writes fail.</li>
+    </ol>
+  </td>
+</tr>
+
+<!-- FINDING 3: Major — Browser bridge regression -->
+<tr>
+  <td class="file">runtime-scripts/launcher-functions.sh</td>
+  <td class="loc">302–308</td>
+  <td class="severity major">🟠 Major</td>
+  <td class="body-cell">
+    <strong>Browser bridge detection regression.</strong>
+    <code>register_wine_browser_bridge()</code> now only checks whether the
+    <code>[Software\\Wine\\WineBrowser]</code> section header exists, not whether
+    the actual <code>Browsers</code> value matches <code>$BROWSER</code>.
+    The old code grepped <code>$BROWSER</code> in the <code>reg query</code> output.
+    If the section exists but points to a different browser path (e.g., after
+    reconfiguring BROWSER), the new code silently skips the update.
+  </td>
+  <td class="rec-cell">
+    After checking section existence, also grep for the actual
+    <code>$BROWSER</code> value inside the section. Example:
+    <br><code>grep -q '^\[Software\\\\Wine\\\\WineBrowser\]' ... && grep -qF "$BROWSER" ... && return 0</code>
+  </td>
+</tr>
+
+<!-- FINDING 4: Major — Glob expansion -->
+<tr>
+  <td class="file">runtime-scripts/uninstall-select.sh</td>
+  <td class="loc">82</td>
+  <td class="severity major">🟠 Major</td>
+  <td class="body-cell">
+    <strong>Unquoted variable subjected to glob expansion.</strong>
+    <code>for num in $selection</code> splits the user's input on whitespace
+    (intentional for space-separated numbers), but also subjects each token to
+    pathname (glob) expansion. If the user types characters like <code>*</code>
+    or <code>?</code>, unexpected file matching occurs.
+  </td>
+  <td class="rec-cell">
+    Use <code>read -ra nums &lt;&lt;&lt; "$selection"</code> (bash) or
+    <code>set -f</code> before the loop and <code>set +f</code> after to
+    disable globbing during parsing.
+  </td>
+</tr>
+
+<!-- FINDING 5: Major — Config format inconsistency -->
+<tr>
+  <td class="file">install-scripts/37-config.sh</td>
+  <td class="loc">34–54</td>
+  <td class="severity major">🟠 Major</td>
+  <td class="body-cell">
+    <strong>Config file written without value escaping.</strong>
+    The install-time config writer uses a plain heredoc with raw variable
+    interpolation (<code>PROTON=$GE_PROTON</code>). Values that contain
+    spaces or special characters produce broken config files.
+    Meanwhile, <code>save_config()</code> in <code>launcher-functions.sh</code>
+    uses <code>printf "%q"</code> for proper shell escaping. These two
+    writers produce inconsistent formats — a config saved via the Python UI
+    will be properly quoted, but a fresh install config won't be.
+  </td>
+  <td class="rec-cell">
+    Use <code>printf "%q"</code> (or <code>shlex.quote</code> in Python) in
+    <em>both</em> config writers. Enforce a single canonical format.
+    The Python UI's <code>write_config_values</code> already does this correctly.
+  </td>
+</tr>
+
+<!-- FINDING 6: Major — Missing set -euo pipefail -->
+<tr>
+  <td class="file">runtime-scripts/ (multiple)</td>
+  <td class="loc">various</td>
+  <td class="severity major">🟠 Major</td>
+  <td class="body-cell">
+    <strong>Most runtime scripts lack <code>set -euo pipefail</code>.</strong>
+    Only <code>kill-wine-proton-fusion-nuclear.sh</code> uses it.
+    <code>fusion-browser.sh</code>, <code>fusion-callback-handler.sh</code>,
+    <code>fusion-browser-listener.sh</code>, <code>fusion-gray-overlay-event-killer.sh</code>,
+    <code>register-protocols.sh</code>, and <code>health-check.sh</code> all lack it.
+    Failures in intermediate pipeline stages or unset variable references go silently unnoticed.
+    The <code>uninstall-select.sh</code> script also lacks it, making the eval issue worse.
+  </td>
+  <td class="rec-cell">
+    Add <code>set -euo pipefail</code> to every standalone script.
+    For sourced scripts, document that they expect <code>set -euo pipefail</code>
+    from the caller (as <code>install.sh</code> already does).
+  </td>
+</tr>
+
+<!-- FINDING 7: Medium — DPI log truncation -->
+<tr>
+  <td class="file">runtime-scripts/launcher-functions.sh</td>
+  <td class="loc">268</td>
+  <td class="severity medium">🟡 Medium</td>
+  <td class="body-cell">
+    <strong>DPI log truncated instead of appended.</strong>
+    The old code used <code>&gt;&gt;</code> to append DPI setting output to
+    <code>$FUSION_DPI_LOG_FILE</code>. The new code uses <code>&gt;</code>
+    which overwrites the file each launch. This loses diagnostic history
+    that could be useful for troubleshooting DPI issues across launches.
+  </td>
+  <td class="rec-cell">
+    Change <code>&gt;</code> to <code>&gt;&gt;</code> on line 268 to preserve
+    log history, or add a log rotation mechanism if size is a concern.
+  </td>
+</tr>
+
+<!-- FINDING 8: Medium — winetricks env conflict -->
+<tr>
+  <td class="file">install-scripts/30-prefix.sh</td>
+  <td class="loc">17–20</td>
+  <td class="severity medium">🟡 Medium</td>
+  <td class="body-cell">
+    <strong>Conflicting Wine environment variables.</strong>
+    The winetricks invocation sets both <code>STEAM_COMPAT_DATA_PATH</code>
+    (Proton's prefix location) and <code>WINEPREFIX</code> (Wine's prefix
+    location) simultaneously. These point to different paths by convention
+    (<code>STEAM_COMPAT_DATA_PATH</code> is the parent of <code>pfx/</code>,
+    while <code>WINEPREFIX</code> points directly at the prefix root).
+    Depending on winetricks version, one may override the other, leading to
+    components being installed in the wrong location.
+  </td>
+  <td class="rec-cell">
+    Use only one prefix mechanism consistently. If using Proton's
+    <code>STEAM_COMPAT_DATA_PATH</code>, drop <code>WINEPREFIX</code>.
+    If winetricks requires <code>WINEPREFIX</code>, set it to
+    <code>$PFX_DIR/pfx</code> and ensure it matches.
+  </td>
+</tr>
+
+<!-- FINDING 9: Medium — parse_args ignores unknown -->
+<tr>
+  <td class="file">doctor/00-common.sh</td>
+  <td class="loc">11–20</td>
+  <td class="severity medium">🟡 Medium</td>
+  <td class="body-cell">
+    <strong>parse_args silently ignores unknown arguments.</strong>
+    Only <code>--save</code> and <code>--quick</code> are recognized.
+    Any other argument (typo, <code>--help</code>, etc.) falls through
+    with no error or feedback. The user believes a flag was applied when it wasn't.
+  </td>
+  <td class="rec-cell">
+    Add a <code>*)</code> catch-all case that prints an error and exits,
+    or add a <code>--help</code> flag. At minimum, warn on unknown arguments.
+  </td>
+</tr>
+
+<!-- FINDING 10: Medium — sed TOCTOU -->
+<tr>
+  <td class="file">runtime-scripts/launcher-functions.sh</td>
+  <td class="loc">252–253, 262–263</td>
+  <td class="severity medium">🟡 Medium</td>
+  <td class="body-cell">
+    <strong>Sequential sed -i calls create TOCTOU window.</strong>
+    Two back-to-back <code>sed -i</code> invocations on <code>user.reg</code>
+    (delete-then-append pattern) leave a window where another process could
+    read a partially-modified file. While the risk is low in single-user
+    scenarios, concurrent launcher instances (e.g., from a misconfigured
+    double-click) would race.
+  </td>
+  <td class="rec-cell">
+    Combine both operations into a single <code>sed</code> invocation
+    using multiple <code>-e</code> expressions, or write to a temp file
+    and atomically rename.
+  </td>
+</tr>
+
+<!-- FINDING 11: Minor — echo -e -->
+<tr>
+  <td class="file">doctor/00-common.sh</td>
+  <td class="loc">31</td>
+  <td class="severity minor">🟢 Minor</td>
+  <td class="body-cell">
+    <strong><code>echo -e</code> is a bashism.</strong>
+    POSIX <code>echo</code> does not support <code>-e</code>; in some shells
+    it would literally print <code>-e</code>. Since the shebang is
+    <code>#!/usr/bin/env bash</code> this works in practice, but it's fragile
+    if ever sourced from a <code>/bin/sh</code> script.
+  </td>
+  <td class="rec-cell">
+    Replace <code>echo -e "$*"</code> with <code>printf '%b\n' "$*"</code>
+    for portability. Or use <code>$'...'</code> ANSI-C quoting in bash.
+  </td>
+</tr>
+
+<!-- FINDING 12: Minor — printf %q portability -->
+<tr>
+  <td class="file">runtime-scripts/launcher-functions.sh</td>
+  <td class="loc">41–72</td>
+  <td class="severity minor">🟢 Minor</td>
+  <td class="body-cell">
+    <strong><code>printf "%q"</code> output format varies across bash versions.</strong>
+    <code>save_config()</code> uses <code>printf "%q"</code> for shell escaping.
+    The output format differs between bash versions — some use <code>$'...'</code>
+    quoting, others use backslash escaping. When <code>load_config()</code>
+    sources the file, older bash versions may not parse <code>$'...'</code>
+    correctly, leading to config loading failures.
+  </td>
+  <td class="rec-cell">
+    Consider using a non-shell config format (INI, JSON) or use a consistent
+    quoting mechanism. The Python UI's approach (<code>shlex.quote</code>)
+    produces single-quote wrapping that all bash versions handle correctly.
+  </td>
+</tr>
+
+<!-- FINDING 13: Minor — doctor.sh inconsistent set -->
+<tr>
+  <td class="file">doctor.sh</td>
+  <td class="loc">12</td>
+  <td class="severity minor">🟢 Minor</td>
+  <td class="body-cell">
+    <strong><code>set -uo pipefail</code> without <code>-e</code>.</strong>
+    <code>doctor.sh</code> uses <code>set -uo pipefail</code> but omits
+    <code>-e</code> (errexit). This is inconsistent with <code>install.sh</code>
+    which uses the full <code>set -euo pipefail</code>. Without <code>-e</code>,
+    commands that fail mid-script don't halt execution, and the summary may
+    report misleading pass/fail counts.
+  </td>
+  <td class="rec-cell">
+    Add <code>-e</code> to make it <code>set -euo pipefail</code>.
+    The individual doctor module checks use <code>|| true</code> where needed
+    (e.g., <code>find ... || true</code>) so they won't be affected.
+  </td>
+</tr>
+
+</tbody>
+</table>
+
+<h2>Architecture Notes</h2>
+
+<div class="scope-note">
+<strong>Design observations (not defects):</strong>
+<ul style="margin:0.3em 0 0 1.2em;">
+  <li><strong>Dual config writers</strong> — Config is generated at install time
+      (<code>37-config.sh</code>) and re-saved at runtime (<code>save_config()</code>
+      + Python UI). These use different escaping strategies, creating format ambiguity.</li>
+  <li><strong>Mixed ownership</strong> — The install scripts are sourced into a single
+      shell (they inherit <code>set -euo pipefail</code> from <code>install.sh</code>),
+      but runtime scripts are standalone executables with no shared error-handling contract.</li>
+  <li><strong>IPC via filesystem</strong> — Browser bridge and callback handler use
+      <code>/tmp/fusion360-*</code> directories with atomic rename
+      (<code>mv .partial → .request</code>). This is correct for single-instance use
+      but has no cleanup guarantee if the listener crashes.</li>
+  <li><strong>Registry manipulation strategy shift</strong> — The diff replaces
+      <code>proton run reg add</code> (safe, goes through Wine's registry locking)
+      with direct <code>sed</code>/<code>echo</code> on <code>user.reg</code>
+      (fast but bypasses locking and format guarantees).</li>
+</ul>
+</div>
+
+<h2>Files Reviewed</h2>
+
+<div class="scope-note" style="font-family: monospace; font-size: 0.82rem;">
+install.sh &bull; install-scripts/00-common.sh &bull; install-scripts/00-defaults.sh &bull; install-scripts/10-deps.sh &bull; install-scripts/20-ge-proton.sh &bull; install-scripts/25-install-to-location.sh &bull; install-scripts/30-prefix.sh &bull; install-scripts/35-webview2.sh &bull; install-scripts/37-config.sh &bull; install-scripts/40-fusion-installer.sh &bull; launch-fusion.sh &bull; runtime-scripts/launcher-functions.sh &bull; runtime-scripts/launcher-config-user-interface.py &bull; runtime-scripts/audit-fusion-prefix.sh &bull; runtime-scripts/fusion-browser-listener.sh &bull; runtime-scripts/fusion-browser.sh &bull; runtime-scripts/fusion-callback-handler.sh &bull; runtime-scripts/fusion-gray-overlay-event-killer.sh &bull; runtime-scripts/health-check.sh &bull; runtime-scripts/kill-wine-proton-fusion-nuclear.sh &bull; runtime-scripts/register-protocols.sh &bull; runtime-scripts/uninstall-select.sh &bull; uninstall.sh &bull; status.sh &bull; doctor.sh &bull; doctor/00-common.sh &bull; doctor/10-env.sh &bull; doctor/20-deps.sh &bull; doctor/30-proton.sh &bull; doctor/40-fusion.sh &bull; doctor/50-config.sh &bull; doctor/60-bridge.sh &bull; doctor/70-processes.sh &bull; doctor/80-logs.sh &bull; doctor/90-install.sh &bull; doctor/100-network.sh &bull; scroll-test.sh &bull; helpers/run_scrollbox.sh
+</div>
+
+</body>
+</html>

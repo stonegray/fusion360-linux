@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Layout Proposal — GitHub-Ready Directory Structure</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; max-width: 1000px; margin: 0 auto; }
+        h1 { color: #333; }
+        h2 { color: #555; margin-top: 2em; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #f4f4f4; }
+        code { font-family: monospace; background: #eee; padding: 2px 4px; }
+        pre { background: #f4f4f4; padding: 16px; border-radius: 8px; overflow-x: auto; }
+        .file-old { color: #c0392b; }
+        .file-new { color: #27ae60; }
+    </style>
+</head>
+<body>
+    <h1>Layout Proposal — GitHub-Ready Directory Structure</h1>
+
+    <h2>Proposed Public Repo Layout</h2>
+    <pre>
+fusion360-linux-launcher/
+├── bin/                    # CLI entry points (symlinked to ~/.local/bin/)
+│   ├── fusion360           # Launch Fusion 360
+│   ├── fusion360-install   # Run installer
+│   ├── fusion360-uninstall # Remove installation
+│   ├── fusion360-doctor    # Diagnostics
+│   └── fusion360-config    # Config UI (Python TUI)
+├── src/
+│   ├── core/
+│   │   ├── bootstrap.sh    # Environment/path init
+│   │   └── utils.sh        # Shared helpers (log, error, die)
+│   ├── modules/
+│   │   ├── proton.sh       # Wine/Proton management
+│   │   ├── dpi.sh          # DPI detection & resolution
+│   │   ├── browser.sh      # OAuth browser bridge
+│   │   ├── paths.sh        # XDG path resolution
+│   │   └── desktop.sh      # Desktop entry & protocol handler
+│   ├── install/
+│   │   ├── deps.sh         # Dependency install (distro-aware)
+│   │   ├── prefix.sh       # Wine prefix setup
+│   │   ├── config.sh       # Config generation
+│   │   └── fusion-installer.sh  # Main Fusion installer
+│   ├── doctor/
+│   │   ├── doctor.sh       # Doctor entry point
+│   │   └── modules/        # Individual diagnostic checks
+│   └── config-ui.py        # Python config TUI
+├── docs/
+│   ├── installation.md
+│   ├── troubleshooting.md
+│   └── review/             # Code review reports
+├── .github/
+│   └── workflows/
+│       └── lint.yml        # ShellCheck + bash -n CI
+├── LICENSE
+├── CONTRIBUTING.md
+└── README.md
+    </pre>
+
+    <h2>Migration Plan</h2>
+    <table>
+        <tr><th>Current Path</th><th>→ Proposed Path</th><th>Action</th></tr>
+        <tr>
+            <td class="file-old"><code>launch-fusion.sh</code></td>
+            <td class="file-new"><code>src/core/bootstrap.sh</code> (sourced)</td>
+            <td>Split: env setup → bootstrap, launch logic → bin/fusion360</td>
+        </tr>
+        <tr>
+            <td class="file-old"><code>runtime-scripts/launcher-functions.sh</code></td>
+            <td class="file-new"><code>src/modules/*.sh</code> (split)</td>
+            <td>Split into focused modules by concern</td>
+        </tr>
+        <tr>
+            <td class="file-old"><code>install.sh</code></td>
+            <td class="file-new"><code>bin/fusion360-install</code></td>
+            <td>Rename + simplify to wrapper</td>
+        </tr>
+        <tr>
+            <td class="file-old"><code>uninstall.sh</code></td>
+            <td class="file-new"><code>bin/fusion360-uninstall</code></td>
+            <td>Rename</td>
+        </tr>
+        <tr>
+            <td class="file-old"><code>doctor.sh</code></td>
+            <td class="file-new"><code>bin/fusion360-doctor</code></td>
+            <td>Rename</td>
+        </tr>
+        <tr>
+            <td class="file-old"><code>install-scripts/</code></td>
+            <td class="file-new"><code>src/install/</code></td>
+            <td>Move + simplify numbering</td>
+        </tr>
+        <tr>
+            <td class="file-old"><code>doctor/</code></td>
+            <td class="file-new"><code>src/doctor/modules/</code></td>
+            <td>Move</td>
+        </tr>
+        <tr>
+            <td class="file-old"><code>runtime-scripts/</code></td>
+            <td class="file-new"><code>src/modules/</code></td>
+            <td>Move + split into focused concerns</td>
+        </tr>
+        <tr>
+            <td class="file-old"><code>helpers/run_scrollbox.sh</code></td>
+            <td class="file-new"><code>src/modules/scrollbox.sh</code></td>
+            <td>Rename + move</td>
+        </tr>
+        <tr>
+            <td class="file-old"><code>status.sh</code></td>
+            <td class="file-new"><em>Remove</em> (merged into doctor)</td>
+            <td>Functionality absorbed by doctor modules</td>
+        </tr>
+        <tr>
+            <td class="file-old"><code>scroll-test.sh</code></td>
+            <td class="file-new"><em>Remove</em> (dev-only)</td>
+            <td>Not part of public release</td>
+        </tr>
+    </table>
+
+    <h2>Key Principles</h2>
+    <ul>
+        <li><strong>bin/ vs src/:</strong> <code>bin/</code> holds user-facing CLI entry points (thin wrappers). <code>src/</code> holds all implementation logic.</li>
+        <li><strong>install vs runtime:</strong> Install logic in <code>src/install/</code>, runtime/daily-use in <code>src/modules/</code> and <code>bin/</code>.</li>
+        <li><strong>No top-level scripts:</strong> Every script lives in a subdirectory with a clear purpose.</li>
+        <li><strong>GitHub standard:</strong> README, LICENSE, CONTRIBUTING, CI workflow, docs/.</li>
+    </ul>
+</body>
+</html>

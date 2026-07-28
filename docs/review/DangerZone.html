@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+    body { font-family: sans-serif; line-height: 1.6; color: #333; margin: 40px; }
+    h1 { color: #2c3e50; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    code { background-color: #f4f4f4; padding: 2px 4px; border-radius: 4px; font-family: monospace; }
+    .severity-critical { color: #c0392b; font-weight: bold; }
+    .severity-high { color: #e74c3c; font-weight: bold; }
+    .severity-med { color: #f39c12; font-weight: bold; }
+    .severity-low { color: #3498db; font-weight: bold; }
+</style>
+<title>Danger Zone — Unsafe Operations Audit</title>
+</head>
+<body>
+    <h1>Danger Zone Audit: Unsafe / Destructive Operations</h1>
+    <table>
+        <tr><th>File:Line</th><th>Issue</th><th>Severity</th><th>Recommendation</th></tr>
+        <tr>
+            <td><code>uninstall.sh:49</code></td>
+            <td><code>rm -rf</code> without pre-flight directory existence check</td>
+            <td class="severity-high">High</td>
+            <td>Guard with <code>[[ -d "$dir" ]] &amp;&amp; rm -rf "$dir"</code></td>
+        </tr>
+        <tr>
+            <td><code>uninstall.sh:58</code></td>
+            <td><code>rm -rf</code> without pre-flight directory existence check</td>
+            <td class="severity-high">High</td>
+            <td>Guard with <code>[[ -d "$dir" ]] &amp;&amp; rm -rf "$dir"</code></td>
+        </tr>
+        <tr>
+            <td><code>uninstall.sh:97</code></td>
+            <td>Unchecked wildcard <code>rm</code> — glob could expand unexpectedly</td>
+            <td class="severity-med">Med</td>
+            <td>Validate path pattern before <code>rm -rf</code></td>
+        </tr>
+        <tr>
+            <td><code>uninstall-select.sh:28</code></td>
+            <td>Path variable in <code>rm -rf</code> not strictly validated</td>
+            <td class="severity-high">High</td>
+            <td>Ensure variable is non-empty and resolves to expected path</td>
+        </tr>
+        <tr>
+            <td><code>doctor.sh:18</code></td>
+            <td><code>exec &gt;log</code> without fallback — losing stderr if log write fails</td>
+            <td class="severity-low">Low</td>
+            <td>Add error handling or preserve original stderr</td>
+        </tr>
+        <tr>
+            <td>Various files</td>
+            <td>Unquoted variable expansions (<code>$var</code> instead of <code>"$var"</code>)</td>
+            <td class="severity-med">Med</td>
+            <td>Audit and quote all <code>"$var"</code> to prevent word splitting/globbing</td>
+        </tr>
+    </table>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Code Review Report - CodeSmell</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; margin: 40px; }
+        h1 { color: #2c3e50; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f4f4f4; }
+        code { background: #eee; padding: 2px 4px; border-radius: 4px; font-family: monospace; }
+        .high { color: #d9534f; font-weight: bold; }
+        .med { color: #f0ad4e; font-weight: bold; }
+        .low { color: #5bc0de; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Code Review Report — Code Smell & Duplication</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>File(s)</th>
+                <th>Issue</th>
+                <th>Severity</th>
+                <th>Recommendation</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>install-scripts/00-common.sh</code></td>
+                <td>Duplicated process management logic (kill, cleanup, wait)</td>
+                <td class="high">High</td>
+                <td>Extract to <code>launcher-functions.sh</code> and source from both</td>
+            </tr>
+            <tr>
+                <td><code>runtime-scripts/kill-wine-proton-fusion-nuclear.sh</code></td>
+                <td>Fragmented and brittle process management; duplicates 00-common.sh</td>
+                <td class="high">High</td>
+                <td>Consolidate killing mechanism into <code>launcher-functions.sh</code></td>
+            </tr>
+            <tr>
+                <td><code>install-scripts/*</code></td>
+                <td>Redundant <code>SCRIPT_DIR</code> calculation in every script</td>
+                <td class="med">Medium</td>
+                <td>Standardize path loading via central init script</td>
+            </tr>
+            <tr>
+                <td><code>install-scripts/00-common.sh</code></td>
+                <td>Hardcoded package lists per distro</td>
+                <td class="med">Medium</td>
+                <td>Move package lists to external <code>distro/</code> config files</td>
+            </tr>
+            <tr>
+                <td><code>install-scripts/00-common.sh</code></td>
+                <td>Brittle <code>pgrep</code> matching — may match wrong processes</td>
+                <td class="high">High</td>
+                <td>Inspect <code>/proc/PID/</code> environment to verify Wine prefix match</td>
+            </tr>
+            <tr>
+                <td><code>install-scripts/40-fusion-installer.sh</code></td>
+                <td>Hardcoded fallback paths in streamer log check</td>
+                <td class="med">Medium</td>
+                <td>Use <code>$PFX_DIR</code> consistently</td>
+            </tr>
+            <tr>
+                <td><code>runtime-scripts/*</code></td>
+                <td>Error handling patterns differ between scripts (some use <code>fail()</code>, some <code>echo</code>)</td>
+                <td class="med">Medium</td>
+                <td>Consolidate on <code>fail()</code> from launcher-functions.sh</td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>

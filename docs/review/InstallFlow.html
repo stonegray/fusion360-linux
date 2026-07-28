@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fusion360 Linux Install Flow</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 20px; }
+        h1, h2, h3 { color: #2c3e50; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f4f4f4; }
+        .code { font-family: monospace; background: #f9f9f9; padding: 2px 5px; border-radius: 3px; }
+        pre { background: #f4f4f4; padding: 16px; border-radius: 8px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Fusion360 Linux Installation Pipeline</h1>
+
+    <h2>Architecture Overview</h2>
+    <p>The installer is a modular, idempotent pipeline. It detects the system environment, prepares a localized Proton prefix, installs necessary Windows dependencies, and configures runtime environment variables before launching the Autodesk downloader. Each script is a self-contained, numbered step sourced by the thin <span class="code">install.sh</span> wrapper.</p>
+
+    <pre>
+    [install.sh] (thin wrapper)
+        │
+        ├─▶ 00-defaults.sh      — XDG path constants
+        ├─▶ 00-common.sh        — Distro detection, shared utils
+        ├─▶ 10-deps.sh          — System packages (apt/dnf/pacman)
+        ├─▶ 20-ge-proton.sh     — Download GE-Proton
+        ├─▶ 25-install-to-location.sh — Copy scripts to ~/.local/share/
+        ├─▶ 30-prefix.sh        — Wine prefix init + VC++ runtimes
+        ├─▶ 35-webview2.sh      — Microsoft Edge WebView2
+        ├─▶ 37-config.sh        — ~/.config/fusion360-linux/config
+        ├─▶ 40-fusion-installer.sh — Main app download + desktop entries
+    </pre>
+
+    <h2>Step-by-Step Breakdown</h2>
+    <table>
+        <tr><th>#</th><th>Step</th><th>Action</th><th>Key Paths Written</th></tr>
+        <tr>
+            <td>1</td><td>Dependencies</td>
+            <td>Installs required system packages (wine, winetricks, curl, xdg-utils, etc.) via distro-specific package manager</td>
+            <td>System-wide (via sudo)</td>
+        </tr>
+        <tr>
+            <td>2</td><td>GE-Proton</td>
+            <td>Downloads and extracts GE-Proton from GitHub if not already present</td>
+            <td><span class="code">~/.local/share/Steam/compatibilitytools.d/</span></td>
+        </tr>
+        <tr>
+            <td>3</td><td>Install to Location</td>
+            <td>Copies runtime scripts to data dir, creates symlinks in bin dir</td>
+            <td><span class="code">~/.local/share/fusion360-linux/</span>, <span class="code">~/.local/bin/</span></td>
+        </tr>
+        <tr>
+            <td>4</td><td>Prefix</td>
+            <td>Initializes Wine prefix, sets Windows version to win10, installs VC++ runtimes via winetricks</td>
+            <td><span class="code">~/.fusion360-proton2/pfx/</span></td>
+        </tr>
+        <tr>
+            <td>5</td><td>WebView2</td>
+            <td>Downloads and installs Microsoft Edge WebView2 runtime into the prefix</td>
+            <td><span class="code">~/.fusion360-proton2/pfx/</span></td>
+        </tr>
+        <tr>
+            <td>6</td><td>Config</td>
+            <td>Generates config file with DPI settings, Proton path, prefix path, browser, env var toggles</td>
+            <td><span class="code">~/.config/fusion360-linux/config</span></td>
+        </tr>
+        <tr>
+            <td>7</td><td>Protocols</td>
+            <td>Registers URI handlers (adsk://, adskidmgr://) and Wine browser bridge</td>
+            <td><span class="code">~/.local/share/applications/fusion360-linux/</span>, prefix registry</td>
+        </tr>
+        <tr>
+            <td>8</td><td>Installer</td>
+            <td>Downloads and runs the Autodesk webdeploy streamer. On completion, creates <span class="code">autodesk-fusion360.desktop</span> entry</td>
+            <td><span class="code">~/.fusion360-proton2/pfx/</span>, desktop entry</td>
+        </tr>
+    </table>
+
+    <h2>Data & Path Map</h2>
+    <table>
+        <tr><th>Category</th><th>Path</th><th>Contents</th></tr>
+        <tr>
+            <td>Config</td>
+            <td><span class="code">~/.config/fusion360-linux/config</span></td>
+            <td>Key=value env overrides (DPI, Proton path, performance flags)</td>
+        </tr>
+        <tr>
+            <td>Runtime data</td>
+            <td><span class="code">~/.local/share/fusion360-linux/</span></td>
+            <td>Launch scripts, browser bridge, callback handler, doctor, helpers</td>
+        </tr>
+        <tr>
+            <td>Desktop entries</td>
+            <td><span class="code">~/.local/share/applications/fusion360-linux/</span></td>
+            <td><span class="code">autodesk-fusion360.desktop</span>, <span class="code">fusion360-callback-handler.desktop</span></td>
+        </tr>
+        <tr>
+            <td>CLI symlinks</td>
+            <td><span class="code">~/.local/bin/fusion360</span></td>
+            <td>Symlink to <span class="code">launch-fusion.sh</span></td>
+        </tr>
+        <tr>
+            <td>Wine prefix</td>
+            <td><span class="code">~/.fusion360-proton2/pfx/</span></td>
+            <td>Complete Wine prefix (drive_c, user.reg, system.reg)</td>
+        </tr>
+        <tr>
+            <td>GE-Proton</td>
+            <td><span class="code">~/.local/share/Steam/compatibilitytools.d/GE-Proton*/</span></td>
+            <td>GE-Proton runtime</td>
+        </tr>
+        <tr>
+            <td>DPI log</td>
+            <td><span class="code">/tmp/fusion360-dpi.log</span></td>
+            <td>DPI detection resolution trace</td>
+        </tr>
+        <tr>
+            <td>Browser bridge</td>
+            <td><span class="code">/tmp/fusion360-browser-requests/</span></td>
+            <td>OAuth callback request files</td>
+        </tr>
+    </table>
+
+    <h2>System Changes</h2>
+    <ul>
+        <li><strong>System packages:</strong> wine, winetricks, curl, zenity, xdg-utils, xdotool, moreutils, etc. (distro-specific)</li>
+        <li><strong>Desktop entries:</strong> Fusion 360 launcher + callback handler in <span class="code">~/.local/share/applications/fusion360-linux/</span></li>
+        <li><strong>MIME associations:</strong> <span class="code">x-scheme-handler/adsk</span> and <span class="code">x-scheme-handler/adskidmgr</span> registered via xdg-mime</li>
+        <li><strong>CLI symlinks:</strong> <span class="code">fusion360</span>, <span class="code">fusion-status</span>, <span class="code">fusion-doctor</span>, <span class="code">fusion-uninstall</span> in <span class="code">~/.local/bin/</span></li>
+        <li><strong>Wine registry:</strong> DPI (LogPixels, Win8DpiScaling), WineBrowser paths, Windows version set to win10</li>
+    </ul>
+
+    <h2>Re-run Behavior (Idempotency)</h2>
+    <p>The pipeline is designed for safe re-entry. Each step checks for prior completion:</p>
+    <ul>
+        <li><strong>10-deps.sh:</strong> Skips packages already installed (via package manager)</li>
+        <li><strong>20-ge-proton.sh:</strong> Checks if <span class="code">proton</span> binary exists in compatibilitytools.d</li>
+        <li><strong>30-prefix.sh:</strong> Checks if <span class="code">pfx/user.reg</span> exists</li>
+        <li><strong>35-webview2.sh:</strong> Checks if WebView2 is already installed in the prefix</li>
+        <li><strong>37-config.sh:</strong> Adds missing config keys if config exists; skips if all present</li>
+        <li><strong>40-fusion-installer.sh:</strong> Checks <span class="code">autodesk.webdeploy.streamer.log</span> for "Configure app complete"</li>
+    </ul>
+    <p>This makes re-running <span class="code">bash install.sh</span> safe at any point — completed steps are detected and skipped.</p>
+</body>
+</html>
