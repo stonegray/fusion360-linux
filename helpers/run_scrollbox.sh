@@ -15,18 +15,20 @@ run_scrollbox() {
     # Not a terminal — pass through
     [[ -t 1 ]] || { cat -; return 0; }
 
-    # Save cursor, reserve blank lines (push terminal up if at bottom),
-    # then restore cursor to saved position — this is our fixed anchor.
-    tput sc
-    for ((i=0; i<height; i++)); do echo; done
-    tput rc
-
     local -a buf=()
+    local started=0
+
     while IFS= read -r line; do
         buf+=("$line")
         buf=("${buf[@]: -$height}")
 
-        # Go to saved anchor, clear everything below it, redraw buffer
+        # On first content, save cursor and print box
+        if (( !started )); then
+            tput sc
+            started=1
+        fi
+
+        # Go to saved position, clear below it, print buffer
         tput rc
         tput ed
         for l in "${buf[@]}"; do
@@ -43,6 +45,8 @@ run_scrollbox() {
     done
 
     # Clean up the box area
-    tput rc
-    tput ed
+    if (( started )); then
+        tput rc
+        tput ed
+    fi
 }
