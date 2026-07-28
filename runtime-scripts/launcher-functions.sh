@@ -241,6 +241,14 @@ apply_fusion_wine_dpi() {
     win8_dpi_scaling=1
   fi
 
+  # Check if already set correctly — skip if so
+  local current_dpi current_win8
+  current_dpi=$("$PROTON" run reg query 'HKCU\Software\Wine\Fonts' /v LogPixels 2>/dev/null | grep -oP '0x[0-9a-fA-F]+|[0-9]+' | tail -1 || echo "")
+  current_win8=$("$PROTON" run reg query 'HKCU\Control Panel\Desktop' /v Win8DpiScaling 2>/dev/null | grep -oP '0x[0-9a-fA-F]+|[0-9]+' | tail -1 || echo "")
+  if [[ "$current_dpi" == "$dpi_value" && "$current_win8" == "$win8_dpi_scaling" ]]; then
+    return 0
+  fi
+
   {
     echo "timestamp=$(date -Is)"
     echo "FUSION_WINE_DPI=$FUSION_WINE_DPI"
@@ -282,8 +290,11 @@ install_callback_protocol_handlers() {
   applications_dir="${F360_APPS_DIR:-$HOME/.local/share/applications/fusion360-linux}"
   desktop_file="$applications_dir/fusion360-callback-handler.desktop"
 
-  mkdir -p "$applications_dir"
+  if [[ -f "$desktop_file" ]] && grep -q "$CALLBACK_HANDLER" "$desktop_file" 2>/dev/null; then
+    return 0
+  fi
 
+  mkdir -p "$applications_dir"
   cat > "$desktop_file" <<EOF_DESKTOP
 [Desktop Entry]
 Name=Fusion 360 Autodesk Callback Handler
@@ -295,13 +306,17 @@ EOF_DESKTOP
 
   xdg-mime default fusion360-callback-handler.desktop x-scheme-handler/adsk 2>/dev/null || true
   xdg-mime default fusion360-callback-handler.desktop x-scheme-handler/adskidmgr 2>/dev/null || true
-
-  if command -v update-desktop-database >/dev/null 2>&1; then
-    update-desktop-database "$applications_dir" >/dev/null 2>&1 || true
-  fi
+  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$applications_dir" >/dev/null 2>&1 || true
 }
 
 register_wine_browser_bridge() {
+  # Check if already registered
+  local current
+  current=$("$PROTON" run reg query 'HKCU\Software\Wine\WineBrowser' /v Browsers 2>/dev/null | grep "$BROWSER" || true)
+  if [[ -n "$current" ]]; then
+    return 0
+  fi
+
   "$PROTON" run reg add 'HKCU\Software\Wine\WineBrowser' /v Browsers /t REG_SZ /d "$BROWSER" /f >/tmp/fusion360-winebrowser-register.log 2>&1 || {
     echo "launch-fusion.sh warning: failed to register WineBrowser. See /tmp/fusion360-winebrowser-register.log" >&2
   }
