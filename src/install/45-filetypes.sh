@@ -76,23 +76,10 @@ _install_fusion_mime_icon() {
     _resize_icon "$master" "$d/application-vnd.autodesk.fusion360.png" "$s" || true
   done
 
-  # We do NOT create a local hicolor/index.theme — the system theme at
-  # /usr/share/icons/hicolor/index.theme already lists all standard
-  # directories (*/mimetypes, */apps, etc.) that our icons use.
-  # Creating a local one would shadow the system theme and potentially
-  # hide apps icons from Firefox, Dolphin, etc.
-  #
-  # gtk-update-icon-cache is NOT run on the local hicolor dir because
-  # the system cache at /usr/share/icons is authoritative and GTK's
-  # fallback directory scanning picks up local additions.  KDE's
-  # kbuildsycoca scans the full filesystem natively.
-  # Refresh icon caches for KDE — kbuildsycoca scans $HOME/.local/share
-  # natively so local additions are picked up without a full rebuild.
-  if command -v kbuildsycoca6 &>/dev/null; then
-    kbuildsycoca6 --noincremental 2>/dev/null || true
-  elif command -v kbuildsycoca5 &>/dev/null; then
-    kbuildsycoca5 --noincremental 2>/dev/null || true
-  fi
+  # Clean up any stale icon-theme.cache left from a previous broken run
+  # (the old code created a local index.theme + ran gtk-update-icon-cache,
+  # which caches a stale directory listing that excludes our new icons).
+  rm -f "$hicolor/icon-theme.cache"
 
   # Also install App icon so the desktop entry (`Icon=fusion360`) resolves
   for s in $sizes; do
@@ -103,6 +90,13 @@ _install_fusion_mime_icon() {
       cp "$src_icon" "$dst_icon"
     fi
   done
+
+  # Refresh KDE icon cache so the running session picks up new icons
+  if command -v kbuildsycoca6 &>/dev/null; then
+    kbuildsycoca6 --noincremental 2>/dev/null || true
+  elif command -v kbuildsycoca5 &>/dev/null; then
+    kbuildsycoca5 --noincremental 2>/dev/null || true
+  fi
 
   rm -f "$icondir"/*.ico 2>/dev/null || true
   log_info " Fusion 360 MIME icons installed."
