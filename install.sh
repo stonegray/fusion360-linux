@@ -59,7 +59,7 @@ case "$MODE" in
     ;;
   --uninstall)
     clear_traps
-    source "$SCRIPT_DIR/uninstall-select.sh"
+    source "$SCRIPT_DIR/runtime-scripts/uninstall-select.sh"
     exit 0
     ;;
   --run-installer)
