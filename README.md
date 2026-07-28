@@ -30,8 +30,7 @@ make run
 | `./setup-fusion.sh` | Re-run post-install config (WebView2, handlers, icons, desktop entry) |
 | `./setup-fusion.sh --force` | Re-do all config steps |
 | `./launch-fusion.sh --configure` | Interactive path configuration |
-| `./status.sh` | Quick prerequisite check |
-| `./doctor.sh` | Full diagnostic report |
+| `./src/doctor/doctor.sh` | Full diagnostic report |
 | `./uninstall.sh` | Remove Fusion, config, icons, desktop entries |
 
 ## Commands reference
@@ -79,8 +78,6 @@ No passwords are written to files. The bridge writes short-lived URLs only.
 ```
 ├── install.sh                 # Thin wrapper over src/install/
 ├── uninstall.sh               # Clean removal
-├── status.sh                  # Quick prerequisite check
-├── doctor.sh                  # Thin wrapper over src/doctor/
 ├── src/
 │   ├── bin/
 │   │   └── launch-fusion.sh   # Main launcher
@@ -107,6 +104,7 @@ No passwords are written to files. The bridge writes short-lived URLs only.
 │   │   ├── uninstall-select.sh
 │   │   └── audit-fusion-prefix.sh
 │   └── doctor/                # Diagnostic modules
+│       ├── doctor.sh          #   entry point
 │       ├── 00-common.sh
 │       ├── 10-env.sh
 │       ├── 20-deps.sh

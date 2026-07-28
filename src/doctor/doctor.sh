@@ -18,11 +18,11 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-source "$SCRIPT_DIR/src/doctor/00-common.sh"
+source "$SCRIPT_DIR/00-common.sh"
 parse_args "$@"
 print_banner
 
-for module in "$SCRIPT_DIR"/src/doctor/[0-9][0-9]-*.sh; do
+for module in "$SCRIPT_DIR"/[0-9][0-9]-*.sh; do
   source "$module"
 done
 
