@@ -161,4 +161,12 @@ if [[ -f "$system_reg" ]]; then
   fi
 fi
 
+# ── Copy toolwindow fixer into Wine prefix ────────────────────────
+if [[ -f "$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.exe" ]]; then
+  mkdir -p "$PFX_DIR/pfx/drive_c"
+  cp "$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.exe" \
+     "$PFX_DIR/pfx/drive_c/fusion-toolwindow-fixer.exe"
+  echo "  [11/12] Toolwindow fixer installed to Wine prefix."
+fi
+
 echo "  [11/12] Done."
