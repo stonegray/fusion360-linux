@@ -12,18 +12,18 @@ else
   echo "  [3/7] Initializing Proton prefix (wineboot)..."
   STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
   STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
+  WINEDLLOVERRIDES="regedit.exe,msiexec.exe=" \
   "$proton" run wineboot -u 2>/dev/null || true
   echo "  [3/7] Prefix initialized."
 fi
 
 if command -v winetricks &>/dev/null; then
   if [[ ! -f "$PFX_DIR/pfx/drive_c/windows/system32/vcruntime140.dll" ]]; then
-    echo "  [3/7] Installing VC++ runtimes via winetricks..."
     STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
     STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
     WINEPREFIX="$PFX_DIR/pfx" \
+    WINEDLLOVERRIDES="regedit.exe,msiexec.exe=" \
     winetricks -q vcrun2022 2>/dev/null || true
-    echo "  [3/7] VC++ runtimes done."
   else
     echo "  [3/7] VC++ runtimes already present."
   fi
