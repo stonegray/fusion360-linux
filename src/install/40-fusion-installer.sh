@@ -6,14 +6,13 @@ return 1
 fi
 
 # ── Check if installer already completed ──────────────────────────────
-F360_LOG="$PFX_DIR/pfx/drive_c/users/steamuser/AppData/Local/Autodesk/autodesk.webdeploy.streamer.log"
-if [[ -f "$F360_LOG" ]] && grep -q "Configure app complete" "$F360_LOG" 2>/dev/null; then
-  echo "  [5/5] Fusion installer already completed. Skipping."
-  # Still check for Fusion.exe for desktop entry
+F360_INSTALL_FLAG="$F360_DATA_DIR/flags/fusion-installed"
+if [[ -f "$F360_INSTALL_FLAG" ]]; then
+  echo "  [10/12] Fusion installer already completed (flag: $F360_INSTALL_FLAG). Skipping."
+  # Still install desktop entry if missing
   fusion_exe=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1 || true)
-  if [[ -n "$fusion_exe" ]]; then
-    echo "  [5/5] Fusion360.exe found."
-    echo "  [5/5] Installing desktop entry..."
+  if [[ -n "$fusion_exe" ]] && [[ ! -f "$F360_APPS_DIR/autodesk-fusion360.desktop" ]]; then
+    echo "  [10/12] Installing desktop entry..."
     mkdir -p "$F360_APPS_DIR"
     cat > "$F360_APPS_DIR/autodesk-fusion360.desktop" <<EOF
 [Desktop Entry]
@@ -27,11 +26,17 @@ MimeType=application/vnd.autodesk.fusion360;model/step;model/iges;model/stl;mode
 StartupNotify=true
 StartupWMClass=fusion360.exe
 EOF
-    command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$F360_APPS_DIR" 2>/dev/null || true
-    command -v kbuildsycoca6 &>/dev/null && kbuildsycoca6 2>/dev/null || true
-    command -v kbuildsycoca5 &>/dev/null && kbuildsycoca5 2>/dev/null || true
-    echo "  [5/5] Desktop entry installed."
+    update-desktop-database "$F360_APPS_DIR" 2>/dev/null || true
+    kbuildsycoca6 2>/dev/null || kbuildsycoca5 2>/dev/null || true
   fi
+  return 0
+fi
+# ── Fallback: check streamer log (for pre-flag installs) ─────────
+F360_LOG="$PFX_DIR/pfx/drive_c/users/steamuser/AppData/Local/Autodesk/autodesk.webdeploy.streamer.log"
+if [[ -f "$F360_LOG" ]] && grep -q "Configure app complete" "$F360_LOG" 2>/dev/null; then
+  echo "  [10/12] Fusion installer already completed (from log)."
+  mkdir -p "$(dirname "$F360_INSTALL_FLAG")"
+  touch "$F360_INSTALL_FLAG"
   return 0
 fi
 
@@ -191,6 +196,9 @@ EOF
   command -v kbuildsycoca6 &>/dev/null && kbuildsycoca6 2>/dev/null || true
   command -v kbuildsycoca5 &>/dev/null && kbuildsycoca5 2>/dev/null || true
   echo "  [10/12] Desktop entry installed."
+  mkdir -p "$(dirname "$F360_INSTALL_FLAG")"
+  touch "$F360_INSTALL_FLAG"
+  echo "  [10/12] Install flag written to $F360_INSTALL_FLAG."
 else
   echo "  [10/12] Fusion360.exe not found yet. Install may still be in progress."
   echo "  [10/12] Run ./setup-fusion.sh once Fusion360.exe exists."
