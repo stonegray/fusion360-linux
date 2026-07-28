@@ -112,9 +112,9 @@ setup_traps() {
     kill_installer
     exit 1
   }
-  trap trap_cleanup EXIT INT TERM
+  trap trap_cleanup INT TERM
 }
 
 clear_traps() {
-  trap - EXIT INT TERM
+  trap - INT TERM
 }
