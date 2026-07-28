@@ -69,6 +69,83 @@ FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT=$(printf "%q" "$FUSION_OVERLAY_SIZE_TOLERA
 EOF_CONFIG
 }
 
+# ── Process killing ──────────────────────────────────────────
+kill_fusion_processes() {
+  local user; user=$(id -u)
+  local pids=()
+  local pid
+
+  # Method 1: pgrep by cmdline patterns
+  for pattern in wineserver wine proton xalia streamer \
+    Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
+    steam.exe node.exe fusion-gray-overlay; do
+    while IFS= read -r pid; do
+      pids+=("$pid")
+    done < <(pgrep -u "$user" -f "$pattern" 2>/dev/null || true)
+  done
+
+  # Method 2: scan /proc/PID/exe for wine/proton binaries
+  local exe
+  for proc in /proc/[0-9]*/exe; do
+    exe=$(readlink "$proc" 2>/dev/null || true)
+    [[ -z "$exe" ]] && continue
+    if [[ "$exe" == *wine* ]] || [[ "$exe" == *proton* ]]; then
+      pid=${proc%/exe}
+      pid=${pid#/proc/}
+      pids+=("$pid")
+    fi
+  done
+
+  # Deduplicate
+  local unique=()
+  for pid in "${pids[@]}"; do
+    [[ -z "$pid" ]] && continue
+    case " ${unique[*]} " in *" $pid "*) continue ;; esac
+    unique+=("$pid")
+  done
+
+  if (( ${#unique[@]} == 0 )); then
+    return 0
+  fi
+
+  echo "  [lifecycle] Killing ${#unique[@]} Wine/Proton process(es)..."
+
+  # Graceful TERM first
+  for pid in "${unique[@]}"; do
+    kill "$pid" 2>/dev/null || true
+  done
+
+  sleep 2
+
+  # Hard KILL for survivors
+  for pid in "${unique[@]}"; do
+    kill -9 "$pid" 2>/dev/null || true
+  done
+
+  sleep 1
+
+  # Verify
+  local survivors=0
+  for proc in /proc/[0-9]*/exe; do
+    exe=$(readlink "$proc" 2>/dev/null || true)
+    [[ -z "$exe" ]] && continue
+    if [[ "$exe" == *wine* ]] || [[ "$exe" == *proton* ]]; then
+      pid=${proc%/exe}
+      pid=${pid#/proc/}
+      echo "  [lifecycle]   SURVIVED: PID $pid ($exe)"
+      survivors=$((survivors + 1))
+    fi
+  done
+
+  if (( survivors == 0 )); then
+    echo "  [lifecycle] Killed successfully."
+    return 1
+  else
+    echo "  [lifecycle] $survivors process(es) still running."
+    return 1
+  fi
+}
+
 configure_with_file_browsers() {
   local user_interface_mode="${1:-hold}"
 

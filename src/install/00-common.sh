@@ -70,48 +70,6 @@ pre_flight() {
 INSTALLER_PID=""
 
 kill_installer() {
-  local user; user=$(id -u)
-
-  # Collect ALL wine/proton PIDs — check both cmdline AND /proc/PID/exe
-  # because Wine processes show Windows paths in cmdline (no "wine" string)
-  # but their actual binary is wine64-preloader or similar
-  local pids=()
-  local pid
-
-  # Method 1: pgrep by cmdline patterns
-  for pattern in wineserver wine proton xalia streamer \
-    Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
-    steam.exe node.exe fusion-gray-overlay; do
-    while IFS= read -r pid; do
-      pids+=("$pid")
-    done < <(pgrep -u "$user" -f "$pattern" 2>/dev/null || true)
-  done
-
-  # Method 2: scan /proc/PID/exe for wine/proton binaries
-  for proc in /proc/[0-9]*/exe; do
-    exe=$(readlink "$proc" 2>/dev/null || true)
-    [[ -z "$exe" ]] && continue
-    if [[ "$exe" == *wine* ]] || [[ "$exe" == *proton* ]]; then
-      pid=${proc%/exe}
-      pid=${pid#/proc/}
-      pids+=("$pid")
-    fi
-  done
-
-  # Deduplicate and remove empty entries
-  local unique=()
-  for pid in "${pids[@]}"; do
-    [[ -z "$pid" ]] && continue
-    case " ${unique[*]} " in *" $pid "*) continue ;; esac
-    unique+=("$pid")
-  done
-
-  if (( ${#unique[@]} == 0 )); then
-    return 0
-  fi
-
-  echo "  [lifecycle] Killing ${#unique[@]} Wine/Proton process(es)..."
-
   # Kill tracked installer PID
   if [[ -n "${INSTALLER_PID:-}" ]] && kill -0 "$INSTALLER_PID" 2>/dev/null; then
     kill "$INSTALLER_PID" 2>/dev/null || true
@@ -119,34 +77,20 @@ kill_installer() {
     kill -9 "$INSTALLER_PID" 2>/dev/null || true
   fi
 
-  # Kill all collected PIDs
-  for pid in "${unique[@]}"; do
-    kill -9 "$pid" 2>/dev/null || true
-  done
-
-  sleep 1
-
-  # Verify — rescan with same methods
-  local survivors=0
-  for proc in /proc/[0-9]*/exe; do
-    exe=$(readlink "$proc" 2>/dev/null || true)
-    [[ -z "$exe" ]] && continue
-    if [[ "$exe" == *wine* ]] || [[ "$exe" == *proton* ]]; then
-      pid=${proc%/exe}
-      pid=${pid#/proc/}
-      echo "  [lifecycle]   SURVIVED: PID $pid ($exe)"
-      survivors=$((survivors + 1))
-    fi
-  done
-
-  if (( survivors == 0 )); then
-    echo "  [lifecycle] Killed successfully."
+  # Use the shared kill function from launcher-functions.sh
+  if [[ -f "$SCRIPT_DIR/src/runtime/launcher-functions.sh" ]]; then
+    source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
+    kill_fusion_processes
   else
-    echo "  [lifecycle] $survivors process(es) still running."
+    # Fallback: simple pgrep kill
+    local user; user=$(id -u)
+    for pattern in wineserver wine proton; do
+      pkill -u "$user" -f "$pattern" 2>/dev/null || true
+    done
   fi
 
   # Remove wineserver lock so next start is clean
-  rm -f "$PFX_DIR/pfx/.wineserver.lock" 2>/dev/null || true
+  [[ -n "${PFX_DIR:-}" ]] && rm -f "$PFX_DIR/pfx/.wineserver.lock" 2>/dev/null || true
 }
 
 installer_is_running() {
