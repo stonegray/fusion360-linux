@@ -237,7 +237,7 @@ read_kde_forced_dpi() {
 read_kde_primary_scale() {
   command -v kscreen-doctor &>/dev/null || return 1
   local scale
-  scale=$(kscreen-doctor -o 2>/dev/null | grep -i '^\tScale:' | awk '{print $2}' | sort -r | head -1)
+  scale=$(kscreen-doctor -o 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -i 'Scale:' | awk '{print $NF}' | sort -r | head -1)
   [[ -n "$scale" ]] || return 1
   # Only return if actual scaling is active (> 1.0)
   awk -v value="$scale" 'BEGIN { exit !(value > 1.0) }' || return 1
