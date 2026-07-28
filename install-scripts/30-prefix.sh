@@ -12,21 +12,19 @@ if [[ -f "$PFX_DIR/pfx/user.reg" ]]; then
 else
   mkdir -p "$PFX_DIR"
   echo "  [3/5] Initializing Proton prefix (wineboot)..."
-  run_scrollbox 8 \
-    "STEAM_COMPAT_DATA_PATH='$PFX_DIR' \
-     STEAM_COMPAT_CLIENT_INSTALL_PATH='$HOME/.local/share/Steam' \
-     '$proton' run wineboot -u 2>&1" || true
+  STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
+  STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
+  "$proton" run wineboot -u 2>&1 | run_scrollbox 5 || true
   echo "  [3/5] Prefix initialized."
 fi
 
 if command -v winetricks &>/dev/null; then
   if [[ ! -f "$PFX_DIR/pfx/drive_c/windows/system32/vcruntime140.dll" ]]; then
     echo "  [3/5] Installing VC++ runtimes via winetricks..."
-    run_scrollbox 8 \
-      "STEAM_COMPAT_DATA_PATH='$PFX_DIR' \
-       STEAM_COMPAT_CLIENT_INSTALL_PATH='$HOME/.local/share/Steam' \
-       WINEPREFIX='$PFX_DIR/pfx' \
-       winetricks -q vcrun2022 2>&1" || true
+    STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
+    STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
+    WINEPREFIX="$PFX_DIR/pfx" \
+    winetricks -q vcrun2022 2>&1 | run_scrollbox 5 || true
     echo "  [3/5] VC++ runtimes done."
   else
     echo "  [3/5] VC++ runtimes already present."
