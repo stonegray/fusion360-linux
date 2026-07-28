@@ -52,4 +52,30 @@ elif command -v kbuildsycoca5 &>/dev/null; then
   kbuildsycoca5 2>/dev/null || true
 fi
 
+# ── Register NLauncher.exe in Wine prefix ─────────────────────────
+# This lets Windows ShellExecute (inside the Wine prefix) open .f3d
+# files and fusion360:// protocol URLs via NLauncher.exe, which
+# communicates with the running Fusion instance without starting a
+# second copy.
+local system_reg="$PFX_DIR/pfx/system.reg"
+if [[ -f "$system_reg" ]]; then
+  local nlauncher
+  nlauncher=$(find "$PFX_DIR" -name NLauncher.exe -type f 2>/dev/null | head -1 || true)
+  if [[ -n "$nlauncher" ]]; then
+    local nlauncher_dos; nlauncher_dos="Z:${nlauncher//\//\\}"
+    local cmdline="\"$nlauncher_dos\" \"%1\""
+    if grep -q 'NLauncher\.exe.*%1' "$system_reg" 2>/dev/null; then
+      echo "  [11/12] Wine prefix already has NLauncher.exe registry entries."
+    else
+      printf '\n[Software\\Classes\\.f3d] 1785266656\n#time=1dd1ebee782a462\n@="Fusion360.AssocDocument"\n' >> "$system_reg"
+      printf '[Software\\Classes\\Fusion360.AssocDocument\\shell\\open\\command] 1785266656\n#time=1dd1ebee782a462\n@=%s\n' "$cmdline" >> "$system_reg"
+      printf '[Software\\Classes\\fusion360] 1785265986\n#time=1dd1ebee782a462\n"URL Protocol"=""\n@="URL:Fusion360 Protocol"\n' >> "$system_reg"
+      printf '[Software\\Classes\\fusion360\\shell\\open\\command] 1785266657\n#time=1dd1ebee782a462\n@=%s\n' "$cmdline" >> "$system_reg"
+      echo "  [11/12] Wine prefix registered NLauncher.exe for .f3d and fusion360://."
+    fi
+  else
+    echo "  [11/12] Warning: NLauncher.exe not found — skipping Wine prefix registration."
+  fi
+fi
+
 echo "  [11/12] Done."
