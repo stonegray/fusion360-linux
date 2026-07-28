@@ -94,9 +94,25 @@ static BOOL needs_fix(HWND hwnd)
 {
     LONG_PTR ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
 
+    /* Must have TOOLWINDOW (the "floating palette" style)           */
     if (!(ex & WS_EX_TOOLWINDOW)) return FALSE;
+
+    /* Must have an owner — toolwindows that float belong to a parent */
     if (!GetWindow(hwnd, GW_OWNER)) return FALSE;
+
+    /* Already done?  Skip so we don't keep calling SetWindowLong.    */
     if (ex & WS_EX_APPWINDOW) return FALSE;
+
+    /* Skip invisible windows — hidden helper windows with TOOLWINDOW
+     * style should not be promoted to managed; showing them would
+     * create phantom white boxes on screen.                          */
+    if (!IsWindowVisible(hwnd)) return FALSE;
+
+    /* Skip zero-size windows — Fusion creates 1x1 helper windows that
+     * carry TOOLWINDOW style but should remain invisible/unmanaged.   */
+    RECT r;
+    GetWindowRect(hwnd, &r);
+    if (r.right - r.left <= 1 && r.bottom - r.top <= 1) return FALSE;
 
     return TRUE;
 }
