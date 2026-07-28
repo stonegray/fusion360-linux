@@ -20,7 +20,7 @@ NC='\033[0m'
 
 echo "=== Fusion360 Linux — Uninstall ==="
 echo ""
-echo -e "${RED}WARNING: This will remove all Fusion360 local data.${NC}"
+printf '%b' "${RED}WARNING: This will remove all Fusion360 local data.${NC}\n"
 echo "  - Proton prefix (~/.fusion360-proton2) — contains Fusion360 itself"
 echo "  - Config files (~/.config/fusion360-linux)"
 echo "  - Desktop entries and protocol handlers"
@@ -30,7 +30,7 @@ echo ""
 echo "  GE-Proton in ~/.local/share/Steam/compatibilitytools.d/ will NOT be removed."
 echo ""
 
-read -r -p "Remove all Fusion360 files? [y/N] " response
+read -r -t 120 -p "Remove all Fusion360 files? [y/N] " response || { echo "Timeout. Aborted."; exit 0; }
 case "$response" in
   [yY]|[yY][eE][sS])
     ;;
@@ -100,7 +100,32 @@ else
   echo "    No bridge temp files to remove."
 fi
 
-# 7. Refresh KDE menu if available
+# 7. Runtime scripts
+if [[ -d "$HOME/.local/share/fusion360-linux" ]]; then
+  echo "  Removing runtime scripts..."
+  rm -rf "$HOME/.local/share/fusion360-linux"
+  echo "    Removed: ~/.local/share/fusion360-linux"
+else
+  echo "  [SKIP] ~/.local/share/fusion360-linux not found."
+fi
+
+# 8. CLI symlinks
+if [[ -L "$HOME/.local/bin/launch-fusion" ]]; then
+  rm -f "$HOME/.local/bin/launch-fusion"
+  echo "    Removed: ~/.local/bin/launch-fusion"
+fi
+if [[ -L "$HOME/.local/bin/fusion-doctor" ]]; then
+  rm -f "$HOME/.local/bin/fusion-doctor"
+  echo "    Removed: ~/.local/bin/fusion-doctor"
+fi
+
+# 9. DPI log
+if [[ -f "/tmp/fusion360-dpi.log" ]]; then
+  rm -f "/tmp/fusion360-dpi.log"
+  echo "    Removed: DPI log"
+fi
+
+# 10. Refresh KDE menu if available
 if command -v kbuildsycoca6 &>/dev/null; then
   kbuildsycoca6 2>/dev/null || true
 elif command -v kbuildsycoca5 &>/dev/null; then
