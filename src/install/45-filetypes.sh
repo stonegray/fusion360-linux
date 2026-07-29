@@ -165,22 +165,27 @@ if [[ -f "$system_reg" ]]; then
     log_info " Warning: NLauncher.exe not found — skipping Wine prefix registration."
   fi
 fi
-# Wine shell folders — DISABLED.  Setting Personal/Desktop/Downloads to
-# Z: paths causes the file open/save dialog to freeze and then crash
-# Fusion under GE-Proton 11-3.  The native file dialog (ComDlg32) does
-# not handle Z: paths correctly when asked to initialize to the default
-# folder location.
-#local user_reg="$PFX_DIR/pfx/user.reg"
-#if [[ -f "$user_reg" ]] && ! grep -q '^"Personal"="Z:' "$user_reg" 2>/dev/null; then
-#  sed -i '/^"Personal"=/d; /^"Desktop"=/d; /^"Downloads"=/d' "$user_reg" 2>/dev/null || true
-#  sed -i \
-#    -e '/User Shell Folders\]/a ""' \
-#    -e '/User Shell Folders\]/a "Personal"="Z:'"$HOME"'/Documents"' \
-#    -e '/User Shell Folders\]/a "Desktop"="Z:'"$HOME"'/Desktop"' \
-#    -e '/User Shell Folders\]/a "Downloads"="Z:'"$HOME"'/Downloads"' \
-#    "$user_reg" 2>/dev/null || true
-#  log_info " Wine shell folders set to $HOME/Documents, $HOME/Desktop, $HOME/Downloads."
-#fi
+# Wine shell folders — set to Linux home directories so file dialog opens
+# at expected locations (Documents, Desktop, Downloads).
+_shell_folder() {
+  local key="$1" path="$2"
+  WINEPREFIX="$PFX_DIR/pfx" "$wine_bin" reg add \
+    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders" \
+    /v "$key" /t REG_SZ /d "Z:$path" /f 2>/dev/null || true
+}
+
+local proton_bin
+proton_bin=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
+local wine_bin
+wine_bin="$(dirname "$proton_bin")/files/bin/wine"
+if [[ -x "$wine_bin" ]]; then
+  _shell_folder "Personal"  "$HOME/Documents"
+  _shell_folder "Desktop"   "$HOME/Desktop"
+  _shell_folder "Downloads" "$HOME/Downloads"
+  log_info " Wine shell folders set to home directories."
+else
+  log_info " Wine binary not found — skipping shell folders."
+fi
 mkdir -p "$PFX_DIR/pfx/drive_c"
 local twf_src="$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.c"
 local twf_prebuilt="$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.exe"
