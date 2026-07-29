@@ -115,10 +115,9 @@ log_info " Launching Fusion installer through Proton..."
 log_info " A Windows installer window will appear.  Do NOT interact with it."
 echo ""
 echo "  ┌─ IMPORTANT ────────────────────────────────────────────┐"
-echo "  │ Do NOT interact with the Fusion installer window.      │"
-echo "  │ This script is actively monitoring its progress and    │"
-echo "  │ will close it around 80% to apply post-install         │"
-echo "  │ patches.  Just let it run.                             │"
+echo "  │ This script is actively controlling the Fusion         │"
+echo "  │ installer; it will exit around 85% in order to apply   │"
+echo "  │ patches.  No user interaction is necessary.             │"
 echo "  └────────────────────────────────────────────────────────┘"
 echo ""
 
@@ -127,11 +126,10 @@ STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
 STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
 "$proton" run "$INSTALLER_PATH" 2>/dev/null || true
 
-# ── Wait for Fusion360.exe + installer completion ─────────────────
 echo ""
 log_info " Waiting for install to finish..."
-log_info " Do not interact with the installer window.  This script"
-log_info " will detect when it's done and close it automatically."
+log_info " The script will detect when it's done and close the installer"
+log_info " automatically."
 for i in $(seq 1 30); do
   sleep 10
   FUSION_PID=$(pgrep -u "$(id -u)" -f "Fusion360\.exe" 2>/dev/null | head -1 || true)
