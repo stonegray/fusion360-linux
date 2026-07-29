@@ -38,23 +38,12 @@ declare -a CONFIG_VALS=(
   "0" "0" "1" "1" "1" "1" "0" "1" "1" "1" "1" "1" "1" "25"
 )
 
-quote_val() {
-  local raw="$1"
-  local q
-  q=$(printf '%q' "$raw" 2>/dev/null || printf '%s' "$raw")
-  if [[ "$q" == $\'* ]]; then
-    local escaped
-    escaped=$(printf '%s' "$raw" | sed "s/'/'\\\\''/g")
-    q="'$escaped'"
-  fi
-  printf '%s' "$q"
-}
 
 if [[ -f "$CONFIG_FILE" ]]; then
   local wrote=0
   for i in "${!CONFIG_KEYS[@]}"; do
     if ! grep -q "^${CONFIG_KEYS[$i]}=" "$CONFIG_FILE" 2>/dev/null; then
-      printf '%s=%s\n' "${CONFIG_KEYS[$i]}" "$(quote_val "${CONFIG_VALS[$i]}")" >> "$CONFIG_FILE"
+      printf '%s=%s\n' "${CONFIG_KEYS[$i]}" "$(config_quote "${CONFIG_VALS[$i]}")" >> "$CONFIG_FILE"
       log_info "  added missing ${CONFIG_KEYS[$i]}"
       wrote=1
     fi
@@ -67,7 +56,7 @@ fi
 
 mkdir -p "$CONFIG_DIR"
 for i in "${!CONFIG_KEYS[@]}"; do
-  printf '%s=%s\n' "${CONFIG_KEYS[$i]}" "$(quote_val "${CONFIG_VALS[$i]}")"
+  printf '%s=%s\n' "${CONFIG_KEYS[$i]}" "$(config_quote "${CONFIG_VALS[$i]}")"
 done > "$CONFIG_FILE"
 chmod 600 "$CONFIG_FILE"
 log_info "  written"
