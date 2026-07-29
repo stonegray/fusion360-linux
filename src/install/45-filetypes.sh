@@ -171,7 +171,7 @@ _shell_folder() {
   local key="$1" path="$2"
   WINEPREFIX="$PFX_DIR/pfx" "$wine_bin" reg add \
     "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders" \
-    /v "$key" /t REG_SZ /d "Z:$path" /f 2>/dev/null || true
+    /v "$key" /t REG_SZ /d "Z:$path" /f &>/dev/null || true
 }
 
 local proton_bin
