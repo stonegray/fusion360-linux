@@ -2,7 +2,7 @@
 CONFIG_DIR="$F360_CONFIG_DIR"
 CONFIG_FILE="$F360_CONFIG_FILE"
 
-GE_PROTON=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
+GE_PROTON=$(find_proton "$COMPAT_DIR")
 FUSION_EXE=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1 || true)
 local fusion_root=""
 if [[ -n "$FUSION_EXE" ]]; then

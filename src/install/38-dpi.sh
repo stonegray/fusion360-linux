@@ -24,7 +24,7 @@ FUSION_DPI_LOG_FILE="/tmp/fusion360-dpi.log"
 
 # Find Proton binary and apply DPI via reg add
 local proton_bin
-proton_bin=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1)
+proton_bin=$(find_proton "$COMPAT_DIR")
 if [[ -n "$proton_bin" ]]; then
   PROTON="$proton_bin" STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
     apply_fusion_wine_dpi 2>/dev/null || true

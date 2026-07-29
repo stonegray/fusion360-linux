@@ -1,5 +1,5 @@
 # src/install/30-prefix.sh — Initialize Proton prefix + winetricks
-proton=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
+proton=$(find_proton "$COMPAT_DIR")
 if [[ -z "$proton" ]]; then
   log_info " GE-Proton not found. Run install.sh first."
 return 1

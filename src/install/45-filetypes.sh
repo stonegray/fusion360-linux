@@ -175,7 +175,7 @@ _shell_folder() {
 }
 
 local proton_bin
-proton_bin=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
+proton_bin=$(find_proton "$COMPAT_DIR")
 local wine_bin
 wine_bin="$(proton_wine_bin "$proton_bin")"
 if [[ -x "$wine_bin" ]]; then

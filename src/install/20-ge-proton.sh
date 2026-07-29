@@ -1,6 +1,6 @@
 # src/install/20-ge-proton.sh — Download and extract GE-Proton
 mkdir -p "$COMPAT_DIR"
-existing=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
+existing="$(find_proton "$COMPAT_DIR")"
 if [[ -n "$existing" ]]; then
   log_info " GE-Proton already installed: $(dirname "$existing")"
   return 0 2>/dev/null || true
