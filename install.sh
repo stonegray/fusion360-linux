@@ -81,58 +81,54 @@ case "$MODE" in
     ;;
 esac
 
-log_step "Step 1/14: System dependencies"
+log_step "Step 1/13: System dependencies"
 run_step 10-deps.sh
 echo ""
 
-log_step "Step 2/14: Preflight checks"
+log_step "Step 2/13: Preflight checks"
 run_step 05-preflight.sh
 echo ""
 
-log_step "Step 3/14: GE-Proton"
+log_step "Step 3/13: GE-Proton"
 run_step 20-ge-proton.sh
 echo ""
 
-log_step "Step 4/14: Install to system"
+log_step "Step 4/13: Install to system"
 run_step 25-install-to-location.sh
 echo ""
 
-log_step "Step 5/14: Proton prefix"
+log_step "Step 5/13: Proton prefix"
 run_step 30-prefix.sh
 echo ""
 
-log_step "Step 6/14: WebView2"
+log_step "Step 6/13: WebView2"
 run_step 35-webview2.sh
 echo ""
 
-log_step "Step 7/14: Config"
+log_step "Step 7/13: Config"
 run_step 37-config.sh
 echo ""
-
-log_step "Step 8/14: Protocol handlers"
-echo ""
-
-log_step "Step 9/14: Display DPI"
+log_step "Step 8/13: Display DPI"
 run_step 38-dpi.sh
 echo ""
 
-log_step "Step 10/14: Windows Version"
+log_step "Step 9/13: Windows Version"
 run_step 39-windows-version.sh
 echo ""
 
-log_step "Step 11/14: Fusion Installer"
+log_step "Step 10/13: Fusion Installer"
 run_step 40-fusion-installer.sh
 echo ""
 
-log_step "Step 12/14: LaunchDarkly streaming fix"
+log_step "Step 11/13: LaunchDarkly streaming fix"
 run_step 42-ld-streaming-fix.sh
 echo ""
 
-log_step "Step 13/14: File type associations"
+log_step "Step 12/13: File type associations"
 run_step 45-filetypes.sh
 echo ""
 
-log_step "Step 14/14: Health check"
+log_step "Step 13/13: Health check"
 if [[ -x "$SCRIPT_DIR/src/doctor/doctor.sh" ]]; then
   "$SCRIPT_DIR/src/doctor/doctor.sh" --quick || true
 fi
