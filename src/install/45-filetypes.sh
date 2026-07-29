@@ -84,12 +84,7 @@ _install_fusion_mime_icon() {
     fi
   done
 
-  # Refresh KDE icon cache so the running session picks up new icons
-  if command -v kbuildsycoca6 &>/dev/null; then
-    kbuildsycoca6 --noincremental 2>/dev/null || true
-  elif command -v kbuildsycoca5 &>/dev/null; then
-    kbuildsycoca5 --noincremental 2>/dev/null || true
-  fi
+  refresh_desktop_database
 
   rm -f "$icondir"/*.ico 2>/dev/null || true
   log_info " Fusion 360 MIME icons installed."
@@ -123,12 +118,7 @@ if command -v update-desktop-database &>/dev/null; then
   fi
 fi
 
-# Refresh KDE menu if running
-if command -v kbuildsycoca6 &>/dev/null; then
-  kbuildsycoca6 2>/dev/null || true
-elif command -v kbuildsycoca5 &>/dev/null; then
-  kbuildsycoca5 2>/dev/null || true
-fi
+refresh_desktop_database
 
 # ── Register NLauncher.exe in Wine prefix ─────────────────────────
 # This lets Windows ShellExecute (inside the Wine prefix) open .f3d

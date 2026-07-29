@@ -21,6 +21,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/share/colors.fn"
 source "$SCRIPT_DIR/share/paths.fn"
+source "$SCRIPT_DIR/share/desktop.fn"
 
 
 echo "=== Fusion360 Linux — Uninstall ==="
@@ -163,12 +164,7 @@ else
   echo "  [SKIP] MIME types not found."
 fi
 
-# 11. Refresh KDE menu if available
-if command -v kbuildsycoca6 &>/dev/null; then
-  kbuildsycoca6 2>/dev/null || true
-elif command -v kbuildsycoca5 &>/dev/null; then
-  kbuildsycoca5 2>/dev/null || true
-fi
+refresh_desktop_database
 
 echo ""
 echo "============================================================"
