@@ -1,6 +1,6 @@
 # share/disk.fn — Disk space checking
 #
-# Sources: (none) — calls df directly
+# Sources: share/constants.fn (MIN_DISK_SPACE_MB)
 # Exports: check_disk_space()
 #
 # Safe under set -e.

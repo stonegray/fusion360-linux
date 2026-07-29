@@ -1,7 +1,7 @@
 # share/network.fn — URL / network availability checks
 #
 # Sources: share/log.fn
-# Exports: check_url(), check_urls_parallel()
+# Exports: check_url()
 #
 # Safe under set -e.
 
