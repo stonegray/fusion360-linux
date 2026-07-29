@@ -54,6 +54,7 @@ if [[ -z "${INSTALLER_PATH:-}" ]]; then
   wget --timeout=30 -O "$HOME/Downloads/fusion360-linux-install/FusionClientDownloader.exe" \
     "https://dl.appstreaming.autodesk.com/production/installers/Fusion%20Client%20Downloader.exe" || {
 
+cat <<EOF
   ┌─ Manual download ────────────────────────────────────────────┐
   │                                                                │
   │  Download FusionClientDownloader.exe manually from:             │
