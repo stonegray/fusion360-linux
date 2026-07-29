@@ -32,7 +32,7 @@ fail() {
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux"
 CONFIG_FILE="$CONFIG_DIR/config"
 
-PROTON="${PROTON:-$HOME/.local/share/Steam/compatibilitytools.d/GE-Proton11-3/proton}"
+PROTON="${PROTON:-$HOME/.local/share/Steam/compatibilitytools.d/GE-Proton10-32/proton}"
 STEAM_COMPAT_DATA_PATH="${STEAM_COMPAT_DATA_PATH:-$HOME/.fusion360-proton2}"
 STEAM_COMPAT_CLIENT_INSTALL_PATH="${STEAM_COMPAT_CLIENT_INSTALL_PATH:-$HOME/.local/share/Steam}"
 FUSION_ROOT="${FUSION_ROOT:-$STEAM_COMPAT_DATA_PATH/pfx/drive_c/users/steamuser/AppData/Local/Autodesk/webdeploy/production}"
