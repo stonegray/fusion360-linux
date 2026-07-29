@@ -31,11 +31,11 @@ load_config() {
   FUSION_DXVK_ASYNC="${FUSION_DXVK_ASYNC:-1}"
   FUSION_NO_AT_BRIDGE="${FUSION_NO_AT_BRIDGE:-1}"
   FUSION_FIX_BCP47LANGS="${FUSION_FIX_BCP47LANGS:-1}"
-  FUSION_WEBVIEW_NO_SANDBOX="${FUSION_WEBVIEW_NO_SANDBOX:-1}"
+  FUSION_WEBVIEW_NO_SANDBOX="${FUSION_WEBVIEW_NO_SANDBOX:-0}"
   FUSION_WEBVIEW_DISABLE_GPU="${FUSION_WEBVIEW_DISABLE_GPU:-0}"
   FUSION_USE_INTEL_VK_ICD="${FUSION_USE_INTEL_VK_ICD:-1}"
-  FUSION_STAGING_WRITECOPY="${FUSION_STAGING_WRITECOPY:-1}"
-  FUSION_HEAP_DELAY_FREE="${FUSION_HEAP_DELAY_FREE:-1}"
+  FUSION_STAGING_WRITECOPY="${FUSION_STAGING_WRITECOPY:-0}"
+  FUSION_HEAP_DELAY_FREE="${FUSION_HEAP_DELAY_FREE:-0}"
   FUSION_ENABLE_OVERLAY_KILLER="${FUSION_ENABLE_OVERLAY_KILLER:-1}"
   FUSION_ENABLE_TOOLWINDOW_FIXER="${FUSION_ENABLE_TOOLWINDOW_FIXER:-1}"
 }
@@ -543,17 +543,6 @@ apply_launch_environment() {
   if is_enabled "$FUSION_WEBVIEW_NO_SANDBOX"; then
     webview_arguments+=("--no-sandbox")
   fi
-  if ! is_enabled "$FUSION_WEBVIEW_DISABLE_GPU"; then
-    # GPU acceleration flags for WebView2 — without these, the Edge
-    # renderer may fall back to software rasterization under Wine,
-    # causing slow UI panel rendering.  --use-angle=d3d11 forces the
-    # D3D11 backend through ANGLE, which DXVK then translates to
-    # Vulkan (same fast path as the 3D viewport).
-    webview_arguments+=("--ignore-gpu-blocklist")
-    webview_arguments+=("--enable-gpu-rasterization")
-    webview_arguments+=("--enable-zero-copy")
-    webview_arguments+=("--use-angle=d3d11")
-  fi
   if is_enabled "$FUSION_WEBVIEW_DISABLE_GPU"; then
     webview_arguments+=("--disable-gpu")
     webview_arguments+=("--disable-features=VizDisplayCompositor")
@@ -565,13 +554,7 @@ apply_launch_environment() {
     unset WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
   fi
 
-  # DXVK tuning for UI rendering — reduces swapchain latency and
-  # sets optimal shader compiler threads (half of logical cores)
-  local dxvk_cfg="dxgi.syncInterval=0"
-  dxvk_cfg="${dxvk_cfg},dxvk.tearFree=1"
-  dxvk_cfg="${dxvk_cfg},dxgi.numBackBuffers=3"
-  dxvk_cfg="${dxvk_cfg},dxvk.numCompilerThreads=$(( $(nproc 2>/dev/null || echo 4) / 2 ))"
-  export DXVK_CONFIG="$dxvk_cfg"
+
 
   if is_enabled "$FUSION_USE_INTEL_VK_ICD"; then
     # Ubuntu/KDE Neon: intel_icd.json (64-bit). Fedora: intel_icd.x86_64.json + .i686.json
