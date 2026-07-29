@@ -149,8 +149,8 @@ while (( SECONDS < MAX_WAIT )); do
     log_info " Installer process ended naturally (${ELAPSED}s elapsed)."
     break
   fi
-  if [[ -f "$F360_LOG" ]] && grep -q "Configure app complete" "$F360_LOG" 2>/dev/null; then
-    log_info " Installer completed (detected 'Configure app complete' in streamer log)."
+  if [[ -f "$F360_LOG" ]] && grep -q "Configure app complete\|VersionExists" "$F360_LOG" 2>/dev/null; then
+    log_info " Installer completed (detected completion or 'already installed' in streamer log)."
     break
   fi
 done
