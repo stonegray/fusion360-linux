@@ -44,7 +44,7 @@ add_comp "Proton prefix (Fusion install)" "$HOME/.fusion360-proton2"
 
 for g in "$HOME/.local/share/Steam/compatibilitytools.d"/GE-Proton*; do
   [[ -d "$g" ]] || continue
-  add_comp "GE-Proton ($name)" "$g"
+  add_comp "GE-Proton ($(basename "$g"))" "$g"
 done
 add_comp "Config files" "$HOME/.config/fusion360-linux"
 add_comp "Callback handler desktop entry" \

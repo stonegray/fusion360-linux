@@ -71,6 +71,10 @@ start_toolwindow_fixer() {
   fi
 
   # Find the Wine binary from the GE-Proton installation
+  if [[ -z "${PROTON:-}" ]]; then
+    log_warn "PROTON is not set — cannot find Wine binary for toolwindow fixer"
+    return 0
+  fi
   local wine_bin
   wine_bin="$(dirname "$PROTON")/files/bin/wine"
   if [[ ! -x "$wine_bin" ]]; then
