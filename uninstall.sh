@@ -49,9 +49,6 @@ echo "  Stopping Fusion 360 processes..."
 if [[ -f "$HOME/.local/share/fusion360-linux/runtime-scripts/launcher-functions.sh" ]]; then
   source "$HOME/.local/share/fusion360-linux/runtime-scripts/launcher-functions.sh"
   kill_fusion_processes
-elif [[ -f "$SCRIPT_DIR/src/runtime/launcher-functions.sh" ]]; then
-  source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
-  kill_fusion_processes
 else
   # Fallback: broad process kill
   patterns=( wineserver wine proton Fusion360 FusionClientDownloader \
