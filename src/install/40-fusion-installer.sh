@@ -112,12 +112,11 @@ fi
 # ── Launch installer ──────────────────────────────────────────────────
 log_info " Found: $INSTALLER_PATH"
 log_info " Launching Fusion installer through Proton..."
-log_info " A Windows installer window will appear.  Do NOT interact with it."
 echo ""
 echo "  ┌─ IMPORTANT ────────────────────────────────────────────┐"
-echo "  │ This script is actively controlling the Fusion         │"
-echo "  │ installer; it will exit around 85% in order to apply   │"
-echo "  │ patches.  No user interaction is necessary.             │"
+echo "  │ Automated install in progress.  The script monitors    │"
+echo "  │ the Fusion installer and kills it at ~85% to apply     │"
+echo "  │ critical patches.  Hands-off — let it run.             │"
 echo "  └────────────────────────────────────────────────────────┘"
 echo ""
 
