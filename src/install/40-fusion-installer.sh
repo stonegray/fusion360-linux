@@ -127,7 +127,6 @@ if (( SECONDS >= MAX_WAIT )); then
   log_warn " Installer did not complete within 2 hours — continuing anyway."
 fi
 log_info " Killing Fusion installer processes..."
-source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
 kill_fusion_processes || true
 log_info " Done. Auth will complete on next launch."
 # ── Check result ──────────────────────────────────────────────────────
