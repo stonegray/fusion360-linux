@@ -112,11 +112,13 @@ fi
 # ── Launch installer ──────────────────────────────────────────────────
 log_info " Found: $INSTALLER_PATH"
 log_info " Launching Fusion installer through Proton..."
-log_info " A Windows installer window will appear. Click through it."
+log_info " A Windows installer window will appear.  Do NOT interact with it."
 echo ""
 echo "  ┌─ IMPORTANT ────────────────────────────────────────────┐"
-echo "  │ Complete the installer in the window that appears.     │"
-echo "  │ When it shows \"Finish\", the installation is done.      │"
+echo "  │ Do NOT interact with the Fusion installer window.      │"
+echo "  │ This script is actively monitoring its progress and    │"
+echo "  │ will close it around 80% to apply post-install         │"
+echo "  │ patches.  Just let it run.                             │"
 echo "  └────────────────────────────────────────────────────────┘"
 echo ""
 
@@ -128,11 +130,8 @@ STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
 # ── Wait for Fusion360.exe + installer completion ─────────────────
 echo ""
 log_info " Waiting for install to finish..."
-log_info " Complete the installer in the window that appeared."
-log_info " The script will detect when it's done automatically."
-F360_LOG="$PFX_DIR/pfx/drive_c/users/steamuser/AppData/Local/Autodesk/autodesk.webdeploy.streamer.log"
-FUSION_PID=""
-F360_EXE=""
+log_info " Do not interact with the installer window.  This script"
+log_info " will detect when it's done and close it automatically."
 for i in $(seq 1 30); do
   sleep 10
   FUSION_PID=$(pgrep -u "$(id -u)" -f "Fusion360\.exe" 2>/dev/null | head -1 || true)
