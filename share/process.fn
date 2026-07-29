@@ -26,14 +26,17 @@ kill_fusion_processes() {
     done < <(pgrep -u "$user" -f "$pattern" 2>/dev/null || true)
   done
 
-  # Method 2: scan /proc/PID/exe for wine/proton binaries
-  local exe proc
+  # Method 2: scan /proc/PID/exe for wine/proton binaries (same user only)
+  local exe proc pid uid
   for proc in /proc/[0-9]*/exe; do
     exe=$(readlink "$proc" 2>/dev/null || true)
     [[ -z "$exe" ]] && continue
     if [[ "$exe" == *wine* ]] || [[ "$exe" == *proton* ]]; then
       pid=${proc%/exe}
       pid=${pid#/proc/}
+      # Verify the process belongs to the same user (skip root/other users' processes)
+      uid=$(stat -c '%u' "/proc/$pid" 2>/dev/null || true)
+      [[ "$uid" == "$user" ]] || continue
       pids+=("$pid")
     fi
   done
