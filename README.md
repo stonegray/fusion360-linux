@@ -95,26 +95,10 @@ between the browser process and its renderer, GPU, and utility processes.
 On Linux, Mojo can use **named platform channels** (named pipes under the
 hood) for this IPC.
 
-Under GE-Proton, the `wine64-preloader` installs **seccomp BPF filters**
-before launching Wine child processes.  These filters are designed to block
-syscalls that Steam games shouldn't need, but Mojo's named pipe channel
-uses a syscall that gets blocked — resulting in **SIGSYS** (signal 31)
-and an immediate crash of `msedgewebview2.exe`.
-
-### The Wine Source Fix (Lolig4's Patch)
-
-The proper fix is a Wine server patch in `server/named_pipe.c`:
-
-- **Don't unlink named pipes when the last server endpoint is destroyed**
-  — keeps the pipe name registered in the Wine namespace while any client
-  handle is still open, matching Windows behavior
-- **Hold an extra reference for namespace registration** — prevents
-  premature destruction of the pipe object while Mojo is still connecting
-
-This is what the `GE-Proton11-Fusion` fork applies at the Wine source
-level.  It requires rebuilding GE-Proton from source, which is impractical
-for most users.
-
+Other solutions (e.g. `GE-Proton11-Fusion`) require building a custom
+GE-Proton binary with a Wine server patch that keeps named pipe
+namespace entries alive across Mojo reconnect gaps.  Our approach
+achieves the same result without modifying Wine.
 ### Our Approach (No Wine Patch Needed)
 
 Instead of patching Wine, we apply three complementary workarounds:
