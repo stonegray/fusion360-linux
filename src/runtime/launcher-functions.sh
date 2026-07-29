@@ -501,6 +501,10 @@ apply_launch_environment() {
   export PROTON_USE_WINED3D="$FUSION_PROTON_USE_WINED3D"
   export PROTON_USE_XALIA="$FUSION_PROTON_USE_XALIA"
 
+
+  # Disable seccomp for all Proton child processes — prevents SIGSYS
+  # kill of msedgewebview2.exe on Mojo named platform channel pipe.
+  export PROTON_NO_SECCOMP=1
   if is_enabled "$FUSION_DXVK_ASYNC"; then
     export DXVK_ASYNC=1
   else

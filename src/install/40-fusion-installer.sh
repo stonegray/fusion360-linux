@@ -116,11 +116,13 @@ echo "  │ around 80%.                                             │"
 echo "  └────────────────────────────────────────────────────────┘"
 echo ""
 
+
 mkdir -p "$PFX_DIR"
 log_info " Starting installer (monitoring for minimum 4 min runtime)..."
 SECONDS=0
 STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
 STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
+PROTON_NO_SECCOMP=1 \
 "$proton" run "$INSTALLER_PATH" 2>/dev/null &
 INSTALLER_PID=$!
 
