@@ -44,7 +44,7 @@ extract_icon_from_exe() {
 #   Returns 0 on success.
 install_mime_icon() {
   local ico="$1" icon_name="$2" hicolor="$3"
-  local sizes="16 22 24 32 48 64 128 256"
+  local sizes=(16 22 24 32 48 64 128 256)
   local master; master="$(dirname "$ico")/${icon_name}.png"
   local ok=false s d src_icon dst_icon
 
@@ -64,14 +64,14 @@ install_mime_icon() {
   [[ "$ok" != "true" ]] && return 1
 
   # Install resized PNGs into hicolor MIME theme
-  for s in $sizes; do
+  for s in "${sizes[@]}"; do
     d="$hicolor/${s}x${s}/mimetypes"
     mkdir -p "$d"
     resize_icon "$master" "$d/${icon_name}.png" "$s" || true
   done
 
   # Also install as app icon so desktop entry Icon= resolves
-  for s in $sizes; do
+  for s in "${sizes[@]}"; do
     src_icon="$hicolor/${s}x${s}/mimetypes/${icon_name}.png"
     dst_icon="$hicolor/${s}x${s}/apps/${icon_name}.png"
     if [[ -f "$src_icon" ]] && [[ ! -f "$dst_icon" ]]; then
