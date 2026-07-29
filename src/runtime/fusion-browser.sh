@@ -4,8 +4,8 @@
 set -euo pipefail
 
 CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux/config"
-REQUEST_DIR="/tmp/fusion360-browser-requests"
-LOG_FILE="/tmp/fusion-browser-bridge.log"
+REQUEST_DIR="${BRIDGE_BROWSER_REQUEST_DIR:-/tmp/fusion360-browser-requests}"
+LOG_FILE="${BRIDGE_BROWSER_LOG:-/tmp/fusion-browser-bridge.log}"
 
 if [[ -f "$CONFIG_FILE" ]]; then
   source "$CONFIG_FILE"

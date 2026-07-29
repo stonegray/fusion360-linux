@@ -37,6 +37,11 @@ PFX_DIR="$HOME/.fusion360-proton2"
 # Log file locations
 FUSION_LOG_DIR="$PFX_DIR/pfx/drive_c/users/steamuser/AppData/Local/Autodesk"
 FUSION_DPI_LOG_FILE="/tmp/fusion360-dpi.log"
+BRIDGE_BROWSER_LOG="/tmp/fusion-browser-bridge.log"
+CALLBACK_HANDLER_LOG="/tmp/fusion-callback-handler.log"
+BRIDGE_LISTENER_LOG="/tmp/fusion-browser-listener.log"
+WINE_BROWSER_REGISTER_LOG="/tmp/fusion360-winebrowser-register.log"
+
 
 # Browser bridge directories
 BRIDGE_BROWSER_REQUEST_DIR="/tmp/fusion360-browser-requests"
