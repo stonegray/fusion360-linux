@@ -114,6 +114,7 @@ save_config() {
       printf '%s=%s\n' "$key" "$val"
     done
   } > "$config_file"
+  chmod 600 "$config_file"
 }
 
 # ── config_validate_keys — Verify expected keys exist ─────────
