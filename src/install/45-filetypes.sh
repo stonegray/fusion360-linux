@@ -21,16 +21,6 @@ fi
 # Extracts Fusion's icon from the Wine prefix and installs it at
 # standard sizes in the hicolor theme so file managers show a
 # Fusion icon for .f3d files instead of a generic one.
-_resize_icon() {
-  local src="$1" dst="$2" size="$3"
-  if command -v convert &>/dev/null; then
-    convert "$src" -resize "${size}x${size}" "$dst" 2>/dev/null && return 0
-  fi
-  if command -v ffmpeg &>/dev/null; then
-    ffmpeg -y -i "$src" -vf "scale=${size}:${size}:flags=lanczos" "$dst" 2>/dev/null && return 0
-  fi
-  return 1
-}
 
 _install_fusion_mime_icon() {
   local sizes=(16 22 24 32 48 64 128 256)
@@ -73,7 +63,7 @@ _install_fusion_mime_icon() {
   for s in "${sizes[@]}"; do
     d="$hicolor/${s}x${s}/mimetypes"
     mkdir -p "$d"
-    _resize_icon "$master" "$d/application-vnd.autodesk.fusion360.png" "$s" || true
+    resize_icon "$master" "$d/application-vnd.autodesk.fusion360.png" "$s" || true
   done
 
   # Clean up any stale icon-theme.cache left from a previous broken
