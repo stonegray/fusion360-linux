@@ -24,10 +24,6 @@ if [[ -x "$RUNTIME_DIR/health-check.sh" ]]; then
   fi
 fi
 
-fail() {
-  echo "launch-fusion.sh failed: $*" >&2
-  exit 1
-}
 
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux"
 CONFIG_FILE="$CONFIG_DIR/config"
@@ -76,6 +72,10 @@ BRIDGE_LISTENER_PID=""
 OVERLAY_KILLER_PID=""
 
 source "$RUNTIME_DIR/launcher-functions.sh"
+fail() {
+  echo "launch-fusion.sh failed: $*" >&2
+  exit 1
+}
 load_config
 
 if [[ "${1:-}" == "--config" || "${1:-}" == "--configure" ]]; then
