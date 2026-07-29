@@ -507,7 +507,6 @@ cleanup() {
 
 apply_launch_environment() {
   export PROTON_USE_WINED3D="$FUSION_PROTON_USE_WINED3D"
-  export PROTON_NO_SECCOMP=1
   export PROTON_USE_XALIA="$FUSION_PROTON_USE_XALIA"
 
   if is_enabled "$FUSION_DXVK_ASYNC"; then
