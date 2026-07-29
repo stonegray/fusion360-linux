@@ -160,9 +160,7 @@ Name=Service Utility
 Icon=fusion360
 Exec=$F360_DATA_DIR/launch-fusion.sh --service-util
 EOF
-  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$F360_APPS_DIR" 2>/dev/null || true
-  command -v kbuildsycoca6 &>/dev/null && kbuildsycoca6 2>/dev/null || true
-  command -v kbuildsycoca5 &>/dev/null && kbuildsycoca5 2>/dev/null || true
+  refresh_desktop_database "$F360_APPS_DIR"
   log_info " Desktop entry installed."
 else
   log_info " Fusion360.exe not found yet. Install may still be in progress."

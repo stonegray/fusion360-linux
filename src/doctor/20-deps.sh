@@ -14,14 +14,6 @@ elif command -v zypper &>/dev/null; then
 fi
 info "Package manager: ${PKG_MGR:-unknown}"
 
-check_dep() {
-  local bin="$1" pkg="$2"
-  if command -v "$bin" &>/dev/null; then
-    pass "$pkg ($bin found)"
-  else
-    fail "$pkg ($bin not found)"
-  fi
-}
 
 check_dep wrestool "icoutils"
 check_dep zenity  "zenity"

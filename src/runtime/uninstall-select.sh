@@ -128,12 +128,7 @@ for idx in "${selected[@]}"; do
   fi
 done
 
-# Refresh KDE menu if available
-if command -v kbuildsycoca6 &>/dev/null; then
-  kbuildsycoca6 2>/dev/null || true
-elif command -v kbuildsycoca5 &>/dev/null; then
-  kbuildsycoca5 2>/dev/null || true
-fi
+refresh_desktop_database
 
 echo ""
 echo "  Done."

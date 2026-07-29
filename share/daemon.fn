@@ -16,10 +16,7 @@
 
 # Check if a boolean config option is enabled (1/yes/true/on/enabled/y)
 _is_enabled() {
-  case "${1:-}" in
-    1|yes|true|on|enabled|y|Y|TRUE|True|ON|On) return 0 ;;
-    *) return 1 ;;
-  esac
+  is_enabled "$@"
 }
 
 # ── Daemon PID tracking variables ──────────────────────────────────────
