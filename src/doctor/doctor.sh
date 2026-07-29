@@ -23,7 +23,7 @@ parse_args "$@"
 print_banner
 
 for module in "$SCRIPT_DIR"/[0-9][0-9]-*.sh; do
-  source "$module"
+  source "$module" 2>/dev/null || warn "Failed to load module: $(basename "$module")"
 done
 
 print_summary
