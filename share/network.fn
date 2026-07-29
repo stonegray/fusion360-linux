@@ -7,6 +7,7 @@
 
 # Check a single URL with timeout
 check_url() {
+  command -v wget >/dev/null 2>&1 || return 2
   local url="${1:?check_url: missing URL}"
   local timeout="${2:-5}"
   wget --spider --timeout="$timeout" --tries=1 "$url" 2>/dev/null
