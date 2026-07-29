@@ -13,10 +13,16 @@ if [[ -z "${NO_COLOR:-}" ]] && [[ -t 1 ]]; then
   COLOR_RESET="\e[0m";  COLOR_BOLD="\e[1m";   COLOR_DIM="\e[2m"
   COLOR_RED="\e[31m";   COLOR_GREEN="\e[32m"; COLOR_YELLOW="\e[33m"
   COLOR_BLUE="\e[34m";  COLOR_CYAN="\e[36m";  COLOR_MAGENTA="\e[35m"
+  _C_RESET="${COLOR_RESET}";  _C_BOLD="${COLOR_BOLD}";   _C_DIM="${COLOR_DIM}"
+  _C_RED="${COLOR_RED}";      _C_GREEN="${COLOR_GREEN}"; _C_YELLOW="${COLOR_YELLOW}"
+  _C_BLUE="${COLOR_BLUE}";    _C_CYAN="${COLOR_CYAN}"
 else
   COLOR_RESET=""; COLOR_BOLD=""; COLOR_DIM=""
   COLOR_RED="";  COLOR_GREEN=""; COLOR_YELLOW=""
   COLOR_BLUE=""; COLOR_CYAN="";  COLOR_MAGENTA=""
+  _C_RESET="${COLOR_RESET}";  _C_BOLD="${COLOR_BOLD}";   _C_DIM="${COLOR_DIM}"
+  _C_RED="${COLOR_RED}";      _C_GREEN="${COLOR_GREEN}"; _C_YELLOW="${COLOR_YELLOW}"
+  _C_BLUE="${COLOR_BLUE}";    _C_CYAN="${COLOR_CYAN}"
 fi
 
 # Runtime check — use when NO_COLOR may be set after source time

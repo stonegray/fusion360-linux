@@ -19,6 +19,7 @@ RECOMMENDATIONS=()
 section_header() {
   printf "\n${COLOR_BOLD}${COLOR_CYAN}━━━ %s ━━━${COLOR_RESET}\n" "$*"
 }
+header() { section_header "$@"; }
 
 pass() {
   printf "  ${COLOR_GREEN}✓${COLOR_RESET} %s\n" "$*"
