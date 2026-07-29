@@ -59,6 +59,14 @@ detect_distro() {
       ;;
   esac
 
+  if [[ -z "$INSTALL_CMD" ]]; then
+    echo "ERROR: Unsupported distribution '$ID'. Please install the required" >&2
+    echo "       packages manually, or add support for your distro." >&2
+    echo "       Required: curl, wget, xdg-utils, ImageMagick or ffmpeg," >&2
+    echo "       icoutils, desktop-file-utils, MAME icon tools (wrestool)." >&2
+    exit 1
+  fi
+
   # Normalize distro ID for package file lookup (aliases map to canonical files)
   local distro_id="$ID"
   case "$distro_id" in
