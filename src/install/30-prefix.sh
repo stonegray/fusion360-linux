@@ -41,4 +41,8 @@ STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
 STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
 PROTON_NO_SECCOMP=1 \
 "$proton" run wine reg add "HKCU\\Software\\Wine\\AppDefaults\\msedgewebview2.exe" /v Version /t REG_SZ /d win8 /f 2>/dev/null || log_info " Warning: could not set msedgewebview2.exe version override"
+STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
+STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
+PROTON_NO_SECCOMP=1 \
+"$proton" run wine reg add "HKCU\\Environment" /v "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS" /t REG_SZ /d "--no-sandbox" /f 2>/dev/null || log_info " Warning: could not set WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"
 log_info " Done."
