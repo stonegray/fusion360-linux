@@ -32,7 +32,11 @@ if command -v winetricks &>/dev/null; then
 else
   log_info " winetricks not available — skipping VC++ runtime install."
 fi
-log_info " Configuring AppDefaults for msedgewebview2.exe..."
+log_info " Configuring Wine version and AppDefaults..."
+STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
+STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
+PROTON_NO_SECCOMP=1 \
+"$proton" run wine reg add "HKCU\\Software\\Wine" /v Version /t REG_SZ /d win10 /f 2>/dev/null || log_info " Warning: could not set global Windows version"
 STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
 STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
 PROTON_NO_SECCOMP=1 \
