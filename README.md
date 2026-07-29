@@ -31,6 +31,7 @@ Fusion appears in your application launcher as a native app.
 | **Config UI** | Python Tkinter GUI (`launcher-config-user-interface.py`) for toggling overlay killer, toolwindow fixer, WebView2 GPU, async shaders — no config file editing required |
 | **DPI detection** | Auto-detects display scale (KDE → GNOME → xrdb → default), writes Wine DPI registry before Fusion installer runs |
 | **Cloud sign-in** | dotnet48 + winhttp winetricks, DLL overrides for telemetry suppression, callback protocol handlers |
+| **IE proxy fix** | Applies `winhttp=n,b` DLL override to skip Windows IE proxy detection API — saves ~10s of startup time on every launch |
 | **Preflight checks** | Step 2 validates Vulkan driver, disk space, and existing prefix before proceeding |
 | **Doctor diagnostic** | `./doctor.sh` — full system check with `--quick` summary, `--save` report, and color output |
 | **Graceful process kill** | `kill_fusion_processes()` sends SIGTERM, waits 2s, escalates to SIGKILL — used by cleanup and uninstall |

@@ -31,6 +31,7 @@ load_config() {
   FUSION_DXVK_ASYNC="${FUSION_DXVK_ASYNC:-1}"
   FUSION_NO_AT_BRIDGE="${FUSION_NO_AT_BRIDGE:-1}"
   FUSION_FIX_BCP47LANGS="${FUSION_FIX_BCP47LANGS:-1}"
+  FUSION_FIX_WINHTTP_PROXY="${FUSION_FIX_WINHTTP_PROXY:-1}"
   FUSION_WEBVIEW_NO_SANDBOX="${FUSION_WEBVIEW_NO_SANDBOX:-1}"
   FUSION_WEBVIEW_DISABLE_GPU="${FUSION_WEBVIEW_DISABLE_GPU:-0}"
   FUSION_USE_INTEL_VK_ICD="${FUSION_USE_INTEL_VK_ICD:-1}"
@@ -565,6 +566,21 @@ apply_launch_environment() {
   export DXVK_CONFIG="$dxvk_cfg"
 
 
+
+  # WINEDLLOVERRIDES: bcp47langs= prevents Autodesk Identity Manager crash;
+  # winhttp=n,b skips IE proxy detection (saves ~10s startup under Wine).
+  local dll_overrides="bcp47langs="
+  if ! is_enabled "$FUSION_FIX_BCP47LANGS"; then
+    dll_overrides=""
+  fi
+  if is_enabled "${FUSION_FIX_WINHTTP_PROXY:-1}"; then
+    dll_overrides="${dll_overrides:+$dll_overrides,}winhttp=n,b"
+  fi
+  if [[ -n "$dll_overrides" ]]; then
+    export WINEDLLOVERRIDES="$dll_overrides"
+  else
+    unset WINEDLLOVERRIDES
+  fi
 
   if is_enabled "$FUSION_USE_INTEL_VK_ICD"; then
     # Ubuntu/KDE Neon: intel_icd.json (64-bit). Fedora: intel_icd.x86_64.json + .i686.json
