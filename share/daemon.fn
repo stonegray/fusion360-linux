@@ -29,10 +29,11 @@ TOOLWINDOW_FIXER_PID=""
 
 # ── Browser bridge listener ────────────────────────────────────────────
 # Start the browser bridge listener in background (nohup).
-# Caller should run clear_bridge_temp_files() beforehand to ensure a clean
-# bridge state.
+# Clears stale bridge temp files first, then launches the listener.
 start_browser_listener() {
   [[ -x "$BROWSER_LISTENER" ]] || { log_error "Browser listener not found or not executable: $BROWSER_LISTENER"; return 1; }
+
+  clear_bridge_temp_files || true
 
   "$BROWSER_LISTENER" &
   BRIDGE_LISTENER_PID="$!"
