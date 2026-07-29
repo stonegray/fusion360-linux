@@ -1,0 +1,36 @@
+# share/cleanup.fn — Cleanup and temp file management for Fusion 360
+#
+# Sources: share/log.fn, share/paths.fn
+# Exports: clear_bridge_temp_files(), cleanup()
+#
+# cleanup() also stops daemon processes.  For best results, source
+# share/daemon.fn before this file so stop_all_daemons() is available.
+#
+# Safe under set -e.
+
+# ── Bridge temp file cleanup ──────────────────────────────────────────
+# Remove stale .request and .partial files from all bridge directories.
+clear_bridge_temp_files() {
+  mkdir -p "$BRIDGE_BROWSER_REQUEST_DIR" \
+           "$BRIDGE_BROWSER_PROCESSED_DIR" \
+           "$BRIDGE_CALLBACK_REQUEST_DIR" \
+           "$BRIDGE_CALLBACK_PROCESSED_DIR"
+
+  find "$BRIDGE_BROWSER_REQUEST_DIR"   -type f \( -name "*.request" -o -name "*.partial" \) -delete 2>/dev/null || true
+  find "$BRIDGE_BROWSER_PROCESSED_DIR" -type f \( -name "*.request" -o -name "*.partial" \) -delete 2>/dev/null || true
+  find "$BRIDGE_CALLBACK_REQUEST_DIR"  -type f \( -name "*.request" -o -name "*.partial" \) -delete 2>/dev/null || true
+  find "$BRIDGE_CALLBACK_PROCESSED_DIR" -type f \( -name "*.request" -o -name "*.partial" \) -delete 2>/dev/null || true
+}
+
+# ── Main cleanup orchestrator ────────────────────────────────────────
+# Called on exit — kills tracked daemons and clears bridge temp files.
+# If share/daemon.fn is loaded, uses stop_all_daemons() for PID tracking.
+cleanup() {
+  # Kill daemons (if daemon module is loaded)
+  if declare -F stop_all_daemons &>/dev/null; then
+    stop_all_daemons
+  fi
+
+  # Clear bridge temp files
+  clear_bridge_temp_files
+}

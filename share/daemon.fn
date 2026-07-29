@@ -1,0 +1,108 @@
+# share/daemon.fn — Background daemon lifecycle for Fusion 360
+#
+# Sources: share/paths.fn, share/log.fn
+# Exports: start_browser_listener(), start_overlay_killer(),
+#          start_toolwindow_fixer(), stop_all_daemons()
+#
+# Expects the following env vars to be set externally (e.g. by load_config
+# or launch context):
+#   BROWSER_LISTENER, FUSION_OVERLAY_KILLER, FUSION_TOOLWINDOW_FIXER,
+#   FUSION_ENABLE_OVERLAY_KILLER, FUSION_ENABLE_TOOLWINDOW_FIXER,
+#   FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT, PROTON, STEAM_COMPAT_DATA_PATH
+#
+# Safe under set -e.
+
+# ── Private helpers ────────────────────────────────────────────────────
+
+# Check if a boolean config option is enabled (1/yes/true/on/enabled/y)
+_is_enabled() {
+  case "${1:-}" in
+    1|yes|true|on|enabled|y|Y|TRUE|True|ON|On) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# ── Daemon PID tracking variables ──────────────────────────────────────
+BRIDGE_LISTENER_PID=""
+OVERLAY_KILLER_PID=""
+TOOLWINDOW_FIXER_PID=""
+
+# ── Browser bridge listener ────────────────────────────────────────────
+# Start the browser bridge listener in background (nohup).
+# Caller should run clear_bridge_temp_files() beforehand to ensure a clean
+# bridge state.
+start_browser_listener() {
+  [[ -x "$BROWSER_LISTENER" ]] || { log_error "Browser listener not found or not executable: $BROWSER_LISTENER"; exit 1; }
+
+  "$BROWSER_LISTENER" &
+  BRIDGE_LISTENER_PID="$!"
+  log_info "Browser listener started (PID $BRIDGE_LISTENER_PID)"
+}
+
+# ── Gray overlay killer ────────────────────────────────────────────────
+# Start the gray overlay killer daemon in background.
+# Passes FUSION_ENABLE_OVERLAY_KILLER and FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT
+# as env vars to the child process.
+start_overlay_killer() {
+  _is_enabled "$FUSION_ENABLE_OVERLAY_KILLER" || return 0
+
+  if [[ ! -x "$FUSION_OVERLAY_KILLER" ]]; then
+    log_warn "Overlay killer is enabled but not executable: $FUSION_OVERLAY_KILLER"
+    return 0
+  fi
+
+  FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="$FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT" \
+    "$FUSION_OVERLAY_KILLER" &
+  OVERLAY_KILLER_PID="$!"
+  log_info "Overlay killer started (PID $OVERLAY_KILLER_PID)"
+}
+
+# ── Toolwindow fixer ───────────────────────────────────────────────────
+# Background daemon that adds WS_EX_APPWINDOW to Fusion's docked
+# toolwindow popups so Wine's X11 driver makes them "managed" instead
+# of override-redirect.  Fixes the "always on top" z-order bug.
+start_toolwindow_fixer() {
+  _is_enabled "$FUSION_ENABLE_TOOLWINDOW_FIXER" || return 0
+
+  if [[ ! -x "$FUSION_TOOLWINDOW_FIXER" ]]; then
+    log_warn "Toolwindow fixer is enabled but not executable: $FUSION_TOOLWINDOW_FIXER"
+    return 0
+  fi
+
+  # Find the Wine binary from the GE-Proton installation
+  local wine_bin
+  wine_bin="$(dirname "$PROTON")/files/bin/wine"
+  if [[ ! -x "$wine_bin" ]]; then
+    log_warn "Wine binary not found at $wine_bin"
+    return 0
+  fi
+
+  WINEPREFIX="${STEAM_COMPAT_DATA_PATH:-${PFX_DIR:-$HOME/.fusion360-proton2}}/pfx" \
+    "$wine_bin" "$FUSION_TOOLWINDOW_FIXER" &
+  TOOLWINDOW_FIXER_PID="$!"
+  log_info "Toolwindow fixer started (PID $TOOLWINDOW_FIXER_PID)"
+}
+
+# ── Stop all tracked daemons ───────────────────────────────────────────
+stop_all_daemons() {
+  if [[ -n "$OVERLAY_KILLER_PID" ]]; then
+    if kill -0 "$OVERLAY_KILLER_PID" 2>/dev/null; then
+      kill "$OVERLAY_KILLER_PID" 2>/dev/null || true
+      wait "$OVERLAY_KILLER_PID" 2>/dev/null || true
+    fi
+  fi
+
+  if [[ -n "$BRIDGE_LISTENER_PID" ]]; then
+    if kill -0 "$BRIDGE_LISTENER_PID" 2>/dev/null; then
+      kill "$BRIDGE_LISTENER_PID" 2>/dev/null || true
+      wait "$BRIDGE_LISTENER_PID" 2>/dev/null || true
+    fi
+  fi
+
+  if [[ -n "$TOOLWINDOW_FIXER_PID" ]]; then
+    if kill -0 "$TOOLWINDOW_FIXER_PID" 2>/dev/null; then
+      kill "$TOOLWINDOW_FIXER_PID" 2>/dev/null || true
+      wait "$TOOLWINDOW_FIXER_PID" 2>/dev/null || true
+    fi
+  fi
+}

@@ -1,0 +1,84 @@
+# share/browser-request.fn — Browser bridge atomic request writer
+#
+# Sources: share/paths.fn  (BRIDGE_BROWSER_REQUEST_DIR,
+#            BRIDGE_CALLBACK_REQUEST_DIR)
+# Exports: write_browser_request(), request_filename(), request_dir()
+#
+# Safe under set -e.
+
+# request_dir <type>
+#   Return the bridge request directory for <type> ("browser" or
+#   "callback").  Output is empty with RC 1 on unknown type.
+request_dir() {
+  local type="${1:-browser}"
+  case "$type" in
+    browser)  echo "${BRIDGE_BROWSER_REQUEST_DIR:-/tmp/fusion360-browser-requests}"  ;;
+    callback) echo "${BRIDGE_CALLBACK_REQUEST_DIR:-/tmp/fusion360-callback-requests}" ;;
+    *)
+      echo "error: unknown request type '$type' (expected browser|callback)" >&2
+      return 1
+      ;;
+  esac
+}
+
+# request_filename
+#   Generate a filename for a bridge request: <epoch-seconds>.<nanos>.<pid>
+request_filename() {
+  echo "$(date +%s.%N).$$"
+}
+
+# write_browser_request <request_dir> <log_file> <url> [extra args...]
+#   Atomically write a browser bridge request: dump <url> to a .partial
+#   file, then rename to .request.  Log a detailed debug record
+#   (timestamp, script info, argument list with printf '%q', and key
+#   environment variables) to <log_file>.
+write_browser_request() {
+  local request_dir="$1" log_file="$2" url="$3"
+  shift 3 || true
+
+  mkdir -p "$request_dir"
+
+  # Debug log with full provenance
+  {
+    echo "============================================================"
+    echo "timestamp=$(date -Is)"
+    echo "script=$0"
+    echo "pid=$$"
+    echo "ppid=$PPID"
+    echo "pwd=$PWD"
+    echo "argc=$#"
+
+    local idx=0 arg
+    for arg in "$@"; do
+      printf 'argv[%d]=%q\n' "$idx" "$arg"
+      echo "argv[${idx}]_len=${#arg}"
+      echo "argv[${idx}]_first200=${arg:0:200}"
+      echo "argv[${idx}]_last200=${arg: -200}"
+      idx=$((idx + 1))
+    done
+
+    echo "--- env dump ---"
+    echo "KDE_SESSION_VERSION=${KDE_SESSION_VERSION:-}"
+    echo "WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}"
+    echo "DISPLAY=${DISPLAY:-}"
+    echo "XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-}"
+    echo "DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS:-}"
+    echo "XDG_CURRENT_DESKTOP=${XDG_CURRENT_DESKTOP:-}"
+    echo "XDG_SESSION_TYPE=${XDG_SESSION_TYPE:-}"
+    echo "============================================================"
+    echo
+  } >> "$log_file" 2>&1
+
+  local name; name=$(request_filename)
+  local partial="$request_dir/$name.partial"
+  local request="$request_dir/$name.request"
+
+  printf "%s\n" "$url" > "$partial"
+  mv "$partial" "$request"
+
+  {
+    echo "wrote_request=$request"
+    echo "============================================================"
+    echo
+  } >> "$log_file" 2>&1
+}

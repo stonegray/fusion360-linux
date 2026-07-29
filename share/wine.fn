@@ -1,0 +1,83 @@
+# share/wine.fn — Wine / Proton prefix and registry operations
+#
+# Sources: share/proton.fn, share/log.fn
+# Exports: wine_reg(), wine_run(), wine_prefix_init(), winetricks_run()
+#
+# Safe under set -e.
+
+# ── wine_reg — Generic Wine registry operation ────────────────
+# Wraps `wine reg` with WINEPREFIX setup and stderr suppression.
+# Usage:
+#   wine_reg <wine_bin> <prefix> add   <key> [/v name] [/t type] [/d data] [/f]
+#   wine_reg <wine_bin> <prefix> query <key> [/v name]
+#   wine_reg <wine_bin> <prefix> delete <key> [/v name] [/f]
+#
+# Example:
+#   wine_reg "$wine_bin" "$pfx" add \
+#     "HKCU\\Software\\Wine\\Fonts" /v LogPixels /t REG_DWORD /d 144 /f
+wine_reg() {
+  local wine_bin="${1:?wine_reg: missing wine binary}"
+  local prefix="${2:?wine_reg: missing prefix}"
+  shift 2
+  WINEPREFIX="$prefix" "$wine_bin" reg "$@" &>/dev/null || true
+}
+
+# ── wine_run — Run a command through Wine ─────────────────────
+# Runs a command via proton run with the Steam compatibility
+# environment variables.  The proton binary must be discoverable
+# via $PROTON or the caller should set it beforehand.
+# Usage: wine_run <proton_bin> <command> [args...]
+#
+# Example:
+#   wine_run "$proton" wineboot -u
+wine_run() {
+  local proton="${1:?wine_run: missing proton binary}"
+  shift
+  "$proton" run "$@" 2>/dev/null || true
+}
+
+# ── wine_prefix_init — Initialize a Proton prefix ────────────
+# Runs wineboot -u to bootstrap the Wine prefix (creates
+# user.reg, system.reg, and the drive_c directory tree).
+# Usage: wine_prefix_init <proton_bin> <prefix_dir> <steam_dir>
+#
+# Example:
+#   wine_prefix_init "$proton" "$PFX_DIR" "$HOME/.local/share/Steam"
+wine_prefix_init() {
+  local proton="${1:?wine_prefix_init: missing proton binary}"
+  local prefix_dir="${2:?wine_prefix_init: missing prefix directory}"
+  local steam_dir="${3:-$HOME/.local/share/Steam}"
+
+  mkdir -p "$prefix_dir"
+  STEAM_COMPAT_DATA_PATH="$prefix_dir" \
+  STEAM_COMPAT_CLIENT_INSTALL_PATH="$steam_dir" \
+  PROTON_NO_SECCOMP=1 \
+  WINEDLLOVERRIDES="regedit.exe,msiexec.exe=" \
+    wine_run "$proton" wineboot -u
+}
+
+# ── winetricks_run — Install winetricks verbs ─────────────────
+# Installs winetricks verbs into a prefix.  Silently skips if
+# winetricks is not installed.  Returns 0 on success; non-zero
+# but non-fatal if some verbs fail.
+# Usage: winetricks_run <prefix_dir> <steam_dir> <verb> [verb...]
+#
+# Example:
+#   winetricks_run "$PFX_DIR" "$HOME/.local/share/Steam" \
+#     vcrun2022 dotnet48 winhttp
+winetricks_run() {
+  command -v winetricks &>/dev/null || return 0
+
+  local prefix_dir="${1:?winetricks_run: missing prefix directory}"
+  local steam_dir="${2:?winetricks_run: missing steam directory}"
+  shift 2
+
+  [[ $# -eq 0 ]] && return 0
+
+  STEAM_COMPAT_DATA_PATH="$prefix_dir" \
+  STEAM_COMPAT_CLIENT_INSTALL_PATH="$steam_dir" \
+  PROTON_NO_SECCOMP=1 \
+  WINEDLLOVERRIDES="regedit.exe,msiexec.exe=" \
+    winetricks -q "$@" 2>/dev/null || \
+    log_warn "Some winetricks verbs failed (prefix may still work)"
+}

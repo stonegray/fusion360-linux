@@ -1,0 +1,141 @@
+# share/config.fn — Config file read / write / validation
+#
+# Sources: share/paths.fn, share/log.fn
+# Exports: is_enabled(), load_config(), save_config(), config_quote(),
+#          config_set_defaults(), config_validate_keys()
+#
+# Safe under set -e.
+
+# ── is_enabled — Check truthiness of a config value ───────────
+# Accepts 0/1, yes/no, true/false, on/off (any case).
+# Returns 0 (truthy) or 1 (falsy).
+is_enabled() {
+  shopt -s nocasematch
+  case "${1:-}" in
+    1|yes|true|on|enabled|y)
+      shopt -u nocasematch
+      return 0
+      ;;
+    *)
+      shopt -u nocasematch
+      return 1
+      ;;
+  esac
+}
+
+# ── config_quote — Shell-safe value quoting ──────────────────
+# Uses printf '%q' when available, falls back to single-quote
+# wrapping for $'...' output (bash 5.0+ style that older bash
+# cannot parse).  Prints the quoted value to stdout.
+config_quote() {
+  local raw="${1:?config_quote: missing value}"
+  local q
+  q=$(printf '%q' "$raw" 2>/dev/null || printf '%s' "$raw")
+  if [[ "$q" == $\'* ]]; then
+    local escaped
+    escaped=$(printf '%s' "$raw" | sed "s/'/'\\\\''/g")
+    q="'$escaped'"
+  fi
+  printf '%s' "$q"
+}
+
+# ── config_set_defaults — Set all config defaults ─────────────
+# Calls after sourcing share/constants.fn to ensure every expected
+# config key has a default value (can be overridden by config file).
+config_set_defaults() {
+  FUSION_WINE_DPI="${FUSION_WINE_DPI:-auto}"
+  FUSION_WINE_SCALE_PERCENT="${FUSION_WINE_SCALE_PERCENT:-auto}"
+  FUSION_WINE_DPI_FALLBACK="${FUSION_WINE_DPI_FALLBACK:-144}"
+  FUSION_WINE_SCALE_FALLBACK_PERCENT="${FUSION_WINE_SCALE_FALLBACK_PERCENT:-150}"
+  FUSION_PROTON_USE_WINED3D="${FUSION_PROTON_USE_WINED3D:-0}"
+  FUSION_PROTON_USE_XALIA="${FUSION_PROTON_USE_XALIA:-0}"
+  FUSION_DXVK_ASYNC="${FUSION_DXVK_ASYNC:-1}"
+  FUSION_NO_AT_BRIDGE="${FUSION_NO_AT_BRIDGE:-1}"
+  FUSION_FIX_BCP47LANGS="${FUSION_FIX_BCP47LANGS:-1}"
+  FUSION_FIX_WINHTTP_PROXY="${FUSION_FIX_WINHTTP_PROXY:-1}"
+  FUSION_STAGING_WRITECOPY="${FUSION_STAGING_WRITECOPY:-0}"
+  FUSION_HEAP_DELAY_FREE="${FUSION_HEAP_DELAY_FREE:-0}"
+  FUSION_WEBVIEW_NO_SANDBOX="${FUSION_WEBVIEW_NO_SANDBOX:-1}"
+  FUSION_WEBVIEW_DISABLE_GPU="${FUSION_WEBVIEW_DISABLE_GPU:-0}"
+  FUSION_USE_INTEL_VK_ICD="${FUSION_USE_INTEL_VK_ICD:-1}"
+  FUSION_ENABLE_OVERLAY_KILLER="${FUSION_ENABLE_OVERLAY_KILLER:-1}"
+  FUSION_ENABLE_TOOLWINDOW_FIXER="${FUSION_ENABLE_TOOLWINDOW_FIXER:-1}"
+  FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="${FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT:-25}"
+  FUSION_DARK_MODE="${FUSION_DARK_MODE:-auto}"
+}
+
+# ── load_config — Source config file with defaults ────────────
+# Sources the config file if it exists, then fills in any missing
+# keys with sensible defaults.
+# Usage: load_config [config_file]
+load_config() {
+  local config_file="${1:-${FUSION_CONFIG_FILE:-}}"
+  [[ -f "$config_file" ]] && source "$config_file" || true
+  config_set_defaults
+}
+
+# ── save_config — Write config file ───────────────────────────
+# Writes all config keys with shell-safe quoting to the config
+# file.  Uses printf %q as the primary quoting mechanism, with
+# a fallback for bash 5.0+ $'...' style.
+# Usage: save_config [config_file] [config_dir]
+save_config() {
+  local config_file="${1:-${FUSION_CONFIG_FILE:-}}"
+  local config_dir="${2:-${FUSION_CONFIG_DIR:-}}"
+
+  [[ -z "$config_file" ]] && { log_error "save_config: no config file path"; return 1; }
+
+  mkdir -p "${config_dir:-$(dirname "$config_file")}"
+
+  {
+    local keys=(
+      PROTON STEAM_COMPAT_DATA_PATH STEAM_COMPAT_CLIENT_INSTALL_PATH
+      FUSION_ROOT BROWSER BROWSER_LISTENER CALLBACK_HANDLER CHROME
+      FUSION_TOOLWINDOW_FIXER
+      FUSION_ENABLE_TOOLWINDOW_FIXER
+      FUSION_OVERLAY_KILLER FUSION_WINE_RESTART_SCRIPT
+      FUSION_WINE_DPI FUSION_WINE_SCALE_PERCENT FUSION_WINE_DPI_FALLBACK
+      FUSION_WINE_SCALE_FALLBACK_PERCENT FUSION_PROTON_USE_WINED3D
+      FUSION_PROTON_USE_XALIA FUSION_DXVK_ASYNC FUSION_NO_AT_BRIDGE
+      FUSION_FIX_BCP47LANGS FUSION_WEBVIEW_NO_SANDBOX FUSION_WEBVIEW_DISABLE_GPU
+      FUSION_USE_INTEL_VK_ICD FUSION_STAGING_WRITECOPY FUSION_HEAP_DELAY_FREE
+      FUSION_ENABLE_OVERLAY_KILLER FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT
+    )
+    for key in "${keys[@]}"; do
+      local val
+      val=$(printf "%q" "${!key}" 2>/dev/null || printf '%s' "${!key}")
+      # bash 5.0+ printf %q outputs $'...' which older bash can't parse
+      if [[ "$val" == \$* ]]; then
+        val=$(printf '%s' "${!key}" | sed "s/'/'\\\\''/g")
+        val="'$val'"
+      fi
+      printf '%s=%s\n' "$key" "$val"
+    done
+  } > "$config_file"
+}
+
+# ── config_validate_keys — Verify expected keys exist ─────────
+# Checks that every key in the expected list has a non-empty value
+# after loading the config.  Returns 0 if all present, 1 if any
+# missing, and logs warnings for absent keys.
+config_validate_keys() {
+  local missing=0
+  local keys=(
+    PROTON STEAM_COMPAT_DATA_PATH STEAM_COMPAT_CLIENT_INSTALL_PATH
+    FUSION_ROOT FUSION_WINE_DPI FUSION_WINE_SCALE_PERCENT
+    FUSION_WINE_DPI_FALLBACK FUSION_WINE_SCALE_FALLBACK_PERCENT
+    FUSION_PROTON_USE_WINED3D FUSION_PROTON_USE_XALIA
+    FUSION_DXVK_ASYNC FUSION_NO_AT_BRIDGE FUSION_FIX_BCP47LANGS
+    FUSION_WEBVIEW_NO_SANDBOX FUSION_WEBVIEW_DISABLE_GPU
+    FUSION_USE_INTEL_VK_ICD FUSION_STAGING_WRITECOPY FUSION_HEAP_DELAY_FREE
+    FUSION_ENABLE_OVERLAY_KILLER FUSION_ENABLE_TOOLWINDOW_FIXER
+    FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT
+  )
+  for key in "${keys[@]}"; do
+    if [[ -z "${!key:-}" ]]; then
+      log_warn "Config key '$key' is missing or empty"
+      missing=1
+    fi
+  done
+  return "$missing"
+}

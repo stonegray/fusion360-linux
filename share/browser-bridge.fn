@@ -1,0 +1,55 @@
+# share/browser-bridge.fn — Wine browser bridge and protocol handlers
+#
+# Sources: share/config.fn, share/wine.fn, share/paths.fn
+# Exports: register_wine_browser_bridge(), install_callback_protocol_handlers()
+#
+# Depends on config variables: PROTON, STEAM_COMPAT_DATA_PATH, BROWSER,
+#   CALLBACK_HANDLER, F360_APPS_DIR
+#
+# Safe under set -e.
+
+# Set Wine browser registry keys so Fusion 360 can open URLs via the
+# host system browser.  Registers the browser executable path and
+# callback handler paths.
+#
+# Requires: PROTON, STEAM_COMPAT_DATA_PATH, BROWSER
+register_wine_browser_bridge() {
+  local wine_bin
+  wine_bin="$(dirname "$PROTON")/files/bin/wine"
+  [[ -x "$wine_bin" ]] || { echo "launch-fusion.sh warning: wine binary not found at $wine_bin" >&2; return 1; }
+  local pfx="$STEAM_COMPAT_DATA_PATH/pfx"
+  WINEPREFIX="$pfx" "$wine_bin" reg add 'HKCU\Software\Wine\WineBrowser' /v Browsers /t REG_SZ /d "$BROWSER" /f >/tmp/fusion360-winebrowser-register.log 2>&1 || {
+    echo "launch-fusion.sh warning: failed to register WineBrowser. See /tmp/fusion360-winebrowser-register.log" >&2
+  }
+}
+
+# Install adsk:// and adskidmgr:// protocol handler .desktop files.
+# Creates a desktop entry for the callback handler and registers the
+# protocol MIME types via xdg-mime.
+#
+# Requires: CALLBACK_HANDLER, F360_APPS_DIR
+install_callback_protocol_handlers() {
+  local applications_dir
+  local desktop_file
+
+  applications_dir="${F360_APPS_DIR:-$HOME/.local/share/applications/fusion360-linux}"
+  desktop_file="$applications_dir/fusion360-callback-handler.desktop"
+
+  if [[ -f "$desktop_file" ]] && grep -q "$CALLBACK_HANDLER" "$desktop_file" 2>/dev/null; then
+    return 0
+  fi
+
+  mkdir -p "$applications_dir"
+  cat > "$desktop_file" <<EOF_DESKTOP
+[Desktop Entry]
+Name=Fusion 360 Autodesk Callback Handler
+Exec=$CALLBACK_HANDLER %u
+Type=Application
+NoDisplay=true
+MimeType=x-scheme-handler/adsk;x-scheme-handler/adskidmgr;
+EOF_DESKTOP
+
+  xdg-mime default fusion360-callback-handler.desktop x-scheme-handler/adsk 2>/dev/null || true
+  xdg-mime default fusion360-callback-handler.desktop x-scheme-handler/adskidmgr 2>/dev/null || true
+  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$applications_dir" >/dev/null 2>&1 || true
+}

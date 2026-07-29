@@ -1,0 +1,13 @@
+# share/network.fn — URL / network availability checks
+#
+# Sources: share/log.fn
+# Exports: check_url(), check_urls_parallel()
+#
+# Safe under set -e.
+
+# Check a single URL with timeout
+check_url() {
+  local url="${1:?check_url: missing URL}"
+  local timeout="${2:-5}"
+  wget --spider --timeout="$timeout" --tries=1 "$url" 2>/dev/null
+}

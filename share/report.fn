@@ -1,0 +1,66 @@
+# share/report.fn — Test result reporting primitives
+#
+# Sources: share/colors.fn, share/log.fn
+# Exports: pass(), fail(), warn(), info(), detail(),
+#          section_header(), section_counter_reset(),
+#          add_recommendation(), print_recommendations()
+#
+# Provides colored test-result reporting distinct from log.fn's
+# general-purpose progress logging.  Uses SECTION_PASS/SECTION_WARN/
+# SECTION_FAIL counters and a RECOMMENDATIONS array.
+#
+# Safe under set -e.
+
+SECTION_PASS=0
+SECTION_FAIL=0
+SECTION_WARN=0
+RECOMMENDATIONS=()
+
+section_header() {
+  printf "\n${COLOR_BOLD}${COLOR_CYAN}━━━ %s ━━━${COLOR_RESET}\n" "$*"
+}
+
+pass() {
+  printf "  ${COLOR_GREEN}✓${COLOR_RESET} %s\n" "$*"
+  ((SECTION_PASS++))
+}
+
+fail() {
+  printf "  ${COLOR_RED}✗${COLOR_RESET} %s\n" "$*"
+  ((SECTION_FAIL++))
+  RECOMMENDATIONS+=("$*")
+}
+
+warn() {
+  printf "  ${COLOR_YELLOW}⚠${COLOR_RESET} %s\n" "$*"
+  ((SECTION_WARN++))
+}
+
+info() {
+  printf "  ${COLOR_BLUE}●${COLOR_RESET} %s\n" "$*"
+}
+
+detail() {
+  printf "  ${COLOR_DIM}%s${COLOR_RESET}\n" "$*"
+}
+
+section_counter_reset() {
+  SECTION_PASS=0
+  SECTION_FAIL=0
+  SECTION_WARN=0
+}
+
+add_recommendation() {
+  RECOMMENDATIONS+=("$*")
+}
+
+print_recommendations() {
+  if [[ ${#RECOMMENDATIONS[@]} -gt 0 ]]; then
+    echo ""
+    echo "  ┌── Recommendations ──"
+    for r in "${RECOMMENDATIONS[@]}"; do
+      echo "  │ $r"
+    done
+    echo "  └─────────────────────"
+  fi
+}

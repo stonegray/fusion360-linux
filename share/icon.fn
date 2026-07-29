@@ -1,0 +1,104 @@
+# share/icon.fn — Icon extraction, resizing, and installation
+#
+# Sources: (none)
+# Exports: resize_icon(), install_mime_icon(), shell_folder(),
+#          extract_icon_from_exe()
+#
+# Safe under set -e.
+
+# resize_icon <src> <dst> <size>
+#   Resize image <src> to a <size>x<size> square, writing to <dst>.
+#   Uses ImageMagick convert if available, otherwise ffmpeg.
+#   Returns 0 on success.
+resize_icon() {
+  local src="$1" dst="$2" size="$3"
+  if command -v convert &>/dev/null; then
+    convert "$src" -resize "${size}x${size}" "$dst" 2>/dev/null && return 0
+  fi
+  if command -v ffmpeg &>/dev/null; then
+    ffmpeg -y -i "$src" -vf "scale=${size}:${size}:flags=lanczos" "$dst" 2>/dev/null && return 0
+  fi
+  return 1
+}
+
+# extract_icon_from_exe <exe> <outdir>
+#   Extract all icon groups (RT_GROUP_ICON, type 14) from a Windows
+#   .exe using wrestool.  Writes .ico files into <outdir> and echoes
+#   the path of the first extracted .ico (or empty string on failure).
+extract_icon_from_exe() {
+  local exe="$1" outdir="$2"
+  local ico=""
+  if command -v wrestool &>/dev/null; then
+    mkdir -p "$outdir"
+    wrestool -x -t 14 "$exe" -o "$outdir/" 2>/dev/null || true
+    ico=$(find "$outdir" -maxdepth 1 -name "*.ico" 2>/dev/null | head -1 || true)
+  fi
+  echo "$ico"
+}
+
+# install_mime_icon <source_ico> <icon_name> <hicolor_base>
+#   Install an icon from a .ico file into the hicolor theme at standard
+#   MIME sizes (16,22,24,32,48,64,128,256).  Converts master to PNG,
+#   installs under <hicolor_base>/{size}x{size}/{mimetypes,apps}/.
+#   Cleans up stale icon-theme.cache and triggers KDE icon cache rebuild.
+#   Returns 0 on success.
+install_mime_icon() {
+  local ico="$1" icon_name="$2" hicolor="$3"
+  local sizes="16 22 24 32 48 64 128 256"
+  local master; master="$(dirname "$ico")/${icon_name}.png"
+  local ok=false s d src_icon dst_icon
+
+  [[ -n "$ico" ]] && [[ -f "$ico" ]] || return 1
+
+  # Convert .ico → master PNG
+  if command -v convert &>/dev/null; then
+    convert "${ico}[7]" "$master" 2>/dev/null || \
+    convert "${ico}[6]" "$master" 2>/dev/null || \
+    convert "${ico}" -flatten "$master" 2>/dev/null || true
+    [[ -f "$master" ]] && ok=true
+  fi
+  if ! $ok && command -v ffmpeg &>/dev/null; then
+    ffmpeg -y -i "$ico" "$master" 2>/dev/null || true
+    [[ -f "$master" ]] && ok=true
+  fi
+  $ok || return 1
+
+  # Install resized PNGs into hicolor MIME theme
+  for s in $sizes; do
+    d="$hicolor/${s}x${s}/mimetypes"
+    mkdir -p "$d"
+    resize_icon "$master" "$d/${icon_name}.png" "$s" || true
+  done
+
+  # Also install as app icon so desktop entry Icon= resolves
+  for s in $sizes; do
+    src_icon="$hicolor/${s}x${s}/mimetypes/${icon_name}.png"
+    dst_icon="$hicolor/${s}x${s}/apps/${icon_name}.png"
+    if [[ -f "$src_icon" ]] && [[ ! -f "$dst_icon" ]]; then
+      mkdir -p "$(dirname "$dst_icon")"
+      cp "$src_icon" "$dst_icon"
+    fi
+  done
+
+  # Clean stale icon-theme.cache (old buggy installs left a fragment
+  # that shadows the filesystem, hiding all app icons)
+  rm -f "$hicolor/icon-theme.cache" 2>/dev/null || true
+
+  # Refresh KDE icon cache
+  command -v kbuildsycoca6 &>/dev/null && kbuildsycoca6 --noincremental 2>/dev/null || true
+  command -v kbuildsycoca5 &>/dev/null && kbuildsycoca5 --noincremental 2>/dev/null || true
+
+  # Clean up extracted .ico files
+  rm -f "$(dirname "$ico")"/*.ico 2>/dev/null || true
+}
+
+# shell_folder <key> <path> <wine_bin> <pfx_dir>
+#   Set a Windows shell folder (e.g. Personal, Desktop, Downloads) in
+#   the Wine prefix so Fusion's file dialog opens at Linux home paths.
+#   Calls `wine reg add` under the given prefix.
+shell_folder() {
+  local key="$1" path="$2" wine_bin="$3" pfx_dir="$4"
+  WINEPREFIX="$pfx_dir/pfx" "$wine_bin" reg add \
+    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders" \
+    /v "$key" /t REG_SZ /d "Z:$path" /f &>/dev/null || true
+}

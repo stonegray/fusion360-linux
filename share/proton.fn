@@ -1,0 +1,35 @@
+# share/proton.fn — Proton discovery and Wine binary derivation
+#
+# Sources: share/paths.fn
+# Exports: find_proton(), proton_wine_bin(), detect_proton_version()
+#
+# Safe under set -e.
+
+# Search COMPAT_DIR for the 'proton' binary.  Returns the first match
+# (or empty string if none found).  Used in many installer scripts that
+# need to locate GE-Proton.
+find_proton() {
+  local compat_dir="${1:-$COMPAT_DIR}"
+  find "$compat_dir" -name proton -type f 2>/dev/null | head -1 || true
+}
+
+# Given a proton binary path, derive the Wine binary location.
+# Proton ships its own Wine inside the bundle under files/bin/.
+# Usage: wine_bin=$(proton_wine_bin "$proton")
+proton_wine_bin() {
+  local proton="${1:?proton_wine_bin: missing proton path}"
+  local dir
+  dir="$(dirname "$proton" 2>/dev/null)" || return 1
+  printf "%s" "$dir/files/bin/wine"
+}
+
+# Detect Proton version from the parent directory name.
+# GE-Proton installations are named by version, e.g.
+# /path/to/GE-Proton11-3/proton → "GE-Proton11-3".
+# Falls back to "unknown" on failure.
+detect_proton_version() {
+  local proton="${1:?detect_proton_version: missing proton path}"
+  local dir
+  dir="$(dirname "$proton" 2>/dev/null)" || { echo "unknown"; return 1; }
+  basename "$dir" 2>/dev/null || echo "unknown"
+}

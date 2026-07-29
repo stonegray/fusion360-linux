@@ -1,0 +1,55 @@
+# share/detect-display.fn — Display/DPI detection helpers
+#
+# Sources: (none) — calls system tools directly
+# Exports: read_gsettings_number(), read_kde_forced_dpi(),
+#          read_kde_primary_scale(), read_gnome_text_scaling()
+#
+# Functions return raw values (not converted to DPI).  Callers in
+# share/dpi.fn perform scale-to-DPI conversion.
+#
+# Safe under set -e.
+
+# Read a numeric gsettings value.  Returns the numeric portion on
+# success, or non-zero exit with no output if gsettings is unavailable.
+read_gsettings_number() {
+  local schema_name="$1"
+  local key_name="$2"
+  local raw_value
+
+  command -v gsettings >/dev/null 2>&1 || return 1
+
+  raw_value="$(gsettings get "$schema_name" "$key_name" 2>/dev/null)" || return 1
+  printf "%s\n" "$raw_value" | grep -Eo '[0-9]+([.][0-9]+)?' | tail -n 1
+}
+
+# Read forced DPI from KDE (kreadconfig5 / kdeglobals).
+# Returns the DPI value if forced, empty otherwise.
+read_kde_forced_dpi() {
+  command -v kreadconfig5 >/dev/null 2>&1 || return 1
+  local dpi
+  dpi="$(kreadconfig5 --file "$HOME/.config/kdeglobals" --group "General" --key "forceFontDPI" 2>/dev/null)" || return 1
+  [[ "$dpi" =~ ^[0-9]+$ ]] && [[ "$dpi" -gt 0 ]] || return 1
+  printf "%s" "$dpi"
+}
+
+# Read KDE primary display scale factor via kscreen-doctor.
+# Returns the raw scale factor (e.g. "1.5"), empty if not available or <= 1.0.
+read_kde_primary_scale() {
+  command -v kscreen-doctor &>/dev/null || return 1
+  local scale
+  scale=$(kscreen-doctor -o 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -i 'Scale:' | awk '{print $NF}' | sort -r | head -1)
+  [[ -n "$scale" ]] || return 1
+  awk -v value="$scale" 'BEGIN { exit !(value > 1.0) }' || return 1
+  printf "%s" "$scale"
+}
+
+# Read GNOME text scaling factor via gsettings.
+# Returns the raw scale factor (e.g. "1.25"), empty if not available or at default.
+read_gnome_text_scaling() {
+  command -v gsettings &>/dev/null || return 1
+  local scale
+  scale=$(gsettings get org.gnome.desktop.interface text-scaling-factor 2>/dev/null || true)
+  [[ -n "$scale" ]] || return 1
+  awk -v value="$scale" 'BEGIN { exit !(value > 0 && value != 1) }' || return 1
+  printf "%s" "$scale"
+}

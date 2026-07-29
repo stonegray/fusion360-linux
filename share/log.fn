@@ -1,0 +1,22 @@
+# share/log.fn — Unified logging API (merges install + doctor formatting)
+#
+# Sources: share/colors.fn
+# Exports: log_set_quiet(), log_info(), log_warn(), log_error(),
+#          log_pass(), log_debug(), log_detail(), log_step()
+#
+# Safe under set -e.
+
+log_set_quiet() { _LOG_QUIET=1; }
+
+# ── Install-style log lines ─────────────────────────────────────
+log_step()   { printf "${COLOR_BOLD}${COLOR_CYAN}── %s${COLOR_RESET}\n" "$*"; }
+log_info()   { printf "  ${COLOR_BLUE}●${COLOR_RESET} %s\n" "$*"; }
+log_pass()   { printf "  ${COLOR_GREEN}✓${COLOR_RESET} %s\n" "$*"; }
+log_warn()   { printf "  ${COLOR_YELLOW}⚠${COLOR_RESET} %s\n" "$*"; }
+log_error()  { printf "  ${COLOR_RED}✗${COLOR_RESET} %s\n" "$*"; }
+log_detail() { printf "  ${COLOR_DIM}%s${COLOR_RESET}\n" "$*"; }
+log_debug()  {
+  if [[ -n "${FUSION_DEBUG:-}" ]]; then
+    printf "  ${COLOR_DIM}[debug] %s${COLOR_RESET}\n" "$*"
+  fi
+}

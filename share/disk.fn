@@ -1,0 +1,25 @@
+# share/disk.fn — Disk space checking
+#
+# Sources: (none) — calls df directly
+# Exports: check_disk_space()
+#
+# Safe under set -e.
+
+# Check if a path has at least N MiB of free space.
+# Returns 0 (sufficient), 1 (insufficient), 2 (can't check).
+check_disk_space() {
+  local path="${1:-$HOME}"
+  local needed_mb="${2:-$MIN_DISK_SPACE_MB}"
+  local available
+  available=$(df --output=avail "$path" 2>/dev/null | tail -1 || true)
+  if [[ -z "$available" ]]; then
+    return 2
+  fi
+  # df reports in 1K blocks
+  local available_mb=$((available / 1024))
+  if (( available_mb < needed_mb )); then
+    echo "warning: only ${available_mb}MiB free, need ${needed_mb}MiB" >&2
+    return 1
+  fi
+  return 0
+}

@@ -1,0 +1,64 @@
+# share/os.fn — OS / distro / display server detection
+#
+# Sources: share/paths.fn
+# Exports: detect_distro(), detect_os(), detect_display_server(),
+#          distro_install_cmd(), distro_package_list()
+#
+# Safe under set -e.
+
+# Detect Linux distro from /etc/os-release
+detect_distro() {
+  if [[ -f /etc/os-release ]]; then
+    local id
+    id="$(grep -oP '(?<=^ID=).*' /etc/os-release | tr -d '"' | head -1 || true)"
+    local id_like
+    id_like="$(grep -oP '(?<=^ID_LIKE=).*' /etc/os-release | tr -d '"' | head -1 || true)"
+    case "$id" in
+      ubuntu|debian|linuxmint|pop|neon|kali)  echo "debian"  ;;
+      fedora|rhel|centos)                      echo "fedora"  ;;
+      arch|manjaro|endeavouros)                echo "arch"    ;;
+      opensuse*)                                echo "suse"    ;;
+      solus)                                    echo "solus"   ;;
+      void)                                     echo "void"    ;;
+      alpine)                                   echo "alpine"  ;;
+      *)
+        # Fall back to ID_LIKE
+        case "$id_like" in
+          *debian*)  echo "debian" ;;
+          *fedora*)  echo "fedora" ;;
+          *arch*)    echo "arch"   ;;
+          *suse*)    echo "suse"   ;;
+          *)         echo "unknown" ;;
+        esac
+        ;;
+    esac
+  else
+    echo "unknown"
+  fi
+}
+
+# Return the package manager install command for a distro
+distro_install_cmd() {
+  local distro="${1:-$(detect_distro)}"
+  case "$distro" in
+    debian)  echo "apt-get install -y"   ;;
+    fedora)  echo "dnf install -y"       ;;
+    arch)    echo "pacman -S --noconfirm" ;;
+    suse)    echo "zypper install -y"    ;;
+    solus)   echo "eopkg install -y"     ;;
+    void)    echo "xbps-install -y"      ;;
+    alpine)  echo "apk add"              ;;
+    *)       echo "unknown"              ;;
+  esac
+}
+
+# Detect display server
+detect_display_server() {
+  if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+    echo "wayland"
+  elif [[ -n "${DISPLAY:-}" ]]; then
+    echo "x11"
+  else
+    echo "tty"
+  fi
+}

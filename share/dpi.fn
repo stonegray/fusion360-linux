@@ -1,0 +1,175 @@
+# share/dpi.fn — DPI detection and Wine registry application
+#
+# Sources: share/detect-display.fn, share/wine.fn, share/config.fn, share/paths.fn
+# Exports: scale_to_dpi(), percent_to_dpi(), resolve_fusion_wine_dpi(),
+#          apply_fusion_wine_dpi()
+#
+# Depends on config variables: FUSION_WINE_DPI, FUSION_WINE_SCALE_PERCENT,
+#   FUSION_WINE_DPI_FALLBACK, FUSION_WINE_SCALE_FALLBACK_PERCENT, PROTON,
+#   STEAM_COMPAT_DATA_PATH
+# Depends on path variables: FUSION_DPI_LOG_FILE (from share/paths.fn)
+#
+# Safe under set -e.
+
+# Convert a scale factor (e.g. 1.5) to DPI (e.g. 144).
+scale_to_dpi() {
+  local scale_value="$1"
+  awk -v scale_value="$scale_value" 'BEGIN { printf "%d", (96 * scale_value) + 0.5 }'
+}
+
+# Convert a percentage (e.g. 150) to DPI.
+percent_to_dpi() {
+  local percent_value="$1"
+  awk -v percent_value="$percent_value" 'BEGIN { printf "%d", (96 * percent_value / 100) + 0.5 }'
+}
+
+# Run the full DPI detection chain.
+# Returns the resolved DPI value on stdout.
+# Detection order:
+#   1. User-defined explicit FUSION_WINE_SCALE_PERCENT
+#   2. User-defined explicit FUSION_WINE_DPI
+#   3. KDE Plasma forced font DPI (kreadconfig5)
+#   4. KDE Plasma primary monitor scale factor (kscreen-doctor)
+#   5. GNOME text scaling factor (gsettings)
+#   6. Cinnamon text scaling factor (gsettings)
+#   7. Cinnamon scaling factor (gsettings)
+#   8. Xft.dpi from xrdb
+#   9. FUSION_WINE_SCALE_FALLBACK_PERCENT
+#  10. FUSION_WINE_DPI_FALLBACK
+resolve_fusion_wine_dpi() {
+  local kde_forced_dpi
+  local cinnamon_scaling_factor
+  local cinnamon_text_scaling_factor
+
+  # 1. User-defined explicit percentage → DPI
+  if printf "%s\n" "$FUSION_WINE_SCALE_PERCENT" | grep -Eq '^[0-9]+$'; then
+    percent_to_dpi "$FUSION_WINE_SCALE_PERCENT"
+    return 0
+  fi
+
+  # 2. User-defined explicit DPI
+  if printf "%s\n" "$FUSION_WINE_DPI" | grep -Eq '^[0-9]+$'; then
+    printf "%s" "$FUSION_WINE_DPI"
+    return 0
+  fi
+
+  # 3. KDE Plasma: forced font DPI
+  kde_forced_dpi="$(read_kde_forced_dpi || true)"
+  if [[ -n "$kde_forced_dpi" ]]; then
+    printf "%s" "$kde_forced_dpi"
+    return 0
+  fi
+
+  # 4. KDE Plasma: primary monitor scale factor
+  local kde_primary_scale
+  kde_primary_scale="$(read_kde_primary_scale || true)"
+  if [[ -n "$kde_primary_scale" ]]; then
+    local kde_primary_dpi
+    kde_primary_dpi=$(scale_to_dpi "$kde_primary_scale")
+    if [[ -n "$kde_primary_dpi" ]] && [[ "$kde_primary_dpi" =~ ^[0-9]+$ ]]; then
+      printf "%s" "$kde_primary_dpi"
+      return 0
+    fi
+  fi
+
+  # 5. GNOME: text scaling factor
+  local gnome_text_scale
+  gnome_text_scale="$(read_gnome_text_scaling || true)"
+  if [[ -n "$gnome_text_scale" ]]; then
+    local gnome_text_dpi
+    gnome_text_dpi=$(scale_to_dpi "$gnome_text_scale")
+    if [[ -n "$gnome_text_dpi" ]] && [[ "$gnome_text_dpi" =~ ^[0-9]+$ ]]; then
+      printf "%s" "$gnome_text_dpi"
+      return 0
+    fi
+  fi
+
+  # 6. Cinnamon: text scaling factor
+  cinnamon_text_scaling_factor="$(read_gsettings_number org.cinnamon.desktop.interface text-scaling-factor || true)"
+  cinnamon_scaling_factor="$(read_gsettings_number org.cinnamon.desktop.interface scaling-factor || true)"
+
+  if [[ -n "$cinnamon_text_scaling_factor" ]]; then
+    if awk -v value="$cinnamon_text_scaling_factor" 'BEGIN { exit !(value > 0 && value != 1) }'; then
+      scale_to_dpi "$cinnamon_text_scaling_factor"
+      return 0
+    fi
+  fi
+
+  if [[ -n "$cinnamon_scaling_factor" ]]; then
+    if awk -v value="$cinnamon_scaling_factor" 'BEGIN { exit !(value > 1) }'; then
+      scale_to_dpi "$cinnamon_scaling_factor"
+      return 0
+    fi
+  fi
+
+  # 7. Xft.dpi from xrdb (set by KDE font DPI, GNOME, or .Xresources)
+  if command -v xrdb &>/dev/null; then
+    local xft_dpi
+    xft_dpi=$(xrdb -query 2>/dev/null | grep '^Xft\.dpi:' | awk '{print $2}' || true)
+    if [[ -n "$xft_dpi" ]] && [[ "$xft_dpi" =~ ^[0-9]+$ ]] && [[ "$xft_dpi" -gt 0 ]]; then
+      printf "%s" "$xft_dpi"
+      return 0
+    fi
+  fi
+
+  # 8. Fallback percentage
+  if printf "%s\n" "$FUSION_WINE_SCALE_FALLBACK_PERCENT" | grep -Eq '^[0-9]+$'; then
+    percent_to_dpi "$FUSION_WINE_SCALE_FALLBACK_PERCENT"
+    return 0
+  fi
+
+  # 9. Hard fallback
+  printf "%s" "$FUSION_WINE_DPI_FALLBACK"
+}
+
+# Write DPI to Wine registry (Fonts LogPixels, Desktop LogPixels,
+# Win8DpiScaling).  Uses the resolved DPI from resolve_fusion_wine_dpi().
+#
+# Requires: PROTON, STEAM_COMPAT_DATA_PATH, FUSION_DPI_LOG_FILE
+apply_fusion_wine_dpi() {
+  local dpi_value
+  local win8_dpi_scaling
+
+  dpi_value="$(resolve_fusion_wine_dpi)"
+  [[ "$dpi_value" =~ ^[0-9]+$ ]] || { echo "warning: invalid DPI value '$dpi_value'" >&2; return 1; }
+  [[ "$dpi_value" -eq 96 ]] && win8_dpi_scaling=0 || win8_dpi_scaling=1
+
+  {
+    echo "timestamp=$(date -Is)"
+    echo "FUSION_WINE_DPI=$FUSION_WINE_DPI"
+    echo "FUSION_WINE_SCALE_PERCENT=$FUSION_WINE_SCALE_PERCENT"
+    echo "FUSION_WINE_DPI_FALLBACK=$FUSION_WINE_DPI_FALLBACK"
+    echo "FUSION_WINE_SCALE_FALLBACK_PERCENT=$FUSION_WINE_SCALE_FALLBACK_PERCENT"
+    echo "resolved_dpi=$dpi_value"
+    echo "win8_dpi_scaling=$win8_dpi_scaling"
+    echo "cinnamon_scaling_factor=$(read_gsettings_number org.cinnamon.desktop.interface scaling-factor || true)"
+    echo "cinnamon_text_scaling_factor=$(read_gsettings_number org.cinnamon.desktop.interface text-scaling-factor || true)"
+    echo "kde_forced_dpi=$(read_kde_forced_dpi || true)"
+  } > "$FUSION_DPI_LOG_FILE"
+
+  local wine_bin
+  wine_bin="$(dirname "$PROTON")/files/bin/wine"
+  [[ -x "$wine_bin" ]] || { echo "launch-fusion.sh warning: wine binary not found at $wine_bin" >&2; return 1; }
+
+  local pfx="$STEAM_COMPAT_DATA_PATH/pfx"
+
+  WINEPREFIX="$pfx" "$wine_bin" reg add 'HKCU\Software\Wine\Fonts' /v LogPixels /t REG_DWORD /d "$dpi_value" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
+    echo "launch-fusion.sh warning: failed to set Wine Fonts LogPixels. See $FUSION_DPI_LOG_FILE" >&2
+  }
+
+  WINEPREFIX="$pfx" "$wine_bin" reg add 'HKCU\Control Panel\Desktop' /v LogPixels /t REG_DWORD /d "$dpi_value" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
+    echo "launch-fusion.sh warning: failed to set Desktop LogPixels. See $FUSION_DPI_LOG_FILE" >&2
+  }
+
+  WINEPREFIX="$pfx" "$wine_bin" reg add 'HKCU\Control Panel\Desktop' /v Win8DpiScaling /t REG_DWORD /d "$win8_dpi_scaling" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
+    echo "launch-fusion.sh warning: failed to set Win8DpiScaling. See $FUSION_DPI_LOG_FILE" >&2
+  }
+
+  {
+    echo
+    echo "---- registry check after write ----"
+    WINEPREFIX="$pfx" "$wine_bin" reg query 'HKCU\Software\Wine\Fonts' /v LogPixels 2>&1 || true
+    WINEPREFIX="$pfx" "$wine_bin" reg query 'HKCU\Control Panel\Desktop' /v LogPixels 2>&1 || true
+    WINEPREFIX="$pfx" "$wine_bin" reg query 'HKCU\Control Panel\Desktop' /v Win8DpiScaling 2>&1 || true
+  } >> "$FUSION_DPI_LOG_FILE"
+}

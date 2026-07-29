@@ -1,0 +1,45 @@
+# share/paths.fn — XDG and Fusion 360 path constants
+#
+# Exports (all set at source time):
+#   XDG_DATA_HOME, XDG_CONFIG_HOME, XDG_CACHE_HOME, XDG_BIN_HOME
+#   FUSION_DATA_DIR, FUSION_CONFIG_DIR, FUSION_CACHE_DIR
+#   FUSION_CONFIG_FILE, FUSION_APPS_DIR, FUSION_ICONS_DIR
+#   FUSION_BIN_DIR, COMPAT_DIR, PFX_DIR, FUSION_LOG_DIR
+#   FUSION_DPI_LOG_FILE, BRIDGE_BROWSER_REQUEST_DIR
+#   BRIDGE_BROWSER_PROCESSED_DIR, BRIDGE_CALLBACK_REQUEST_DIR
+#   BRIDGE_CALLBACK_PROCESSED_DIR
+#
+# Safe under set -e.
+
+: "${HOME:?HOME is not set — aborting}"
+
+# XDG base directories
+XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+XDG_BIN_HOME="${XDG_BIN_HOME:-$HOME/.local/bin}"
+
+# Fusion 360 data / config
+FUSION_DATA_DIR="$XDG_DATA_HOME/fusion360-linux"
+FUSION_CONFIG_DIR="$XDG_CONFIG_HOME/fusion360-linux"
+FUSION_CONFIG_FILE="$FUSION_CONFIG_DIR/config"
+FUSION_CACHE_DIR="$XDG_CACHE_HOME/fusion360-linux"
+
+# Desktop integration
+FUSION_APPS_DIR="$XDG_DATA_HOME/applications/fusion360-linux"
+FUSION_ICONS_DIR="$XDG_DATA_HOME/icons/hicolor"
+FUSION_BIN_DIR="$XDG_BIN_HOME"
+
+# Proton / Wine paths
+COMPAT_DIR="$HOME/.local/share/Steam/compatibilitytools.d"
+PFX_DIR="$HOME/.fusion360-proton2"
+
+# Log file locations
+FUSION_LOG_DIR="$PFX_DIR/pfx/drive_c/users/steamuser/AppData/Local/Autodesk"
+FUSION_DPI_LOG_FILE="/tmp/fusion360-dpi.log"
+
+# Browser bridge directories
+BRIDGE_BROWSER_REQUEST_DIR="/tmp/fusion360-browser-requests"
+BRIDGE_BROWSER_PROCESSED_DIR="/tmp/fusion360-browser-processed"
+BRIDGE_CALLBACK_REQUEST_DIR="/tmp/fusion360-callback-requests"
+BRIDGE_CALLBACK_PROCESSED_DIR="/tmp/fusion360-callback-processed"

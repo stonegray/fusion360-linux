@@ -1,0 +1,30 @@
+# share/hosts.fn — Hosts file management
+#
+# Sources: (none)
+# Exports: ensure_hosts_entry()
+#
+# Safe under set -e.
+
+# Ensure a hosts file contains an entry.  Creates the hosts file if
+# missing, appends if entry doesn't exist.
+# Usage: ensure_hosts_entry <hosts_file> <ip> <hostname> [comment]
+ensure_hosts_entry() {
+  local hosts_file="${1:?ensure_hosts_entry: missing hosts file}"
+  local ip="${2:?ensure_hosts_entry: missing IP}"
+  local hostname="${3:?ensure_hosts_entry: missing hostname}"
+  local comment="${4:-}"
+
+  if [[ -f "$hosts_file" ]] && grep -qs "$hostname" "$hosts_file" 2>/dev/null; then
+    return 0  # already present
+  fi
+
+  local entry="$ip\t$hostname"
+  [[ -n "$comment" ]] && entry="$entry\t# $comment"
+
+  mkdir -p "$(dirname "$hosts_file")" 2>/dev/null || return 1
+  if [[ ! -f "$hosts_file" ]]; then
+    printf "# Wine hosts file\n$entry\n\n127.0.0.1 localhost\n::1 localhost\n" > "$hosts_file"
+  else
+    printf "%s\n" "$entry" >> "$hosts_file"
+  fi
+}

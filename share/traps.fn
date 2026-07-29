@@ -1,0 +1,16 @@
+# share/traps.fn — Signal trap management
+#
+# Exports: setup_traps(), clear_traps()
+#
+# Safe under set -e.
+
+# Register cleanup handlers for common signals
+setup_traps() {
+  local cleanup_func="${1:-cleanup}"
+  trap "$cleanup_func" INT TERM
+}
+
+# Remove signal traps
+clear_traps() {
+  trap - INT TERM
+}

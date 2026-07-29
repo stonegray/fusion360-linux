@@ -1,0 +1,68 @@
+# share/guard.fn — Root, HOME, lock file, and SCRIPT_DIR resolution
+#
+# Exports: require_root(), require_home(), require_non_root(),
+#          acquire_lock(), release_lock(), script_dir()
+#
+# Safe under set -e (uses return, never exit).  Callers should
+# check return codes and handle failures.
+
+# Abort if run as root (most of our scripts should not be root)
+require_non_root() {
+  if [[ $EUID -eq 0 ]]; then
+    echo "This script should not be run as root." >&2
+    return 1
+  fi
+}
+
+# Abort if not root (for system-wide operations)
+require_root() {
+  if [[ $EUID -ne 0 ]]; then
+    echo "This operation requires root privileges. Try: sudo $0" >&2
+    return 1
+  fi
+}
+
+# Abort if HOME is unset (catches sudo -s scenarios)
+require_home() {
+  if [[ -z "${HOME:-}" ]]; then
+    echo "HOME is not set — aborting." >&2
+    return 1
+  fi
+}
+
+# Resolve a caller's directory, given a BASH_SOURCE context.
+# Usage: SCRIPT_DIR=$(script_dir "${BASH_SOURCE[0]}")
+script_dir() {
+  local source="${1:?script_dir: missing argument}"
+  cd "$(dirname "$(readlink -f "$source")")" 2>/dev/null && pwd || {
+    echo "script_dir: could not resolve $source" >&2
+    return 1
+  }
+}
+
+# Lock file management — prevents concurrent installer runs
+acquire_lock() {
+  local lock_dir="${1:?acquire_lock: missing lock dir}"
+  local lock_name="${2:-install}"
+  local lock_file="$lock_dir/.${lock_name}.lock"
+  mkdir -p "$lock_dir" 2>/dev/null || return 1
+  if ! ( set -o noclobber; : > "$lock_file" ) 2>/dev/null; then
+    echo "Another installer appears to be running." >&2
+    echo "If sure no other instance is active, remove: $lock_file" >&2
+    return 1
+  fi
+  # Record PID for cleanup reference
+  echo "$$" > "$lock_file"
+  printf "%s" "$lock_file"
+}
+
+release_lock() {
+  local lock_file="${1:?release_lock: missing lock file}"
+  if [[ -f "$lock_file" ]]; then
+    local lock_pid
+    lock_pid="$(cat "$lock_file" 2>/dev/null || true)"
+    if [[ "$lock_pid" == "$$" ]]; then
+      rm -f "$lock_file"
+    fi
+  fi
+}
