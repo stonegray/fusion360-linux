@@ -162,7 +162,7 @@ if (( SECONDS >= MAX_WAIT )); then
 fi
 log_info " Killing Fusion installer processes..."
 source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
-kill_fusion_processes
+kill_fusion_processes || true
 log_info " Done. Auth will complete on next launch."
 # ── Check result ──────────────────────────────────────────────────────
 echo ""
