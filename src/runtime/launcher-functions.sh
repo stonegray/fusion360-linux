@@ -9,8 +9,6 @@ if [[ -d "$_share_dir" ]]; then
 fi
 unset _share_dir
 
-
-
 configure_with_file_browsers() {
   local user_interface_mode="${1:-hold}"
 
@@ -68,8 +66,6 @@ Fusion 360 launch selections:
   Wine restart script: $FUSION_WINE_RESTART_SCRIPT
 EOF_SUMMARY
 }
-
-
 
 apply_launch_environment() {
   export PROTON_USE_WINED3D="$FUSION_PROTON_USE_WINED3D"
