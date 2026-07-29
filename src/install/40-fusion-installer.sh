@@ -134,39 +134,20 @@ WAIT_COUNT=0
 while true; do
   sleep 10
   WAIT_COUNT=$((WAIT_COUNT + 1))
-  FUSION_PID=$(pgrep -u "$(id -u)" -f "Fusion360\.exe" 2>/dev/null | head -1 || true)
-  F360_EXE=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1 || true)
   LOG_DONE=0
   [[ -f "$F360_LOG" ]] && grep -q "Configure app complete" "$F360_LOG" 2>/dev/null && LOG_DONE=1
-  if [[ $LOG_DONE -eq 1 && ( -n "$FUSION_PID" || -n "$F360_EXE" ) ]]; then
-    if [[ -n "$FUSION_PID" ]]; then
-      log_info " Install complete and Fusion360.exe running (PID $FUSION_PID)."
-      log_info " Letting it initialize for 5 seconds..."
-      sleep 5
-    else
-      log_info " Install complete — Fusion360.exe found on disk."
-    fi
+  if [[ $LOG_DONE -eq 1 ]]; then
+    log_info " Installer completed (detected 'Configure app complete' in streamer log)."
     break
   fi
-  if [[ -n "$FUSION_PID" ]]; then
-    log_info " Fusion360.exe started, waiting for install to finalize..."
-  fi
   if (( WAIT_COUNT % 6 == 0 )); then
-    log_info " Still waiting... (installer window may still be open, $((WAIT_COUNT * 10 / 60)) min elapsed)"
+    log_info " Still waiting... ($((WAIT_COUNT * 10 / 60)) min elapsed)"
   fi
 done
 
-if [[ -n "$FUSION_PID" ]]; then
-  log_info " Killing Fusion360 after first-run setup..."
-  source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
-  kill_fusion_processes
-  kill "$FUSION_PID" 2>/dev/null || true
-  sleep 1
-  kill -9 "$FUSION_PID" 2>/dev/null || true
-else
-  log_info " Fusion360 already exited — cleaning up remaining processes..."
-  kill_installer
-fi
+log_info " Killing Fusion installer processes..."
+source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
+kill_fusion_processes
 log_info " Done. Auth will complete on next launch."
 
 # ── Check result ──────────────────────────────────────────────────────
