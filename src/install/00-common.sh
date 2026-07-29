@@ -1,6 +1,14 @@
 # src/install/00-common.sh — Shared functions and vars for install steps
 # Sourced by install.sh, not executed directly.
 
+
+# Load share/ modules (path resolution: this file is at src/install/,
+# share/ is at the repo root)
+_share_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../share" 2>/dev/null && pwd)" || true
+if [[ -d "$_share_dir" ]]; then
+  source "$_share_dir/load.sh"
+fi
+unset _share_dir
 # Path defaults (XDG-compliant, single source of truth)
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 source "$SCRIPT_DIR/src/install/00-defaults.sh"

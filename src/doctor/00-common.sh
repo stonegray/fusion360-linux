@@ -1,6 +1,14 @@
 # src/doctor/00-common.sh — Shared state and output helpers
 # Sourced by doctor.sh, not executed directly.
 
+# Load share/ modules (path resolution: this file is at src/doctor/,
+# share/ is at the repo root)
+_share_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../share" 2>/dev/null && pwd)" || true
+if [[ -d "$_share_dir" ]]; then
+  source "$_share_dir/load.sh"
+fi
+unset _share_dir
+
 SECTION_PASS=0
 SECTION_FAIL=0
 SECTION_WARN=0
