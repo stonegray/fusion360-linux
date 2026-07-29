@@ -581,10 +581,6 @@ apply_launch_environment() {
     unset WINEDLLOVERRIDES
   fi
 
-  # Suppress LaunchDarkly streaming under Wine (curl error 56 noise).
-  # The SDK falls back to polling which works fine.
-  export LD_DISABLE_STREAMING=1
-
   if is_enabled "$FUSION_USE_INTEL_VK_ICD"; then
     # Ubuntu/KDE Neon: intel_icd.json (64-bit). Fedora: intel_icd.x86_64.json + .i686.json
     if [[ -f /usr/share/vulkan/icd.d/intel_icd.x86_64.json && -f /usr/share/vulkan/icd.d/intel_icd.i686.json ]]; then
