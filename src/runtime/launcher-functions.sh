@@ -39,6 +39,7 @@ load_config() {
   FUSION_HEAP_DELAY_FREE="${FUSION_HEAP_DELAY_FREE:-0}"
   FUSION_ENABLE_OVERLAY_KILLER="${FUSION_ENABLE_OVERLAY_KILLER:-1}"
   FUSION_ENABLE_TOOLWINDOW_FIXER="${FUSION_ENABLE_TOOLWINDOW_FIXER:-1}"
+  FUSION_DARK_MODE="${FUSION_DARK_MODE:-auto}"
 }
 
 save_config() {
@@ -390,6 +391,85 @@ apply_fusion_wine_dpi() {
     WINEPREFIX="$pfx" "$wine_bin" reg query 'HKCU\Control Panel\Desktop' /v LogPixels 2>&1 || true
     WINEPREFIX="$pfx" "$wine_bin" reg query 'HKCU\Control Panel\Desktop' /v Win8DpiScaling 2>&1 || true
   } >> "$FUSION_DPI_LOG_FILE"
+}
+
+# ── Dark mode ────────────────────────────────────────────────
+
+# Detect current system dark/light color scheme.  Returns 0 (dark) or 1
+# (light) by exit code, echoes the scheme name on stdout.  Supports:
+#   - KDE Plasma 5/6  (kreadconfig5 / kdeglobals)
+#   - GNOME 42+       (gsettings color-scheme)
+#   - GTK 3           (settings.ini gtk-application-prefer-dark-theme)
+detect_system_dark_mode() {
+  local scheme=""
+
+  # 1. KDE Plasma
+  if command -v kreadconfig5 &>/dev/null; then
+    scheme=$(kreadconfig5 --file ~/.config/kdeglobals --group General --key ColorScheme 2>/dev/null || true)
+    if [[ -n "$scheme" ]]; then
+      case "$scheme" in
+        *Dark*)  return 0 ;;
+        *Light*) return 1 ;;
+      esac
+    fi
+  fi
+
+  # 2. GNOME 42+ (prefer-dark = dark, default = light)
+  if command -v gsettings &>/dev/null; then
+    scheme=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null || true)
+    if [[ "$scheme" == "'prefer-dark'" ]]; then
+      return 0
+    elif [[ -n "$scheme" ]]; then
+      return 1
+    fi
+  fi
+
+  # 3. GTK 3 settings.ini
+  local gtk_ini="${XDG_CONFIG_HOME:-$HOME/.config}/gtk-3.0/settings.ini"
+  if [[ -f "$gtk_ini" ]]; then
+    if grep -iqs "gtk-application-prefer-dark-theme\s*=\s*1" "$gtk_ini" 2>/dev/null; then
+      return 0
+    fi
+    if grep -iqs "gtk-theme-name.*[Dd]ark" "$gtk_ini" 2>/dev/null; then
+      return 0
+    fi
+    return 1
+  fi
+
+  # No detection method available — return undetermined
+  return 2
+}
+
+# Write Windows dark mode registry keys matching the host system theme.
+# Fusion 360 respects AppsUseLightTheme when rendering its UI panels.
+apply_fusion_wine_dark_mode() {
+  local theme_val=1  # default: light
+
+  case "${FUSION_DARK_MODE:-auto}" in
+    0)   theme_val=1 ;;   # force light
+    1)   theme_val=0 ;;   # force dark
+    auto|*)
+      if detect_system_dark_mode 2>/dev/null; then
+        theme_val=0  # dark
+      else
+        theme_val=1  # light or undetected
+      fi
+      ;;
+  esac
+
+  local wine_bin
+  wine_bin="$(dirname "$PROTON")/files/bin/wine"
+  [[ -x "$wine_bin" ]] || { echo "launch-fusion.sh warning: wine binary not found at $wine_bin" >&2; return 1; }
+
+  local pfx="${STEAM_COMPAT_DATA_PATH:-$HOME/.fusion360-proton2}/pfx"
+  local reg_key="HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"
+
+  WINEPREFIX="$pfx" "$wine_bin" reg add "$reg_key" /v AppsUseLightTheme /t REG_DWORD /d "$theme_val" /f &>/dev/null || {
+    echo "launch-fusion.sh warning: failed to set AppsUseLightTheme" >&2
+  }
+  WINEPREFIX="$pfx" "$wine_bin" reg add "$reg_key" /v SystemUsesLightTheme /t REG_DWORD /d "$theme_val" /f &>/dev/null || {
+    echo "launch-fusion.sh warning: failed to set SystemUsesLightTheme" >&2
+  }
 }
 
 install_callback_protocol_handlers() {

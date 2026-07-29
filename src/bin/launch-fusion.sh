@@ -141,6 +141,7 @@ fi
 trap cleanup EXIT INT TERM
 
 apply_fusion_wine_dpi
+apply_fusion_wine_dark_mode
 install_callback_protocol_handlers
 register_wine_browser_bridge
 start_browser_listener
