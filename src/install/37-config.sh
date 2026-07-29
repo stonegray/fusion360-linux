@@ -69,4 +69,5 @@ mkdir -p "$CONFIG_DIR"
 for i in "${!CONFIG_KEYS[@]}"; do
   printf '%s=%s\n' "${CONFIG_KEYS[$i]}" "$(quote_val "${CONFIG_VALS[$i]}")"
 done > "$CONFIG_FILE"
+chmod 600 "$CONFIG_FILE"
 log_info "  written"

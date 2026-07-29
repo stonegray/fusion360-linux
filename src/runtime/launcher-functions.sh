@@ -81,6 +81,7 @@ save_config() {
       printf '%s=%s\n' "$key" "$val"
     done
   } > "$CONFIG_FILE"
+  chmod 600 "$CONFIG_FILE"
 }
 
 # ── Process killing ──────────────────────────────────────────

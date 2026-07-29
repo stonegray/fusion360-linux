@@ -50,9 +50,9 @@ else
 fi
 
 header()   { printf "\n${_C_BOLD}${_C_CYAN}━━━ %s ━━━${_C_RESET}\n" "$*"; }
-pass()     { printf "  ${_C_GREEN}✓${_C_RESET} %s\n" "$*"; ((SECTION_PASS++)); }
-fail()     { printf "  ${_C_RED}✗${_C_RESET} %s\n" "$*"; ((SECTION_FAIL++)); RECOMMENDATIONS+=("$*"); }
-warn()     { printf "  ${_C_YELLOW}⚠${_C_RESET} %s\n" "$*"; ((SECTION_WARN++)); }
+pass()     { printf "  ${_C_GREEN}✓${_C_RESET} %s\n" "$*"; ((SECTION_PASS++)) || true; }
+fail()     { printf "  ${_C_RED}✗${_C_RESET} %s\n" "$*"; ((SECTION_FAIL++)) || true; RECOMMENDATIONS+=("$*"); }
+warn()     { printf "  ${_C_YELLOW}⚠${_C_RESET} %s\n" "$*"; ((SECTION_WARN++)) || true; }
 info()     { printf "  ${_C_BLUE}●${_C_RESET} %s\n" "$*"; }
 detail()   { printf "  ${_C_DIM}%s${_C_RESET}\n" "$*"; }
 

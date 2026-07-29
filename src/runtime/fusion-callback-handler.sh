@@ -6,6 +6,7 @@ CALLBACK_DIR="/tmp/fusion360-callback-requests"
 LOG_FILE="/tmp/fusion-callback-handler.log"
 
 mkdir -p "$CALLBACK_DIR"
+chmod 0700 "$CALLBACK_DIR"
 
 {
   echo "============================================================"

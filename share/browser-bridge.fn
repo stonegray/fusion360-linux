@@ -35,7 +35,7 @@ install_callback_protocol_handlers() {
   applications_dir="${F360_APPS_DIR:-$HOME/.local/share/applications/fusion360-linux}"
   desktop_file="$applications_dir/fusion360-callback-handler.desktop"
 
-  if [[ -f "$desktop_file" ]] && grep -q "$CALLBACK_HANDLER" "$desktop_file" 2>/dev/null; then
+  if [[ -f "$desktop_file" ]] && grep -qF "$CALLBACK_HANDLER" "$desktop_file" 2>/dev/null; then
     return 0
   fi
 

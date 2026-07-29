@@ -18,7 +18,7 @@ read_gsettings_number() {
 
   command -v gsettings >/dev/null 2>&1 || return 1
 
-  raw_value="$(gsettings get "$schema_name" "$key_name" 2>/dev/null)" || return 1
+  raw_value="$(gsettings get "$schema_name" "$key_name" 2>/dev/null)" || true
   printf "%s\n" "$raw_value" | grep -Eo '[0-9]+([.][0-9]+)?' | tail -n 1
 }
 

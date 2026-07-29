@@ -11,6 +11,8 @@
 # ── Bridge temp file cleanup ──────────────────────────────────────────
 # Remove stale .request and .partial files from all bridge directories.
 clear_bridge_temp_files() {
+  [[ -n "${BRIDGE_BROWSER_REQUEST_DIR:-}" ]] || return 0
+
   mkdir -p "$BRIDGE_BROWSER_REQUEST_DIR" \
            "$BRIDGE_BROWSER_PROCESSED_DIR" \
            "$BRIDGE_CALLBACK_REQUEST_DIR" \

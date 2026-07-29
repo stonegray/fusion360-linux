@@ -10,14 +10,16 @@
 # Accepts 0/1, yes/no, true/false, on/off (any case).
 # Returns 0 (truthy) or 1 (falsy).
 is_enabled() {
+  local restore_nocasematch
+  [[ -o nocasematch ]] && restore_nocasematch=true || restore_nocasematch=false
   shopt -s nocasematch
   case "${1:-}" in
     1|yes|true|on|enabled|y)
-      shopt -u nocasematch
+      $restore_nocasematch && shopt -s nocasematch || shopt -u nocasematch
       return 0
       ;;
     *)
-      shopt -u nocasematch
+      $restore_nocasematch && shopt -s nocasematch || shopt -u nocasematch
       return 1
       ;;
   esac
@@ -112,6 +114,7 @@ save_config() {
       printf '%s=%s\n' "$key" "$val"
     done
   } > "$config_file"
+  chmod 600 "$config_file"
 }
 
 # ── config_validate_keys — Verify expected keys exist ─────────

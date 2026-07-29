@@ -37,6 +37,7 @@ write_browser_request() {
   shift 3 || true
 
   mkdir -p "$request_dir"
+  chmod 0700 "$request_dir"
 
   # Debug log with full provenance
   {

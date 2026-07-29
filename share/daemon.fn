@@ -32,7 +32,7 @@ TOOLWINDOW_FIXER_PID=""
 # Caller should run clear_bridge_temp_files() beforehand to ensure a clean
 # bridge state.
 start_browser_listener() {
-  [[ -x "$BROWSER_LISTENER" ]] || { log_error "Browser listener not found or not executable: $BROWSER_LISTENER"; exit 1; }
+  [[ -x "$BROWSER_LISTENER" ]] || { log_error "Browser listener not found or not executable: $BROWSER_LISTENER"; return 1; }
 
   "$BROWSER_LISTENER" &
   BRIDGE_LISTENER_PID="$!"
@@ -90,6 +90,7 @@ stop_all_daemons() {
       kill "$OVERLAY_KILLER_PID" 2>/dev/null || true
       wait "$OVERLAY_KILLER_PID" 2>/dev/null || true
     fi
+    OVERLAY_KILLER_PID=""
   fi
 
   if [[ -n "$BRIDGE_LISTENER_PID" ]]; then
@@ -97,6 +98,7 @@ stop_all_daemons() {
       kill "$BRIDGE_LISTENER_PID" 2>/dev/null || true
       wait "$BRIDGE_LISTENER_PID" 2>/dev/null || true
     fi
+    BRIDGE_LISTENER_PID=""
   fi
 
   if [[ -n "$TOOLWINDOW_FIXER_PID" ]]; then
@@ -104,5 +106,6 @@ stop_all_daemons() {
       kill "$TOOLWINDOW_FIXER_PID" 2>/dev/null || true
       wait "$TOOLWINDOW_FIXER_PID" 2>/dev/null || true
     fi
+    TOOLWINDOW_FIXER_PID=""
   fi
 }

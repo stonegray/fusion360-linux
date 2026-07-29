@@ -7,10 +7,10 @@
 # Register cleanup handlers for common signals
 setup_traps() {
   local cleanup_func="${1:-cleanup}"
-  trap "$cleanup_func" INT TERM
+  trap "$cleanup_func" EXIT INT TERM
 }
 
 # Remove signal traps
 clear_traps() {
-  trap - INT TERM
+trap - EXIT INT TERM
 }

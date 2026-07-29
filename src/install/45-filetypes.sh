@@ -33,7 +33,7 @@ _resize_icon() {
 }
 
 _install_fusion_mime_icon() {
-  local sizes="16 22 24 32 48 64 128 256"
+  local sizes=(16 22 24 32 48 64 128 256)
   local hicolor="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"
   local icondir="${F360_DATA_DIR:-$HOME/.local/share/fusion360-linux}/icons"
   local master="$icondir/fusion360.png"
@@ -70,7 +70,7 @@ _install_fusion_mime_icon() {
   fi
 
   # Install resized PNGs into the hicolor MIME theme
-  for s in $sizes; do
+  for s in "${sizes[@]}"; do
     d="$hicolor/${s}x${s}/mimetypes"
     mkdir -p "$d"
     _resize_icon "$master" "$d/application-vnd.autodesk.fusion360.png" "$s" || true
@@ -85,7 +85,7 @@ _install_fusion_mime_icon() {
   rm -f "$hicolor/icon-theme.cache"
 
   # Also install App icon so the desktop entry (`Icon=fusion360`) resolves
-  for s in $sizes; do
+  for s in "${sizes[@]}"; do
     local src_icon="$hicolor/${s}x${s}/mimetypes/application-vnd.autodesk.fusion360.png"
     local dst_icon="$hicolor/${s}x${s}/apps/fusion360.png"
     if [[ -f "$src_icon" ]] && [[ ! -f "$dst_icon" ]]; then

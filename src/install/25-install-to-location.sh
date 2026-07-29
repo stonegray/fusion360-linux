@@ -18,6 +18,7 @@ chmod +x "$F360_DATA_DIR/launch-fusion.sh" "$F360_DATA_DIR/doctor.sh" "$F360_DAT
 
 # Create CLI symlinks
 ln -sf "$F360_DATA_DIR/launch-fusion.sh" "$F360_BIN_DIR/launch-fusion"
+ln -sf "$F360_DATA_DIR/launch-fusion.sh" "$F360_BIN_DIR/fusion360"
 ln -sf "$F360_DATA_DIR/doctor.sh" "$F360_BIN_DIR/fusion-doctor" 2>/dev/null || true
 ln -sf "$F360_DATA_DIR/uninstall.sh" "$F360_BIN_DIR/fusion-uninstall" 2>/dev/null || true
 
