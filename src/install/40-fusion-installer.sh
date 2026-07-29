@@ -152,10 +152,12 @@ Actions=NewDocument;ServiceUtility;
 
 [Desktop Action NewDocument]
 Name=New Document
+Icon=fusion360
 Exec=$F360_DATA_DIR/launch-fusion.sh
 
 [Desktop Action ServiceUtility]
 Name=Service Utility
+Icon=fusion360
 Exec=$F360_DATA_DIR/launch-fusion.sh --service-util
 EOF
   command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$F360_APPS_DIR" 2>/dev/null || true
