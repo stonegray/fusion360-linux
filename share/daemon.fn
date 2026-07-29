@@ -32,7 +32,7 @@ TOOLWINDOW_FIXER_PID=""
 # Caller should run clear_bridge_temp_files() beforehand to ensure a clean
 # bridge state.
 start_browser_listener() {
-  [[ -x "$BROWSER_LISTENER" ]] || { log_error "Browser listener not found or not executable: $BROWSER_LISTENER"; exit 1; }
+  [[ -x "$BROWSER_LISTENER" ]] || { log_error "Browser listener not found or not executable: $BROWSER_LISTENER"; return 1; }
 
   "$BROWSER_LISTENER" &
   BRIDGE_LISTENER_PID="$!"
