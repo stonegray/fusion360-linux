@@ -18,8 +18,8 @@ ensure_hosts_entry() {
     return 0  # already present
   fi
 
-  local entry="$ip\t$hostname"
-  [[ -n "$comment" ]] && entry="$entry\t# $comment"
+  local entry="$ip"$'\t'"$hostname"
+  [[ -n "$comment" ]] && entry="$entry"$'\t'"# $comment"
 
   mkdir -p "$(dirname "$hosts_file")" 2>/dev/null || return 1
   if [[ ! -f "$hosts_file" ]]; then
