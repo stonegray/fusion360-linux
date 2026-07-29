@@ -22,6 +22,7 @@ EOF
   exit 1
 fi
 LOCK_DIR="/tmp/fusion360-install.lock"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ "${1:-}" == "--kill" ]]; then
   source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
   kill_fusion_processes
@@ -33,7 +34,6 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
 fi
 trap 'rm -rf "$LOCK_DIR"' EXIT INT TERM INT TERM
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODE="${1:-}"
 INSTALLER_PATH_OVERRIDE=""
 
