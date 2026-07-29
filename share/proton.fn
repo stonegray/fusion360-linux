@@ -30,6 +30,6 @@ proton_wine_bin() {
 detect_proton_version() {
   local proton="${1:?detect_proton_version: missing proton path}"
   local dir
-  dir="$(dirname "$proton" 2>/dev/null)" || { echo "unknown"; return 1; }
+  dir="$(dirname "$(readlink -f "$proton")" 2>/dev/null)" || { echo "unknown"; return 1; }
   basename "$dir" 2>/dev/null || echo "unknown"
 }
