@@ -105,25 +105,24 @@ open_browser_url() {
   cd "$HOME" || { log_message "ERROR: cd $HOME failed"; mv "$request_file" "$processed_file"; return 1; }
 
   # Stratified fallback chain — each attempt must stay alive >0.5s
-  # to be considered successful (avoids racing with browser startup).
-
   # 1 — Configured CHROME (fastest path)
   if [[ -n "${CHROME:-}" ]] && [[ -x "$CHROME" ]]; then
     _try_open "CHROME" "$CHROME" "$url" && { mv "$request_file" "$processed_file"; return 0; }
   fi
 
-  # 2 — xdg-open (universal, handles Snap Firefox correctly)
-  if command -v xdg-open &>/dev/null; then
-    _try_open "xdg-open" "xdg-open" "$url" && { mv "$request_file" "$processed_file"; return 0; }
-  fi
-
-  # 3a — kde-open6 (KDE Plasma 6)
+  # 2 — KDE Plasma native openers (most reliable on KDE)
+  # 2a — kde-open6 (KDE Plasma 6)
   if command -v kde-open6 &>/dev/null; then
     _try_open "kde-open6" "kde-open6" "$url" && { mv "$request_file" "$processed_file"; return 0; }
   fi
-  # 3b — kde-open5 (KDE Plasma 5, or compat shim)
+  # 2b — kde-open5 (KDE Plasma 5, or compat shim)
   if command -v kde-open5 &>/dev/null; then
     _try_open "kde-open5" "kde-open5" "$url" && { mv "$request_file" "$processed_file"; return 0; }
+  fi
+
+  # 3 — xdg-open (last resort on KDE, broken under Wayland; universal elsewhere)
+  if command -v xdg-open &>/dev/null; then
+    _try_open "xdg-open" "xdg-open" "$url" && { mv "$request_file" "$processed_file"; return 0; }
   fi
 
   # 4 — Known browser binaries (last resort)
