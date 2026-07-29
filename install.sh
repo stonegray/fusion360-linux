@@ -72,6 +72,7 @@ case "$MODE" in
   --uninstall)
     clear_traps
     source "$SCRIPT_DIR/src/runtime/uninstall-select.sh"
+    exit 0
     ;;
   --run-installer)
     run_step 40-fusion-installer.sh
