@@ -10,9 +10,9 @@
 detect_distro() {
   if [[ -f /etc/os-release ]]; then
     local id
-    id="$(grep -oP '(?<=^ID=).*' /etc/os-release | tr -d '"' | head -1 || true)"
+    id="$(grep '^ID=' /etc/os-release | head -1 | sed 's/^ID=//' | tr -d '"' || true)"
     local id_like
-    id_like="$(grep -oP '(?<=^ID_LIKE=).*' /etc/os-release | tr -d '"' | head -1 || true)"
+    id_like="$(grep '^ID_LIKE=' /etc/os-release | head -1 | sed 's/^ID_LIKE=//' | tr -d '"' || true)"
     case "$id" in
       ubuntu|debian|linuxmint|pop|neon|kali)  echo "debian"  ;;
       fedora|rhel|centos)                      echo "fedora"  ;;
