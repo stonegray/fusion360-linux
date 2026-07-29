@@ -35,14 +35,9 @@ EOF
   fi
   return 0
 fi
-# ── Fallback: check streamer log (for pre-flag installs) ─────────
+# ── Streamer log path (truncated before install to detect fresh completion) ─
 F360_LOG="$PFX_DIR/pfx/drive_c/users/steamuser/AppData/Local/Autodesk/autodesk.webdeploy.streamer.log"
-if [[ -f "$F360_LOG" ]] && grep -q "Configure app complete" "$F360_LOG" 2>/dev/null; then
-  log_info " Fusion installer already completed (from log)."
-  mkdir -p "$(dirname "$F360_INSTALL_FLAG")"
-  touch "$F360_INSTALL_FLAG"
-  return 0
-fi
+rm -f "$F360_LOG"
 
 # ── Check for leftover processes, prompt to kill ──────────────────────
 user_id=$(id -u)
@@ -142,7 +137,8 @@ fi
 log_info " Installer running (PID $INSTALLER_PID). Waiting for completion..."
 log_info " The script will detect when it's done."
 
-while true; do
+MAX_WAIT=$((2 * 3600))  # 2 hour timeout
+while (( SECONDS < MAX_WAIT )); do
   sleep 10
   ELAPSED=$SECONDS
   if ! kill -0 "$INSTALLER_PID" 2>/dev/null; then
@@ -153,19 +149,19 @@ while true; do
     log_info " Installer process ended naturally (${ELAPSED}s elapsed)."
     break
   fi
-  LOG_DONE=0
-  [[ -f "$F360_LOG" ]] && grep -q "Configure app complete" "$F360_LOG" 2>/dev/null && LOG_DONE=1
-  if [[ $LOG_DONE -eq 1 ]]; then
+  if [[ -f "$F360_LOG" ]] && grep -q "Configure app complete" "$F360_LOG" 2>/dev/null; then
     log_info " Installer completed (detected 'Configure app complete' in streamer log)."
     break
   fi
 done
 
+if (( SECONDS >= MAX_WAIT )); then
+  log_warn " Installer did not complete within 2 hours — continuing anyway."
+fi
 log_info " Killing Fusion installer processes..."
 source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
 kill_fusion_processes
 log_info " Done. Auth will complete on next launch."
-
 # ── Check result ──────────────────────────────────────────────────────
 echo ""
 log_info " Checking for Fusion360.exe..."
