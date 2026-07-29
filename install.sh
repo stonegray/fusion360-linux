@@ -32,7 +32,7 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   echo "ERROR: Another install is already running (lock at $LOCK_DIR)." >&2
   exit 1
 fi
-trap 'rm -rf "$LOCK_DIR"' EXIT INT TERM INT TERM
+trap 'rm -rf "$LOCK_DIR"' EXIT INT TERM
 
 MODE="${1:-}"
 INSTALLER_PATH_OVERRIDE=""
