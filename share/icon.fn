@@ -57,11 +57,11 @@ install_mime_icon() {
     convert "${ico}" -flatten "$master" 2>/dev/null || true
     [[ -f "$master" ]] && ok=true
   fi
-  if ! $ok && command -v ffmpeg &>/dev/null; then
+  if [[ "$ok" != "true" ]] && command -v ffmpeg &>/dev/null; then
     ffmpeg -y -i "$ico" "$master" 2>/dev/null || true
     [[ -f "$master" ]] && ok=true
   fi
-  $ok || return 1
+  [[ "$ok" != "true" ]] && return 1
 
   # Install resized PNGs into hicolor MIME theme
   for s in $sizes; do
