@@ -33,20 +33,16 @@ else
   log_info " winetricks not available — skipping VC++ runtime install."
 fi
 log_info " Configuring Wine version and AppDefaults..."
-STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
-STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
-PROTON_NO_SECCOMP=1 \
-"$proton" run wine reg add "HKCU\\Software\\Wine" /v Version /t REG_SZ /d win10 /f 2>/dev/null || log_info " Warning: could not set global Windows version"
-STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
-STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
-PROTON_NO_SECCOMP=1 \
-"$proton" run wine reg add "HKCU\\Software\\Wine\\AppDefaults\\msedgewebview2.exe" /v Version /t REG_SZ /d win8 /f 2>/dev/null || log_info " Warning: could not set msedgewebview2.exe version override"
-STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
-STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
-PROTON_NO_SECCOMP=1 \
-"$proton" run wine reg add "HKCU\\Environment" /v "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS" /t REG_SZ /d "--no-sandbox" /f 2>/dev/null || log_info " Warning: could not set WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"
-STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
-STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
-PROTON_NO_SECCOMP=1 \
-"$proton" run wine reg add "HKCU\\Software\\Wine\\DllOverrides" /v "adpclientservice.exe" /t REG_SZ /d native /f 2>/dev/null || log_info " Warning: could not set adpclientservice override"
+
+# Derive Wine binary from Proton path (proton run doesn't persist reg changes)
+local wine_bin
+wine_bin="$(dirname "$(dirname "$proton")")/files/bin/wine"
+if [[ ! -x "$wine_bin" ]]; then
+  log_info " Warning: Wine binary not found at $wine_bin — skipping registry config."
+else
+  WINEPREFIX="$PFX_DIR/pfx" "$wine_bin" reg add "HKCU\\Software\\Wine" /v Version /t REG_SZ /d win10 /f 2>/dev/null || log_info " Warning: could not set global Windows version"
+  WINEPREFIX="$PFX_DIR/pfx" "$wine_bin" reg add "HKCU\\Software\\Wine\\AppDefaults\\msedgewebview2.exe" /v Version /t REG_SZ /d win8 /f 2>/dev/null || log_info " Warning: could not set msedgewebview2.exe version override"
+  WINEPREFIX="$PFX_DIR/pfx" "$wine_bin" reg add "HKCU\\Environment" /v "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS" /t REG_SZ /d "--no-sandbox" /f 2>/dev/null || log_info " Warning: could not set WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"
+  WINEPREFIX="$PFX_DIR/pfx" "$wine_bin" reg add "HKCU\\Software\\Wine\\DllOverrides" /v "adpclientservice.exe" /t REG_SZ /d native /f 2>/dev/null || log_info " Warning: could not set adpclientservice override"
+fi
 log_info " Done."
