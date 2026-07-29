@@ -17,12 +17,14 @@ fi
 
 : "${HOME:?HOME must be set to run uninstall}"
 
-RED='\033[0;31m'
-NC='\033[0m'
+# Resolve script directory and source color constants
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/share/colors.fn"
+
 
 echo "=== Fusion360 Linux — Uninstall ==="
 echo ""
-printf '%b' "${RED}WARNING: This will remove all Fusion360 local data.${NC}\n"
+printf '%b' "${COLOR_RED}WARNING: This will remove all Fusion360 local data.${COLOR_RESET}\n"
 echo "  - Proton prefix (~/.fusion360-proton2) — contains Fusion360 itself"
 echo "  - Config files (~/.config/fusion360-linux)"
 echo "  - Desktop entries and protocol handlers"

@@ -2,8 +2,8 @@
 # fusion-callback-handler.sh: Fusion 360 Autodesk callback request writer.
 set -euo pipefail
 
-CALLBACK_DIR="/tmp/fusion360-callback-requests"
-LOG_FILE="/tmp/fusion-callback-handler.log"
+CALLBACK_DIR="${BRIDGE_CALLBACK_REQUEST_DIR:-/tmp/fusion360-callback-requests}"
+LOG_FILE="${CALLBACK_HANDLER_LOG:-/tmp/fusion-callback-handler.log}"
 
 mkdir -p "$CALLBACK_DIR"
 chmod 0700 "$CALLBACK_DIR"

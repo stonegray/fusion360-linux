@@ -4,11 +4,11 @@ set -euo pipefail
 
 CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux/config"
 
-BROWSER_REQUEST_DIR="/tmp/fusion360-browser-requests"
-BROWSER_PROCESSED_DIR="/tmp/fusion360-browser-processed"
-CALLBACK_REQUEST_DIR="/tmp/fusion360-callback-requests"
-CALLBACK_PROCESSED_DIR="/tmp/fusion360-callback-processed"
-LOG_FILE="/tmp/fusion-browser-listener.log"
+BROWSER_REQUEST_DIR="${BRIDGE_BROWSER_REQUEST_DIR:-/tmp/fusion360-browser-requests}"
+BROWSER_PROCESSED_DIR="${BRIDGE_BROWSER_PROCESSED_DIR:-/tmp/fusion360-browser-processed}"
+CALLBACK_REQUEST_DIR="${BRIDGE_CALLBACK_REQUEST_DIR:-/tmp/fusion360-callback-requests}"
+CALLBACK_PROCESSED_DIR="${BRIDGE_CALLBACK_PROCESSED_DIR:-/tmp/fusion360-callback-processed}"
+LOG_FILE="${BRIDGE_LISTENER_LOG:-/tmp/fusion-browser-listener.log}"
 
 if [[ -f "$CONFIG_FILE" ]]; then
   source "$CONFIG_FILE"

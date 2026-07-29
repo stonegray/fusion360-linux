@@ -1,5 +1,5 @@
 # src/install/40-fusion-installer.sh — Download and run Fusion installer
-proton=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
+proton=$(find_proton "$COMPAT_DIR")
 if [[ -z "$proton" ]]; then
   log_info " GE-Proton not found. Run install.sh first."
 return 1
@@ -127,7 +127,6 @@ if (( SECONDS >= MAX_WAIT )); then
   log_warn " Installer did not complete within 2 hours — continuing anyway."
 fi
 log_info " Killing Fusion installer processes..."
-source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
 kill_fusion_processes || true
 log_info " Done. Auth will complete on next launch."
 # ── Check result ──────────────────────────────────────────────────────

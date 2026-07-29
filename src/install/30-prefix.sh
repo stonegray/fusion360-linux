@@ -1,5 +1,5 @@
 # src/install/30-prefix.sh — Initialize Proton prefix + winetricks
-proton=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
+proton=$(find_proton "$COMPAT_DIR")
 if [[ -z "$proton" ]]; then
   log_info " GE-Proton not found. Run install.sh first."
 return 1
@@ -36,7 +36,7 @@ log_info " Configuring Wine version and AppDefaults..."
 
 # Derive Wine binary from Proton path (proton run doesn't persist reg changes)
 local wine_bin
-wine_bin="$(dirname "$proton")/files/bin/wine"
+wine_bin="$(proton_wine_bin "$proton")"
 if [[ ! -x "$wine_bin" ]]; then
   log_info " Warning: Wine binary not found at $wine_bin — skipping registry config."
 else
