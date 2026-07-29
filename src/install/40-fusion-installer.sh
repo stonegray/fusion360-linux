@@ -122,27 +122,43 @@ echo "  └───────────────────────
 echo ""
 
 mkdir -p "$PFX_DIR"
+log_info " Starting installer (monitoring for minimum 4 min runtime)..."
+SECONDS=0
 STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
 STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
 WINEDLLOVERRIDES="mscoree,mshtml,webview2=disabled" \
-"$proton" run "$INSTALLER_PATH" 2>/dev/null || true
+"$proton" run "$INSTALLER_PATH" 2>/dev/null &
+INSTALLER_PID=$!
 
-echo ""
-log_info " Waiting for install to finish..."
-log_info " The script will detect when it's done and close the installer"
-log_info " automatically."
-WAIT_COUNT=0
+sleep 3
+if ! kill -0 "$INSTALLER_PID" 2>/dev/null; then
+  log_fail " Fusion installer exited immediately (PID $INSTALLER_PID dead after 3s)."
+  log_info " Possible causes:"
+  log_info "  - DLL overrides blocking a required component"
+  log_info "  - Corrupted or incompatible installer EXE"
+  log_info "  - GE-Proton version incompatibility"
+  return 1
+fi
+
+log_info " Installer running (PID $INSTALLER_PID). Waiting for completion..."
+log_info " The script will detect when it's done."
+
 while true; do
   sleep 10
-  WAIT_COUNT=$((WAIT_COUNT + 1))
+  ELAPSED=$SECONDS
+  if ! kill -0 "$INSTALLER_PID" 2>/dev/null; then
+    if (( ELAPSED < 240 )); then
+      log_fail " Fusion installer exited unexpectedly after ${ELAPSED}s (expected >= 4 min)."
+      return 1
+    fi
+    log_info " Installer process ended naturally (${ELAPSED}s elapsed)."
+    break
+  fi
   LOG_DONE=0
   [[ -f "$F360_LOG" ]] && grep -q "Configure app complete" "$F360_LOG" 2>/dev/null && LOG_DONE=1
   if [[ $LOG_DONE -eq 1 ]]; then
     log_info " Installer completed (detected 'Configure app complete' in streamer log)."
     break
-  fi
-  if (( WAIT_COUNT % 6 == 0 )); then
-    log_info " Still waiting... ($((WAIT_COUNT * 10 / 60)) min elapsed)"
   fi
 done
 
