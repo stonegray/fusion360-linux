@@ -31,11 +31,4 @@ else
   log_info " winetricks not available — skipping VC++ runtime install."
 fi
 log_info " Configuring DLL overrides..."
-STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
-STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
-WINEDLLOVERRIDES="mscoree,mshtml,webview2=disabled" \
-"$proton" run wine reg add "HKCU\\Software\\Wine\\DllOverrides" /v "webview2" /t REG_SZ /d disabled /f 2>/dev/null || log_info " Warning: could not set webview2 override"
-STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
-STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
-"$proton" run wine reg add "HKCU\\Environment" /v "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS" /t REG_SZ /d "--no-sandbox" /f 2>/dev/null || log_info " Warning: could not set WEBVIEW2 environment variable"
 log_info " Done."
