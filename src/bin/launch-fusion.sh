@@ -146,6 +146,11 @@ install_callback_protocol_handlers
 register_wine_browser_bridge
 start_browser_listener
 start_overlay_killer
+
+# ── Service Utility mode ──────────────────────────────────────
+if [[ "${1:-}" == "--service-util" ]]; then
+  exec "$PROTON" run "$FUSION_EXE" -serviceUtil
+fi
 start_toolwindow_fixer
 
 if (( ${#FUSION_ARGS[@]} > 0 )); then

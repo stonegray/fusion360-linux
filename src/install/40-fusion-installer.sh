@@ -148,6 +148,15 @@ Categories=Graphics;Science;Engineering;
 MimeType=application/vnd.autodesk.fusion360;model/step;model/iges;model/stl;model/3mf;image/vnd.dxf;model/x-obj;model/x-acis-sat;model/x-fbx;application/x-inventor-assembly;application/x-inventor-part;model/x-rhino-3dm;application/x-solidworks-part;application/x-solidworks-assembly;model/x-parasolid;
 StartupNotify=true
 StartupWMClass=fusion360.exe
+Actions=NewDocument;ServiceUtility;
+
+[Desktop Action NewDocument]
+Name=New Document
+Exec=$F360_DATA_DIR/launch-fusion.sh
+
+[Desktop Action ServiceUtility]
+Name=Service Utility
+Exec=$F360_DATA_DIR/launch-fusion.sh --service-util
 EOF
   command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$F360_APPS_DIR" 2>/dev/null || true
   command -v kbuildsycoca6 &>/dev/null && kbuildsycoca6 2>/dev/null || true
