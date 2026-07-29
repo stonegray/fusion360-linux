@@ -107,53 +107,6 @@ pre_flight() {
   fi
 }
 
-# ── Install lifecycle management ──────────────────────────────────────
-INSTALLER_PID=""
 
-kill_installer() {
-  # Kill tracked installer PID
-  if [[ -n "${INSTALLER_PID:-}" ]] && kill -0 "$INSTALLER_PID" 2>/dev/null; then
-    kill "$INSTALLER_PID" 2>/dev/null || true
-    sleep 0.3
-    kill -9 "$INSTALLER_PID" 2>/dev/null || true
-  fi
-
-  # Use the shared kill function from launcher-functions.sh
-  if [[ -f "$SCRIPT_DIR/src/runtime/launcher-functions.sh" ]]; then
-    source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
-    kill_fusion_processes
-  else
-    # Fallback: simple pgrep kill
-    local user; user=$(id -u)
-    for pattern in wineserver wine proton; do
-      pkill -u "$user" -f "$pattern" 2>/dev/null || true
-    done
-  fi
-
-  # Remove wineserver lock so next start is clean
-  [[ -n "${PFX_DIR:-}" ]] && rm -f "$PFX_DIR/pfx/.wineserver.lock" 2>/dev/null || true
-}
-
-installer_is_running() {
-  # Check if a Fusion installer is already running through Proton
-  pgrep -f "FusionClientDownloader" 2>/dev/null | grep -q . && return 0
-  # Check if wineserver is running for our prefix
-  [[ -f "${PFX_DIR:-}/pfx/.wineserver.lock" ]] && return 0
-  return 1
-}
-
-setup_traps() {
-  trap_cleanup() {
-    echo ""
-    log_info " Interrupted. Cleaning up..."
-    kill_installer
-    exit 1
-  }
-  trap trap_cleanup INT TERM
-}
-
-clear_traps() {
-  trap - INT TERM
-}
 
 
