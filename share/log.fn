@@ -15,6 +15,7 @@ log_pass()   { printf "  ${COLOR_GREEN}✓${COLOR_RESET} %s\n" "$*"; }
 log_warn()   { printf "  ${COLOR_YELLOW}⚠${COLOR_RESET} %s\n" "$*"; }
 log_error()  { printf "  ${COLOR_RED}✗${COLOR_RESET} %s\n" "$*"; }
 log_detail() { printf "  ${COLOR_DIM}%s${COLOR_RESET}\n" "$*"; }
+log_fail() { log_error "$@"; }
 log_debug()  {
   if [[ -n "${FUSION_DEBUG:-}" ]]; then
     printf "  ${COLOR_DIM}[debug] %s${COLOR_RESET}\n" "$*"
