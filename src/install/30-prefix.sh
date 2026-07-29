@@ -16,6 +16,7 @@ else
   WINEDLLOVERRIDES="regedit.exe,msiexec.exe=" \
   "$proton" run wineboot -u 2>/dev/null || true
   log_info " Prefix initialized."
+fi
 
 if command -v winetricks &>/dev/null; then
   if [[ ! -f "$PFX_DIR/pfx/drive_c/windows/system32/vcruntime140.dll" ]]; then
