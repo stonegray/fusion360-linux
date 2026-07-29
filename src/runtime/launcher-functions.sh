@@ -366,24 +366,30 @@ apply_fusion_wine_dpi() {
     echo "kde_forced_dpi=$(read_kde_forced_dpi || true)"
   } > "$FUSION_DPI_LOG_FILE"
 
-  "$PROTON" run reg add 'HKCU\Software\Wine\Fonts' /v LogPixels /t REG_DWORD /d "$dpi_value" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
+  local wine_bin
+  wine_bin="$(dirname "$PROTON")/files/bin/wine"
+  [[ -x "$wine_bin" ]] || { echo "launch-fusion.sh warning: wine binary not found at $wine_bin" >&2; return 1; }
+
+  local pfx="$STEAM_COMPAT_DATA_PATH/pfx"
+
+  WINEPREFIX="$pfx" "$wine_bin" reg add 'HKCU\Software\Wine\Fonts' /v LogPixels /t REG_DWORD /d "$dpi_value" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
     echo "launch-fusion.sh warning: failed to set Wine Fonts LogPixels. See $FUSION_DPI_LOG_FILE" >&2
   }
 
-  "$PROTON" run reg add 'HKCU\Control Panel\Desktop' /v LogPixels /t REG_DWORD /d "$dpi_value" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
+  WINEPREFIX="$pfx" "$wine_bin" reg add 'HKCU\Control Panel\Desktop' /v LogPixels /t REG_DWORD /d "$dpi_value" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
     echo "launch-fusion.sh warning: failed to set Desktop LogPixels. See $FUSION_DPI_LOG_FILE" >&2
   }
 
-  "$PROTON" run reg add 'HKCU\Control Panel\Desktop' /v Win8DpiScaling /t REG_DWORD /d "$win8_dpi_scaling" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
+  WINEPREFIX="$pfx" "$wine_bin" reg add 'HKCU\Control Panel\Desktop' /v Win8DpiScaling /t REG_DWORD /d "$win8_dpi_scaling" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
     echo "launch-fusion.sh warning: failed to set Win8DpiScaling. See $FUSION_DPI_LOG_FILE" >&2
   }
 
   {
     echo
     echo "---- registry check after write ----"
-    "$PROTON" run reg query 'HKCU\Software\Wine\Fonts' /v LogPixels 2>&1 || true
-    "$PROTON" run reg query 'HKCU\Control Panel\Desktop' /v LogPixels 2>&1 || true
-    "$PROTON" run reg query 'HKCU\Control Panel\Desktop' /v Win8DpiScaling 2>&1 || true
+    WINEPREFIX="$pfx" "$wine_bin" reg query 'HKCU\Software\Wine\Fonts' /v LogPixels 2>&1 || true
+    WINEPREFIX="$pfx" "$wine_bin" reg query 'HKCU\Control Panel\Desktop' /v LogPixels 2>&1 || true
+    WINEPREFIX="$pfx" "$wine_bin" reg query 'HKCU\Control Panel\Desktop' /v Win8DpiScaling 2>&1 || true
   } >> "$FUSION_DPI_LOG_FILE"
 }
 
@@ -414,7 +420,11 @@ EOF_DESKTOP
 }
 
 register_wine_browser_bridge() {
-  "$PROTON" run reg add 'HKCU\Software\Wine\WineBrowser' /v Browsers /t REG_SZ /d "$BROWSER" /f >/tmp/fusion360-winebrowser-register.log 2>&1 || {
+  local wine_bin
+  wine_bin="$(dirname "$PROTON")/files/bin/wine"
+  [[ -x "$wine_bin" ]] || { echo "launch-fusion.sh warning: wine binary not found at $wine_bin" >&2; return 1; }
+  local pfx="$STEAM_COMPAT_DATA_PATH/pfx"
+  WINEPREFIX="$pfx" "$wine_bin" reg add 'HKCU\Software\Wine\WineBrowser' /v Browsers /t REG_SZ /d "$BROWSER" /f >/tmp/fusion360-winebrowser-register.log 2>&1 || {
     echo "launch-fusion.sh warning: failed to register WineBrowser. See /tmp/fusion360-winebrowser-register.log" >&2
   }
 }
@@ -459,7 +469,7 @@ start_toolwindow_fixer() {
 
   # Find the Wine binary from the GE-Proton installation
   local wine_bin
-  wine_bin="$(dirname "$(dirname "${PROTON:-$HOME/.local/share/Steam/compatibilitytools.d/GE-Proton11-3/proton}")")/files/bin/wine"
+  wine_bin="$(dirname "$PROTON")/files/bin/wine"
   if [[ ! -x "$wine_bin" ]]; then
     echo "launch-fusion.sh warning: wine binary not found at $wine_bin" >&2
     return 0
