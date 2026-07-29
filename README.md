@@ -25,10 +25,9 @@ Fusion appears in your application launcher as a native app.
 | **File type associations** | `.f3d` / `.step` / `.stl` / `.3mf` / `.dxf` / `.obj` and 15 more — double-click opens in Fusion via NLauncher.exe, MIME icons in file manager |
 | **Toolwindow z-order fix** | Custom Win32 daemon (`fusion-toolwindow-fixer.exe`, 40 KB) — adds `WS_EX_APPWINDOW` to docked panels so they stack behind other windows instead of floating on top |
 | **Auto-detect install completion** | The installer watches Fusion's streamer log for "Configure app complete" and steps 10 → 11 automatically.  No manual "click next" intervention. |
-| **WebView2 GPU acceleration** | `--ignore-gpu-blocklist`, `--enable-gpu-rasterization`, `--use-angle=d3d11` — smoother browser panels on iGPU |
-| **DXVK tuning** | `syncInterval=0`, `tearFree=1`, `numBackBuffers=3` — reduced swapchain latency |
+| **WebView2 file dialog fix** | Bypasses seccomp (`PROTON_NO_SECCOMP=1`) to prevent SIGSYS on WebView2's Mojo named platform channel pipe — no custom Wine build required |
+| **msedgewebview2.exe Windows version override** | Wine AppDefaults set `msedgewebview2.exe` to report as Windows 8 (not 7) to match WebView2 runtime expectations for Mojo IPC |
 | **Reliable browser bridge** | 4-tier fallback: configured Chrome → `xdg-open` → `kde-open6`/`kde-open5` → known browsers.  Works with Snap Firefox on Ubuntu. |
-| **Application + MIME icons** | Fusion logo extracted from the Wine prefix at install time, installed at 8 sizes for launcher, taskbar, and file manager |
 | **Config UI** | Python Tkinter GUI (`launcher-config-user-interface.py`) for toggling GPU flags, overlay killer, toolwindow fixer, DXVK async — no config file editing required |
 | **DPI detection** | Auto-detects display scale (KDE → GNOME → xrdb → default), writes Wine DPI registry before Fusion installer runs |
 | **Cloud sign-in** | dotnet48 + winhttp winetricks, DLL overrides for telemetry suppression, callback protocol handlers |
@@ -87,6 +86,55 @@ built from source at install time.  It runs in a 5-second scan loop:
 This is equivalent to what the Wine source patch in Lolig4's
 `GE-Proton11-Fusion` fork does in `window_set_managed()`, but applied at
 runtime — no custom Wine build required.
+
+## WebView2 Mojo IPC & Seccomp Bypass
+
+Fusion 360's embedded browser (WebView2 / Edge Chromium) uses Mojo IPC —
+Chromium's internal inter-process communication system — for communication
+between the browser process and its renderer, GPU, and utility processes.
+On Linux, Mojo can use **named platform channels** (named pipes under the
+hood) for this IPC.
+
+Under GE-Proton, the `wine64-preloader` installs **seccomp BPF filters**
+before launching Wine child processes.  These filters are designed to block
+syscalls that Steam games shouldn't need, but Mojo's named pipe channel
+uses a syscall that gets blocked — resulting in **SIGSYS** (signal 31)
+and an immediate crash of `msedgewebview2.exe`.
+
+### The Wine Source Fix (Lolig4's Patch)
+
+The proper fix is a Wine server patch in `server/named_pipe.c`:
+
+- **Don't unlink named pipes when the last server endpoint is destroyed**
+  — keeps the pipe name registered in the Wine namespace while any client
+  handle is still open, matching Windows behavior
+- **Hold an extra reference for namespace registration** — prevents
+  premature destruction of the pipe object while Mojo is still connecting
+
+This is what the `GE-Proton11-Fusion` fork applies at the Wine source
+level.  It requires rebuilding GE-Proton from source, which is impractical
+for most users.
+
+### Our Approach (No Wine Patch Needed)
+
+Instead of patching Wine, we apply three complementary workarounds:
+
+1. **`PROTON_NO_SECCOMP=1`** — Tells `wine64-preloader` to skip seccomp
+   filter installation entirely.  The blocked syscall is now allowed,
+   so Mojo named pipes work.  Seccomp in Proton is a compatibility
+   mechanism, not a security boundary — removing it adds no practical risk.
+2. **`msedgewebview2.exe` AppDefaults `Version=win8`** — Forces the
+   WebView2 process to report as Windows 8 instead of the Wine default
+   (Windows 7).  The WebView2 runtime uses different Mojo IPC paths
+   depending on the reported Windows version; Windows 7 triggers a
+   compatibility code path that doesn't interact well with Wine's named
+   pipe implementation.
+3. **`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--no-sandbox`** — Disables
+   Chromium's own sandbox, which would otherwise conflict with Wine's
+   process model and cause additional Mojo connection failures.
+
+These settings are applied at install time (Wine prefix registry) and
+re-applied at every launch, ensuring they survive prefix resets.
 
 ## File Type Associations
 
