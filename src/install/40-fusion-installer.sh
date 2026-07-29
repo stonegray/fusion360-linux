@@ -126,7 +126,6 @@ log_info " Starting installer (monitoring for minimum 4 min runtime)..."
 SECONDS=0
 STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
 STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
-WINEDLLOVERRIDES="mscoree,mshtml,webview2=disabled" \
 "$proton" run "$INSTALLER_PATH" 2>/dev/null &
 INSTALLER_PID=$!
 
