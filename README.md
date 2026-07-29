@@ -27,8 +27,8 @@ Fusion appears in your application launcher as a native app.
 | **Auto-detect install completion** | The installer watches Fusion's streamer log for "Configure app complete" and steps 10 → 11 automatically.  No manual "click next" intervention. |
 | **WebView2 file dialog fix** | Bypasses seccomp (`PROTON_NO_SECCOMP=1`) to prevent SIGSYS on WebView2's Mojo named platform channel pipe — no custom Wine build required |
 | **msedgewebview2.exe Windows version override** | Wine AppDefaults set `msedgewebview2.exe` to report as Windows 8 (not 7) to match WebView2 runtime expectations for Mojo IPC |
-| **Reliable browser bridge** | 4-tier fallback: configured Chrome → `xdg-open` → `kde-open6`/`kde-open5` → known browsers.  Works with Snap Firefox on Ubuntu. |
-| **Config UI** | Python Tkinter GUI (`launcher-config-user-interface.py`) for toggling GPU flags, overlay killer, toolwindow fixer, DXVK async — no config file editing required |
+| **Reliable browser bridge** | 4-tier fallback: configured Chrome → `kde-open6`/`kde-open5` → `xdg-open` → known browsers.  Works with Snap Firefox on Ubuntu. |
+| **Config UI** | Python Tkinter GUI (`launcher-config-user-interface.py`) for toggling overlay killer, toolwindow fixer, WebView2 GPU, async shaders — no config file editing required |
 | **DPI detection** | Auto-detects display scale (KDE → GNOME → xrdb → default), writes Wine DPI registry before Fusion installer runs |
 | **Cloud sign-in** | dotnet48 + winhttp winetricks, DLL overrides for telemetry suppression, callback protocol handlers |
 | **Preflight checks** | Step 2 validates Vulkan driver, disk space, and existing prefix before proceeding |
@@ -48,10 +48,9 @@ Fusion 360 / Wine
 fusion-browser-listener.sh  (background daemon)
   ↓ attempts in order:
   1. CHROME (from config) —— fastest path
-  2. xdg-open (universal, handles Snap Firefox)
-  3. kde-open6 / kde-open5 (KDE native)
+  2. kde-open6 / kde-open5 (KDE native, most reliable)
+  3. xdg-open (last resort on KDE, broken under Wayland; universal elsewhere)
   4. google-chrome / chromium / firefox (direct binaries)
-  ↓
 Browser opens Autodesk sign-in page
   ↓ user logs in, browser redirects to fusion360-callback-handler.desktop
 fusion-callback-handler.sh → callback URL → /tmp
@@ -99,6 +98,7 @@ Other solutions (e.g. `GE-Proton11-Fusion`) require building a custom
 GE-Proton binary with a Wine server patch that keeps named pipe
 namespace entries alive across Mojo reconnect gaps.  Our approach
 achieves the same result without modifying Wine.
+
 ### Our Approach (No Wine Patch Needed)
 
 Instead of patching Wine, we apply three complementary workarounds:
@@ -172,6 +172,9 @@ Key details:
 | `./install.sh --ge-proton-only` | Download + extract GE-Proton only |
 | `./install.sh --prefix-only` | Init prefix + winetricks |
 | `./install.sh --run-installer` | Launch Fusion installer only |
+| `./install.sh --installer-path /path/to/exe` | Launch installer with local EXE |
+| `./install.sh --kill` | Kill all Fusion/Wine/Proton processes |
+| `./install.sh --uninstall` | Interactive selective uninstall |
 | `./doctor.sh` | Full diagnostic |
 | `./doctor.sh --quick` | Summary check |
 | `./doctor.sh --save` | Write report to file |
@@ -235,5 +238,5 @@ Key details:
 ## Troubleshooting
 
 See [docs/troubleshooting.md](docs/troubleshooting.md) for known issues:
-GPU driver setup, Vulkan troubleshooting, WebView2 performance, and
-scale/DPI configuration.
+GPU driver setup, Vulkan troubleshooting, scale/DPI configuration, and
+WebView2 behavior under Wine.
