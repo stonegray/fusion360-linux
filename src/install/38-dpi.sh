@@ -22,17 +22,13 @@ FUSION_WINE_DPI_FALLBACK="${FUSION_WINE_DPI_FALLBACK:-144}"
 FUSION_WINE_SCALE_FALLBACK_PERCENT="${FUSION_WINE_SCALE_FALLBACK_PERCENT:-150}"
 FUSION_DPI_LOG_FILE="/tmp/fusion360-dpi.log"
 
-# For the installer GUI: apply LogPixels only (font DPI scaling)
-# Win8DpiScaling is applied at launch time by apply_fusion_wine_dpi
-local user_reg="$PFX_DIR/pfx/user.reg"
-local dpi_value; dpi_value="$(resolve_fusion_wine_dpi)"
-[[ "$dpi_value" =~ ^[0-9]+$ ]] || { log_info " Warning: invalid DPI value '$dpi_value'" >&2; return 1; }
-local dpi_hex; dpi_hex=$(printf 'dword:%08x' "$dpi_value")
-
-if grep -q '^\[Software\\\\Wine\\\\Fonts\]' "$user_reg" 2>/dev/null; then
-  sed -i -e '/^\[Software\\\\Wine\\\\Fonts\]/,/^\[/{/^"LogPixels"/d;}' -e '/^\[Software\\\\Wine\\\\Fonts\]/a "LogPixels"='"$dpi_hex" "$user_reg" || { log_info " Warning: failed to write DPI registry" >&2; return 1; }
+# Find Proton binary and apply DPI via reg add
+local proton_bin
+proton_bin=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1)
+if [[ -n "$proton_bin" ]]; then
+  PROTON="$proton_bin" STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
+    apply_fusion_wine_dpi 2>/dev/null || true
+  log_info " DPI configured in Wine registry."
 else
-  printf '\n[Software\\Wine\\Fonts]\n#time=1dd1c05750735e4\n"LogPixels"=%s\n' "$dpi_hex" >> "$user_reg"
+  log_info " Warning: Proton not found — skipping DPI configuration."
 fi
-
-log_info " DPI configured in Wine registry (LogPixels=$dpi_value)."

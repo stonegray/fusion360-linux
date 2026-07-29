@@ -353,29 +353,6 @@ apply_fusion_wine_dpi() {
   [[ "$dpi_value" =~ ^[0-9]+$ ]] || { echo "warning: invalid DPI value '$dpi_value'" >&2; return 1; }
   [[ "$dpi_value" -eq 96 ]] && win8_dpi_scaling=0 || win8_dpi_scaling=1
 
-  local user_reg="$STEAM_COMPAT_DATA_PATH/pfx/user.reg"
-  [[ -f "$user_reg" ]] || return 0
-
-  local dpi_hex
-  dpi_hex=$(printf 'dword:%08x' "$dpi_value")
-  local win8_hex
-  win8_hex=$(printf 'dword:%08x' "$win8_dpi_scaling")
-
-  # Write LogPixels under [Software\\Wine\\Fonts]
-  if grep -q '^\[Software\\\\Wine\\\\Fonts\]' "$user_reg" 2>/dev/null; then
-    sed -i -e '/^\[Software\\\\Wine\\\\Fonts\]/,/^\[/{/^"LogPixels"/d;}' -e '/^\[Software\\\\Wine\\\\Fonts\]/a "LogPixels"='"$dpi_hex" "$user_reg" || { echo "warning: failed to write DPI registry" >&2; return 1; }
-  else
-  printf '\n[Software\\Wine\\Fonts]\n#time=1dd1c05750735e4\n"LogPixels"=%s\n' "$dpi_hex" >> "$user_reg"
-  fi
-
-  # Write LogPixels and Win8DpiScaling under [Control Panel\\Desktop]
-  if grep -q '^\[Control Panel\\\\Desktop\]' "$user_reg" 2>/dev/null; then
-    sed -i -e '/^\[Control Panel\\\\Desktop\]/,/^\[/{/^"LogPixels"/d;/^"Win8DpiScaling"/d;}' -e '/^\[Control Panel\\\\Desktop\]/a "LogPixels"='"$dpi_hex"'\n"Win8DpiScaling"='"$win8_hex" "$user_reg" || { echo "warning: failed to write DPI registry" >&2; return 1; }
-  else
-  printf '\n[Control Panel\\\\Desktop]\n"LogPixels"=%s\n"Win8DpiScaling"=%s\n' "$dpi_hex" "$win8_hex" >> "$user_reg"
-  fi
-
-  # Log what we did
   {
     echo "timestamp=$(date -Is)"
     echo "FUSION_WINE_DPI=$FUSION_WINE_DPI"
@@ -387,6 +364,26 @@ apply_fusion_wine_dpi() {
     echo "cinnamon_scaling_factor=$(read_gsettings_number org.cinnamon.desktop.interface scaling-factor || true)"
     echo "cinnamon_text_scaling_factor=$(read_gsettings_number org.cinnamon.desktop.interface text-scaling-factor || true)"
     echo "kde_forced_dpi=$(read_kde_forced_dpi || true)"
+  } > "$FUSION_DPI_LOG_FILE"
+
+  "$PROTON" run reg add 'HKCU\Software\Wine\Fonts' /v LogPixels /t REG_DWORD /d "$dpi_value" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
+    echo "launch-fusion.sh warning: failed to set Wine Fonts LogPixels. See $FUSION_DPI_LOG_FILE" >&2
+  }
+
+  "$PROTON" run reg add 'HKCU\Control Panel\Desktop' /v LogPixels /t REG_DWORD /d "$dpi_value" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
+    echo "launch-fusion.sh warning: failed to set Desktop LogPixels. See $FUSION_DPI_LOG_FILE" >&2
+  }
+
+  "$PROTON" run reg add 'HKCU\Control Panel\Desktop' /v Win8DpiScaling /t REG_DWORD /d "$win8_dpi_scaling" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
+    echo "launch-fusion.sh warning: failed to set Win8DpiScaling. See $FUSION_DPI_LOG_FILE" >&2
+  }
+
+  {
+    echo
+    echo "---- registry check after write ----"
+    "$PROTON" run reg query 'HKCU\Software\Wine\Fonts' /v LogPixels 2>&1 || true
+    "$PROTON" run reg query 'HKCU\Control Panel\Desktop' /v LogPixels 2>&1 || true
+    "$PROTON" run reg query 'HKCU\Control Panel\Desktop' /v Win8DpiScaling 2>&1 || true
   } >> "$FUSION_DPI_LOG_FILE"
 }
 
@@ -417,14 +414,9 @@ EOF_DESKTOP
 }
 
 register_wine_browser_bridge() {
-  local user_reg="$STEAM_COMPAT_DATA_PATH/pfx/user.reg"
-  [[ -f "$user_reg" ]] || return 0
-
-  # Check if already set with the same value
-  grep -q '^\[Software\\\\Wine\\\\WineBrowser\]' "$user_reg" 2>/dev/null || return 0
-  grep -qF "\"Browsers\"=\"$BROWSER\"" "$user_reg" 2>/dev/null && return 0
-
-  printf '\n[Software\\Wine\\WineBrowser]\n"Browsers"="%s"\n' "$BROWSER" >> "$user_reg"
+  "$PROTON" run reg add 'HKCU\Software\Wine\WineBrowser' /v Browsers /t REG_SZ /d "$BROWSER" /f >/tmp/fusion360-winebrowser-register.log 2>&1 || {
+    echo "launch-fusion.sh warning: failed to register WineBrowser. See /tmp/fusion360-winebrowser-register.log" >&2
+  }
 }
 
 start_browser_listener() {
