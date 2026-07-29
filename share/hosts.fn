@@ -23,7 +23,7 @@ ensure_hosts_entry() {
 
   mkdir -p "$(dirname "$hosts_file")" 2>/dev/null || return 1
   if [[ ! -f "$hosts_file" ]]; then
-    printf "# Wine hosts file\n$entry\n\n127.0.0.1 localhost\n::1 localhost\n" > "$hosts_file"
+    printf '%s\n' "# Wine hosts file" "$entry" "" "127.0.0.1 localhost" "::1 localhost" > "$hosts_file"
   else
     printf "%s\n" "$entry" >> "$hosts_file"
   fi
