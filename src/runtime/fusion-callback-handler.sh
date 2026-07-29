@@ -27,11 +27,11 @@ chmod 0700 "$CALLBACK_DIR"
   done
 
   echo "--- env dump ---"
-  echo "KDE_SESSION_VERSION=$KDE_SESSION_VERSION"
-  echo "WAYLAND_DISPLAY=$WAYLAND_DISPLAY"
-  echo "DISPLAY=$DISPLAY"
-  echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR"
-  echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS"
+  echo "KDE_SESSION_VERSION=${KDE_SESSION_VERSION:-}"
+  echo "WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}"
+  echo "DISPLAY=${DISPLAY:-}"
+  echo "XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-}"
+  echo "DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS:-}"
   echo "============================================================"
   echo
 } >> "$LOG_FILE" 2>&1
