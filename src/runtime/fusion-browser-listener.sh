@@ -15,9 +15,13 @@ if [[ -f "$CONFIG_FILE" ]]; then
 fi
 
 mkdir -p "$BROWSER_REQUEST_DIR"
+chmod 0700 "$BROWSER_REQUEST_DIR"
 mkdir -p "$BROWSER_PROCESSED_DIR"
+chmod 0700 "$BROWSER_PROCESSED_DIR"
 mkdir -p "$CALLBACK_REQUEST_DIR"
+chmod 0700 "$CALLBACK_REQUEST_DIR"
 mkdir -p "$CALLBACK_PROCESSED_DIR"
+chmod 0700 "$CALLBACK_PROCESSED_DIR"
 
 log_message() {
   printf "%s\n" "$*" >> "$LOG_FILE"

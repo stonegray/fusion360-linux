@@ -12,6 +12,7 @@ if [[ -f "$CONFIG_FILE" ]]; then
 fi
 
 mkdir -p "$REQUEST_DIR"
+chmod 0700 "$REQUEST_DIR"
 
 {
   echo "============================================================"
