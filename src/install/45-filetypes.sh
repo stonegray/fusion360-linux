@@ -177,7 +177,7 @@ _shell_folder() {
 local proton_bin
 proton_bin=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
 local wine_bin
-wine_bin="$(dirname "$proton_bin")/files/bin/wine"
+wine_bin="$(proton_wine_bin "$proton_bin")"
 if [[ -x "$wine_bin" ]]; then
   _shell_folder "Personal"  "$HOME/Documents"
   _shell_folder "Desktop"   "$HOME/Desktop"

@@ -36,7 +36,7 @@ log_info " Configuring Wine version and AppDefaults..."
 
 # Derive Wine binary from Proton path (proton run doesn't persist reg changes)
 local wine_bin
-wine_bin="$(dirname "$proton")/files/bin/wine"
+wine_bin="$(proton_wine_bin "$proton")"
 if [[ ! -x "$wine_bin" ]]; then
   log_info " Warning: Wine binary not found at $wine_bin — skipping registry config."
 else

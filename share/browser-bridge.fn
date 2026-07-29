@@ -17,7 +17,7 @@ register_wine_browser_bridge() {
   [[ -n "${PROTON:-}" ]] || { echo "launch-fusion.sh warning: PROTON is not set — cannot register Wine browser bridge" >&2; return 1; }
   [[ -n "${STEAM_COMPAT_DATA_PATH:-}" ]] || { echo "launch-fusion.sh warning: STEAM_COMPAT_DATA_PATH is not set — cannot register Wine browser bridge" >&2; return 1; }
   local wine_bin
-  wine_bin="$(dirname "$PROTON")/files/bin/wine"
+  wine_bin="$(proton_wine_bin "$PROTON")"
   [[ -x "$wine_bin" ]] || { echo "launch-fusion.sh warning: wine binary not found at $wine_bin" >&2; return 1; }
   local pfx="$STEAM_COMPAT_DATA_PATH/pfx"
   WINEPREFIX="$pfx" "$wine_bin" reg add 'HKCU\Software\Wine\WineBrowser' /v Browsers /t REG_SZ /d "$BROWSER" /f >/tmp/fusion360-winebrowser-register.log 2>&1 || {
