@@ -21,6 +21,7 @@ STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
 
 if [[ -d "$target" ]]; then
   log_info " done"
+  rm -f "$bootstrap"
 else
   log_info " may not have completed (can re-run)"
 fi
