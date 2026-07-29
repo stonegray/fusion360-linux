@@ -109,7 +109,7 @@ kill_fusion_processes() {
     return 0
   fi
 
-  echo "  [lifecycle] Killing ${#unique[@]} Wine/Proton process(es)..."
+  log_info " Killing ${#unique[@]} Wine/Proton process(es)..."
 
   # Graceful TERM first
   for pid in "${unique[@]}"; do
@@ -133,16 +133,14 @@ kill_fusion_processes() {
     if [[ "$exe" == *wine* ]] || [[ "$exe" == *proton* ]]; then
       pid=${proc%/exe}
       pid=${pid#/proc/}
-      echo "  [lifecycle]   SURVIVED: PID $pid ($exe)"
+      log_info "   SURVIVED: PID $pid ($exe)"
       survivors=$((survivors + 1))
     fi
   done
 
   if (( survivors == 0 )); then
-    echo "  [lifecycle] Killed successfully."
     return 0
   else
-    echo "  [lifecycle] $survivors process(es) still running."
     return 1
   fi
 }

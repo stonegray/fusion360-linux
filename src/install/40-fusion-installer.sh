@@ -116,9 +116,7 @@ echo "  │ around 80%.                                             │"
 echo "  └────────────────────────────────────────────────────────┘"
 echo ""
 
-
 mkdir -p "$PFX_DIR"
-log_info " Starting installer (monitoring for minimum 4 min runtime)..."
 SECONDS=0
 STEAM_COMPAT_DATA_PATH="$PFX_DIR" \
 STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
@@ -128,7 +126,7 @@ INSTALLER_PID=$!
 
 sleep 3
 if ! kill -0 "$INSTALLER_PID" 2>/dev/null; then
-  log_fail " Fusion installer exited immediately (PID $INSTALLER_PID dead after 3s)."
+  log_fail " Fusion installer exited immediately."
   log_info " Possible causes:"
   log_info "  - DLL overrides blocking a required component"
   log_info "  - Corrupted or incompatible installer EXE"
@@ -136,23 +134,20 @@ if ! kill -0 "$INSTALLER_PID" 2>/dev/null; then
   return 1
 fi
 
-log_info " Installer running (PID $INSTALLER_PID). Waiting for completion..."
-log_info " The script will detect when it's done."
+log_info " Attaching to installer PID $INSTALLER_PID..."
 
-MAX_WAIT=$((2 * 3600))  # 2 hour timeout
+MAX_WAIT=$((2 * 3600))
 while (( SECONDS < MAX_WAIT )); do
   sleep 10
   ELAPSED=$SECONDS
   if ! kill -0 "$INSTALLER_PID" 2>/dev/null; then
     if (( ELAPSED < 240 )); then
-      log_fail " Fusion installer exited unexpectedly after ${ELAPSED}s (expected >= 4 min)."
+      log_fail " Fusion installer exited unexpectedly (${ELAPSED}s)."
       return 1
     fi
-    log_info " Installer process ended naturally (${ELAPSED}s elapsed)."
     break
   fi
   if [[ -f "$F360_LOG" ]] && grep -q "Configure app complete\|VersionExists" "$F360_LOG" 2>/dev/null; then
-    log_info " Installer completed (detected completion or 'already installed' in streamer log)."
     break
   fi
 done

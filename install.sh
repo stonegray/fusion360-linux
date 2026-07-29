@@ -111,7 +111,6 @@ run_step 37-config.sh
 echo ""
 
 log_step "Step 8/12: Protocol handlers"
-"$SCRIPT_DIR/src/runtime/register-protocols.sh"
 echo ""
 
 log_step "Step 9/12: Display DPI"

@@ -40,7 +40,7 @@ wine_bin="$(dirname "$proton")/files/bin/wine"
 if [[ ! -x "$wine_bin" ]]; then
   log_info " Warning: Wine binary not found at $wine_bin — skipping registry config."
 else
-  WINEPREFIX="$PFX_DIR/pfx" "$wine_bin" reg add "HKCU\\Software\\Wine" /v Version /t REG_SZ /d win10 /f 2>/dev/null || log_info " Warning: could not set global Windows version"
-  WINEPREFIX="$PFX_DIR/pfx" "$wine_bin" reg add "HKCU\\Software\\Wine\\AppDefaults\\msedgewebview2.exe" /v Version /t REG_SZ /d win8 /f 2>/dev/null || log_info " Warning: could not set msedgewebview2.exe version override"
-  WINEPREFIX="$PFX_DIR/pfx" "$wine_bin" reg add "HKCU\\Software\\Wine\\DllOverrides" /v "adpclientservice.exe" /t REG_SZ /d native /f 2>/dev/null || log_info " Warning: could not set adpclientservice override"
+  WINEPREFIX="$PFX_DIR/pfx" "$wine_bin" reg add "HKCU\\Software\\Wine" /v Version /t REG_SZ /d win10 /f &>/dev/null || log_info " Warning: could not set global Windows version"
+  WINEPREFIX="$PFX_DIR/pfx" "$wine_bin" reg add "HKCU\\Software\\Wine\\AppDefaults\\msedgewebview2.exe" /v Version /t REG_SZ /d win8 /f &>/dev/null || log_info " Warning: could not set msedgewebview2.exe version override"
+  WINEPREFIX="$PFX_DIR/pfx" "$wine_bin" reg add "HKCU\\Software\\Wine\\DllOverrides" /v "adpclientservice.exe" /t REG_SZ /d native /f &>/dev/null || log_info " Warning: could not set adpclientservice override"
 fi
