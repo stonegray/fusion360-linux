@@ -13,7 +13,6 @@ if [[ ! -f "$PFX_DIR/pfx/user.reg" ]]; then
   log_info " Prefix not yet initialized — skipping DPI config."
   return 0
 fi
-source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
 
 STEAM_COMPAT_DATA_PATH="$PFX_DIR"
 FUSION_WINE_DPI="${FUSION_WINE_DPI:-144}"

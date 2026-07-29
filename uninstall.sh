@@ -17,9 +17,10 @@ fi
 
 : "${HOME:?HOME must be set to run uninstall}"
 
-# Resolve script directory and source color constants
+# Resolve script directory and source color/path constants
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/share/colors.fn"
+source "$SCRIPT_DIR/share/paths.fn"
 
 
 echo "=== Fusion360 Linux — Uninstall ==="
@@ -144,9 +145,9 @@ if [[ -L "$HOME/.local/bin/fusion-doctor" ]]; then
 fi
 
 # 9. DPI log
-if [[ -f "/tmp/fusion360-dpi.log" ]]; then
-  rm -f "/tmp/fusion360-dpi.log"
-  echo "    Removed: DPI log"
+if [[ -f "$FUSION_DPI_LOG_FILE" ]]; then
+  rm -f "$FUSION_DPI_LOG_FILE"
+  echo "    Removed: DPI log ($FUSION_DPI_LOG_FILE)"
 fi
 
 # 10. MIME type definitions
