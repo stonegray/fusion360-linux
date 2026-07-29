@@ -566,15 +566,14 @@ apply_launch_environment() {
   export DXVK_CONFIG="$dxvk_cfg"
 
 
-
   # WINEDLLOVERRIDES: bcp47langs= prevents Autodesk Identity Manager crash;
-  # winhttp=n,b skips IE proxy detection (saves ~10s startup under Wine).
+  # winhttp=b skips IE proxy detection (saves ~10s startup under Wine).
   local dll_overrides="bcp47langs="
   if ! is_enabled "$FUSION_FIX_BCP47LANGS"; then
     dll_overrides=""
   fi
   if is_enabled "${FUSION_FIX_WINHTTP_PROXY:-1}"; then
-    dll_overrides="${dll_overrides:+$dll_overrides,}winhttp=n,b"
+    dll_overrides="${dll_overrides:+$dll_overrides,}winhttp=b"
   fi
   if [[ -n "$dll_overrides" ]]; then
     export WINEDLLOVERRIDES="$dll_overrides"
