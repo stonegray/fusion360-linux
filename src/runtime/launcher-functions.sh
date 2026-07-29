@@ -467,7 +467,7 @@ start_toolwindow_fixer() {
 
   # Find the Wine binary from the GE-Proton installation
   local wine_bin
-  wine_bin="$(dirname "$(dirname "${PROTON:-$HOME/.local/share/Steam/compatibilitytools.d/GE-Proton11-3/proton}")")/files/bin/wine"
+  wine_bin="$(dirname "$(dirname "${PROTON:-$HOME/.local/share/Steam/compatibilitytools.d/GE-Proton10-32/proton}")")/files/bin/wine"
   if [[ ! -x "$wine_bin" ]]; then
     echo "launch-fusion.sh warning: wine binary not found at $wine_bin" >&2
     return 0
