@@ -147,6 +147,7 @@ apply_fusion_wine_dpi() {
     echo "kde_forced_dpi=$(read_kde_forced_dpi || true)"
   } > "$FUSION_DPI_LOG_FILE"
 
+  [[ -n "${PROTON:-}" ]] || { echo "launch-fusion.sh warning: PROTON is not set — cannot configure Wine DPI" >&2; return 1; }
   local wine_bin
   wine_bin="$(dirname "$PROTON")/files/bin/wine"
   [[ -x "$wine_bin" ]] || { echo "launch-fusion.sh warning: wine binary not found at $wine_bin" >&2; return 1; }

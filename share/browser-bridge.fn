@@ -14,6 +14,8 @@
 #
 # Requires: PROTON, STEAM_COMPAT_DATA_PATH, BROWSER
 register_wine_browser_bridge() {
+  [[ -n "${PROTON:-}" ]] || { echo "launch-fusion.sh warning: PROTON is not set — cannot register Wine browser bridge" >&2; return 1; }
+  [[ -n "${STEAM_COMPAT_DATA_PATH:-}" ]] || { echo "launch-fusion.sh warning: STEAM_COMPAT_DATA_PATH is not set — cannot register Wine browser bridge" >&2; return 1; }
   local wine_bin
   wine_bin="$(dirname "$PROTON")/files/bin/wine"
   [[ -x "$wine_bin" ]] || { echo "launch-fusion.sh warning: wine binary not found at $wine_bin" >&2; return 1; }
