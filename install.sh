@@ -82,50 +82,54 @@ case "$MODE" in
     ;;
 esac
 
-log_step "Step 1/12: System dependencies"
+log_step "Step 1/13: System dependencies"
 run_step 10-deps.sh
 echo ""
 
-log_step "Step 2/12: Preflight checks"
+log_step "Step 2/13: Preflight checks"
 run_step 05-preflight.sh
 echo ""
 
-log_step "Step 3/12: GE-Proton"
+log_step "Step 3/13: GE-Proton"
 run_step 20-ge-proton.sh
 echo ""
 
-log_step "Step 4/12: Install to system"
+log_step "Step 4/13: Install to system"
 run_step 25-install-to-location.sh
 echo ""
 
-log_step "Step 5/12: Proton prefix"
+log_step "Step 5/13: Proton prefix"
 run_step 30-prefix.sh
 echo ""
 
-log_step "Step 6/12: WebView2"
+log_step "Step 6/13: WebView2"
 run_step 35-webview2.sh
 echo ""
 
-log_step "Step 7/12: Config"
+log_step "Step 7/13: Config"
 run_step 37-config.sh
 echo ""
 
-log_step "Step 8/12: Protocol handlers"
+log_step "Step 8/13: Protocol handlers"
 echo ""
 
-log_step "Step 9/12: Display DPI"
+log_step "Step 9/13: Display DPI"
 run_step 38-dpi.sh
 echo ""
 
-log_step "Step 10/12: Fusion Installer"
+log_step "Step 10/13: Windows Version"
+run_step 39-windows-version.sh
+echo ""
+
+log_step "Step 11/13: Fusion Installer"
 run_step 40-fusion-installer.sh
 echo ""
 
-log_step "Step 11/12: File type associations"
+log_step "Step 12/13: File type associations"
 run_step 45-filetypes.sh
 echo ""
 
-log_step "Step 12/12: Health check"
+log_step "Step 13/13: Health check"
 if [[ -x "$SCRIPT_DIR/src/doctor/doctor.sh" ]]; then
   "$SCRIPT_DIR/src/doctor/doctor.sh" --quick || true
 fi
