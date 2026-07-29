@@ -9,6 +9,7 @@
 #   ./install.sh --ge-proton-only                        # step 2 only
 #   ./install.sh --prefix-only                           # step 3 only
 #   ./install.sh --uninstall                            # interactive selective uninstall
+#   ./install.sh --kill                                  # kill all Fusion/Wine/Proton processes
 #   ./install.sh --installer-path /path/to/downloader.exe  # step 5 with local file
 
 set -euo pipefail
@@ -21,6 +22,11 @@ EOF
   exit 1
 fi
 LOCK_DIR="/tmp/fusion360-install.lock"
+if [[ "${1:-}" == "--kill" ]]; then
+  source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
+  kill_fusion_processes
+  exit 0
+fi
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   echo "ERROR: Another install is already running (lock at $LOCK_DIR)." >&2
   exit 1
