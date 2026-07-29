@@ -42,7 +42,5 @@ if [[ ! -x "$wine_bin" ]]; then
 else
   WINEPREFIX="$PFX_DIR/pfx" "$wine_bin" reg add "HKCU\\Software\\Wine" /v Version /t REG_SZ /d win10 /f 2>/dev/null || log_info " Warning: could not set global Windows version"
   WINEPREFIX="$PFX_DIR/pfx" "$wine_bin" reg add "HKCU\\Software\\Wine\\AppDefaults\\msedgewebview2.exe" /v Version /t REG_SZ /d win8 /f 2>/dev/null || log_info " Warning: could not set msedgewebview2.exe version override"
-  WINEPREFIX="$PFX_DIR/pfx" "$wine_bin" reg add "HKCU\\Environment" /v "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS" /t REG_SZ /d "--no-sandbox" /f 2>/dev/null || log_info " Warning: could not set WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"
   WINEPREFIX="$PFX_DIR/pfx" "$wine_bin" reg add "HKCU\\Software\\Wine\\DllOverrides" /v "adpclientservice.exe" /t REG_SZ /d native /f 2>/dev/null || log_info " Warning: could not set adpclientservice override"
 fi
-log_info " Done."
