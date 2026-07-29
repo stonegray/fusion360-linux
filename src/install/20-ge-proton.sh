@@ -6,6 +6,19 @@ if [[ -n "$existing" ]]; then
   return 0 2>/dev/null || true
 fi
 
+# Check available disk space — GE-Proton is ~500MB compressed, ~1.5GB extracted
+_check_space() {
+  local dir="$1" needed_mb="$2" label="$3"
+  local avail_mb
+  avail_mb=$(df -m "$dir" 2>/dev/null | awk 'NR==2 {print $4}') || true
+  if [[ -z "$avail_mb" ]] || [[ "$avail_mb" -lt "$needed_mb" ]]; then
+    log_fail " Not enough space in $label ($dir): need ${needed_mb}MB, have ${avail_mb:-?}MB."
+    log_info " Free space and try again, or set a larger tmpdir."
+    return 1
+  fi
+}
+_check_space "/tmp" 2500 "/tmp (download + extraction)" || return 1 2>/dev/null || true
+_check_space "$COMPAT_DIR" 2000 "$COMPAT_DIR (extraction target)" || return 1 2>/dev/null || true
 tarball="/tmp/${GE_PROTON_VERSION}.tar.gz"
 if [[ ! -f "$tarball" ]]; then
   log_info " Downloading ${GE_PROTON_VERSION} (~500MB)..."
