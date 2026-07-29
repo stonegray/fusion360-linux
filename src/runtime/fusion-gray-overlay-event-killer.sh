@@ -26,6 +26,13 @@ SIZE_TOLERANCE_PERCENT="${FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT:-25}"
 PARENT_WINDOW_ID="${FUSION_OVERLAY_PARENT_WINDOW_ID:-}"
 
 echo "fusion-gray-overlay-event-killer-parent-exit started at $(date -Is)" >> "$LOG_FILE"
+# This daemon uses X11-specific tools (xdotool, xprop, xwininfo) to
+# detect and close Fusion 360's grey modal overlay windows.  On Wayland
+# these tools are not available; exit gracefully with a log message.
+if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+  echo "$(date -Is) Wayland detected — overlay killer requires X11, exiting." >> "$LOG_FILE"
+  exit 0
+fi
 
 window_exists() {
   xprop -id "$1" WM_NAME >/dev/null 2>&1
