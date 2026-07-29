@@ -5,36 +5,6 @@ if [[ -z "$proton" ]]; then
 return 1
 fi
 
-# ── Check if installer already completed ──────────────────────────────
-F360_INSTALL_FLAG="$F360_DATA_DIR/flags/fusion-installed"
-if [[ -f "$F360_INSTALL_FLAG" ]]; then
-  log_info " Fusion installer already completed (flag: $F360_INSTALL_FLAG). Skipping."
-  # Still install desktop entry if missing
-  fusion_exe=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1 || true)
-  if [[ -n "$fusion_exe" ]] && [[ ! -f "$F360_APPS_DIR/autodesk-fusion360.desktop" ]]; then
-    log_info " Installing desktop entry..."
-    mkdir -p "$F360_APPS_DIR"
-    cat > "$F360_APPS_DIR/autodesk-fusion360.desktop" <<EOF
-[Desktop Entry]
-Name=Autodesk Fusion 360
-Comment=Fusion 360 CAD/CAM/CAE tool
-Exec=$F360_DATA_DIR/launch-fusion.sh %F
-Icon=fusion360
-Type=Application
-Categories=Graphics;Science;Engineering;
-MimeType=application/vnd.autodesk.fusion360;model/step;model/iges;model/stl;model/3mf;image/vnd.dxf;model/x-obj;model/x-acis-sat;model/x-fbx;application/x-inventor-assembly;application/x-inventor-part;model/x-rhino-3dm;application/x-solidworks-part;application/x-solidworks-assembly;model/x-parasolid;
-StartupNotify=true
-StartupWMClass=fusion360.exe
-EOF
-    update-desktop-database "$F360_APPS_DIR" 2>/dev/null || true
-    if command -v kbuildsycoca6 &>/dev/null; then
-      kbuildsycoca6 2>/dev/null || true
-    elif command -v kbuildsycoca5 &>/dev/null; then
-      kbuildsycoca5 2>/dev/null || true
-    fi
-  fi
-  return 0
-fi
 # ── Streamer log path (truncated before install to detect fresh completion) ─
 F360_LOG="$PFX_DIR/pfx/drive_c/users/steamuser/AppData/Local/Autodesk/autodesk.webdeploy.streamer.log"
 rm -f "$F360_LOG"
@@ -183,9 +153,6 @@ EOF
   command -v kbuildsycoca6 &>/dev/null && kbuildsycoca6 2>/dev/null || true
   command -v kbuildsycoca5 &>/dev/null && kbuildsycoca5 2>/dev/null || true
   log_info " Desktop entry installed."
-  mkdir -p "$(dirname "$F360_INSTALL_FLAG")"
-  touch "$F360_INSTALL_FLAG"
-  log_info " Install flag written to $F360_INSTALL_FLAG."
 else
   log_info " Fusion360.exe not found yet. Install may still be in progress."
   log_info " Run ./setup-fusion.sh once Fusion360.exe exists."
