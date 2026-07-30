@@ -8,6 +8,16 @@ if [[ -d "$_share_dir" ]]; then
   source "$_share_dir/load.sh"
 fi
 unset _share_dir
+#
+# This file now contains only 3 launcher-context-specific functions that
+# don't belong in the general-purpose share/ library:
+#
+#   configure_with_file_browsers()  — runs the Python config UI
+#   show_selection_summary()        — displays launch config summary
+#   apply_launch_environment()      — exports env vars for Fusion launch
+#
+# All reusable logic has been moved to share/*.fn modules loaded above.
+#
 
 configure_with_file_browsers() {
   local user_interface_mode="${1:-hold}"
@@ -153,8 +163,12 @@ apply_launch_environment() {
       echo "launch-fusion.sh warning: Intel Vulkan ICD flag is enabled, but no Intel ICD file was found." >&2
     fi
   fi
-
-  export BROWSER="${BROWSER:-xdg-open}"
+  # BROWSER intentionally NOT exported — Wine uses winebrowser.exe for URL
+  # opening. Exporting BROWSER causes Wine to spawn fusion-browser.sh via
+  # fork+exec, which inherits Proton's seccomp filter and crashes with
+  # SIGSYS (the dynamic linker's __brk is blocked). winebrowser.exe calls
+  # xdg-open through Wine's internal interface, bypassing fork+exec.
+  # export BROWSER
   export BROWSER_LISTENER
   export CALLBACK_HANDLER
   export CHROME
@@ -162,6 +176,26 @@ apply_launch_environment() {
   export FUSION_WINE_SCALE_PERCENT
   export FUSION_WINE_DPI_FALLBACK
   export FUSION_WINE_SCALE_FALLBACK_PERCENT
+  export FUSION_PROTON_USE_WINED3D
+  export FUSION_PROTON_USE_XALIA
+  export FUSION_DXVK_ASYNC
+  export FUSION_NO_AT_BRIDGE
+  export FUSION_FIX_BCP47LANGS
+  export FUSION_WEBVIEW_NO_SANDBOX
+  export FUSION_WEBVIEW_DISABLE_GPU
+  export FUSION_USE_INTEL_VK_ICD
+  export FUSION_ENABLE_OVERLAY_KILLER
+  export FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT
+  export FUSION_ENABLE_TOOLWINDOW_FIXER
+  export FUSION_DARK_MODE
+  export PROTON_NO_SECCOMP
+  export PROTON_USE_WINED3D
+  export PROTON_USE_XALIA
+  export DXVK_ASYNC
+  export STAGING_WRITECOPY
+  export PROTON_HEAP_DELAY_FREE
+  export WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
   export STEAM_COMPAT_DATA_PATH
   export STEAM_COMPAT_CLIENT_INSTALL_PATH
+  export PROTON
 }

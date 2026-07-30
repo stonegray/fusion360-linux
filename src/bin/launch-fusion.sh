@@ -32,7 +32,7 @@ PROTON="${PROTON:-$HOME/.local/share/Steam/compatibilitytools.d/${GE_PROTON_VERS
 STEAM_COMPAT_DATA_PATH="${STEAM_COMPAT_DATA_PATH:-$HOME/.fusion360-proton2}"
 STEAM_COMPAT_CLIENT_INSTALL_PATH="${STEAM_COMPAT_CLIENT_INSTALL_PATH:-$HOME/.local/share/Steam}"
 FUSION_ROOT="${FUSION_ROOT:-$STEAM_COMPAT_DATA_PATH/pfx/drive_c/users/steamuser/AppData/Local/Autodesk/webdeploy/production}"
-BROWSER="${BROWSER:-xdg-open}"
+BROWSER="${BROWSER:-$RUNTIME_DIR/fusion-browser.sh}"
 BROWSER_LISTENER="${BROWSER_LISTENER:-$RUNTIME_DIR/fusion-browser-listener.sh}"
 CALLBACK_HANDLER="${CALLBACK_HANDLER:-$RUNTIME_DIR/fusion-callback-handler.sh}"
 # Auto-detect browser: google-chrome > chromium-browser > chromium > firefox
@@ -110,7 +110,7 @@ fi
 apply_launch_environment
 
 [[ -x "$PROTON" ]] || fail "Proton was not found or is not executable: $PROTON. Run $0 --configure to select it."
-command -v "$BROWSER" >/dev/null 2>&1 || fail "Browser command was not found: $BROWSER. Install xdg-utils or set BROWSER to a browser binary."
+[[ -x "$BROWSER" ]] || fail "Browser bridge was not found or is not executable: $BROWSER"
 [[ -x "$BROWSER_LISTENER" ]] || fail "Browser listener was not found or is not executable: $BROWSER_LISTENER"
 [[ -x "$CALLBACK_HANDLER" ]] || fail "Callback handler was not found or is not executable: $CALLBACK_HANDLER"
 [[ -x "$CHROME" ]] || fail "Chrome was not found or is not executable: $CHROME. Run $0 --configure to select it."
