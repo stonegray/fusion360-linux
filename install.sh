@@ -81,12 +81,12 @@ case "$MODE" in
     ;;
 esac
 
-log_step "Step 1/13: System dependencies"
-run_step 10-deps.sh
+log_step "Step 1/13: Preflight checks"
+run_step 05-preflight.sh
 echo ""
 
-log_step "Step 2/13: Preflight checks"
-run_step 05-preflight.sh
+log_step "Step 2/13: System dependencies"
+run_step 10-deps.sh
 echo ""
 
 log_step "Step 3/13: GE-Proton"
@@ -108,6 +108,7 @@ echo ""
 log_step "Step 7/13: Config"
 run_step 37-config.sh
 echo ""
+
 log_step "Step 8/13: Display DPI"
 run_step 38-dpi.sh
 echo ""
