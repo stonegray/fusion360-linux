@@ -26,7 +26,7 @@ declare -a CONFIG_KEYS=(
 )
 
 declare -a CONFIG_VALS=(
-  "$GE_PROTON" "$HOME/.fusion360-proton2" "$HOME/.local/share/Steam"
+  "$GE_PROTON" "$PFX_DIR" "$HOME/.local/share/Steam"
   "$fusion_root" "$F360_DATA_DIR/runtime-scripts/fusion-browser.sh"
   "$F360_DATA_DIR/runtime-scripts/fusion-browser-listener.sh"
   "$F360_DATA_DIR/runtime-scripts/fusion-callback-handler.sh"
