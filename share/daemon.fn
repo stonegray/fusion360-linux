@@ -64,8 +64,7 @@ start_browser_listener() {
 
   clear_bridge_temp_files || true
 
-  (nohup setsid "$BROWSER_LISTENER" &) &>/dev/null
-  BRIDGE_LISTENER_PID=$!
+  nohup setsid "$BROWSER_LISTENER" &>/dev/null &
   disown 2>/dev/null || true
   daemon_write_pid "browser-listener" "$BRIDGE_LISTENER_PID"
   log_info "Browser listener started (PID $BRIDGE_LISTENER_PID)"
@@ -84,8 +83,8 @@ start_overlay_killer() {
     return 0
   fi
 
-  (nohup setsid env FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="$FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT" \
-    "$FUSION_OVERLAY_KILLER" &) &>/dev/null
+  nohup setsid env FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="$FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT" \
+    "$FUSION_OVERLAY_KILLER" &>/dev/null &
   OVERLAY_KILLER_PID=$!
   disown 2>/dev/null || true
   daemon_write_pid "overlay-killer" "$OVERLAY_KILLER_PID"

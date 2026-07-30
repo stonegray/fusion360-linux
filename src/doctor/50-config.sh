@@ -15,7 +15,7 @@ if [[ -f "$CONFIG_FILE" ]]; then
 
   info "Checking config paths..."
   for var_name in PROTON STEAM_COMPAT_DATA_PATH FUSION_ROOT BROWSER CHROME; do
-    val="${!var_name:-}"
+    val=$(eval "printf '%s' \"\${$var_name:-}\"" 2>/dev/null)
     if [[ -z "$val" ]]; then
       warn "$var_name is not set in config"
     elif [[ -e "$val" ]]; then
