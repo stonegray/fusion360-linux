@@ -97,6 +97,18 @@ if command -v xdg-mime &>/dev/null; then
   log_info " Fusion 360 set as default for .f3d/.f3z files."
   fi
 
+# Check for conflicting protocol handlers — other apps may have registered adsk://
+if command -v xdg-mime &>/dev/null; then
+  for scheme in adsk adskidmgr; do
+    handler=$(xdg-mime query default "x-scheme-handler/$scheme" 2>/dev/null || true)
+    if [[ -n "$handler" ]] && ! echo "$handler" | grep -qi "fusion360-callback"; then
+      log_warn " Found existing handler for $scheme://: $handler"
+      log_warn " This may conflict with Fusion 360's callback handler."
+      log_info " Will register fusion360-callback-handler.desktop for $scheme://"
+    fi
+  done
+fi
+
 # Re-assert protocol handlers — Wine/Fusion installer may have registered its own
 if command -v xdg-mime &>/dev/null; then
   xdg-mime default fusion360-callback-handler.desktop x-scheme-handler/adsk 2>/dev/null || true

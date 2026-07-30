@@ -6,6 +6,9 @@ _share_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../share" 2>/dev/null && pw
 if [[ -z "$_share_dir" ]]; then
   _share_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../../share" 2>/dev/null && pwd)" || true
 fi
+if [[ -d "$_share_dir" ]]; then
+  source "$_share_dir/load.sh"
+fi
 unset _share_dir
 # fusion-gray-overlay-event-killer-parent-exit.sh:
 # Event-driven closer for Fusion 360's broken Wine grey modal overlay.

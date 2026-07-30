@@ -7,8 +7,9 @@ _share_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../share" 2>/dev/null && pw
 if [[ -z "$_share_dir" ]]; then
   _share_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../../share" 2>/dev/null && pwd)" || true
 fi
-unset _share_dir
-
+if [[ -d "$_share_dir" ]]; then
+  source "$_share_dir/load.sh"
+fi
 CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux/config"
 
 BROWSER_REQUEST_DIR="${BRIDGE_BROWSER_REQUEST_DIR:-/tmp/fusion360-browser-requests}"
