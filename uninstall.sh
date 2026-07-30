@@ -18,7 +18,8 @@ fi
 : "${HOME:?HOME must be set to run uninstall}"
 
 # Resolve script directory and source color/path constants
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_this_file="${BASH_SOURCE[0]:-$0}"
+SCRIPT_DIR="$(cd "$(dirname "$_this_file")" && pwd)"
 source "$SCRIPT_DIR/share/colors.fn"
 source "$SCRIPT_DIR/share/paths.fn"
 source "$SCRIPT_DIR/share/desktop.fn"

@@ -7,7 +7,7 @@
 # files directly.
 #
 # Layer 0 (no dependencies)
-_SHARE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_SHARE_DIR="$(cd "$(dirname "\${BASH_SOURCE[0]:-$0}")" && pwd)"
 source "$_SHARE_DIR/colors.fn"
 source "$_SHARE_DIR/paths.fn"
 source "$_SHARE_DIR/constants.fn"
