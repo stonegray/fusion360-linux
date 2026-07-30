@@ -8,7 +8,7 @@ if [[ $EUID -eq 0 ]]; then
 fi
 
 # ── Quick health check ────────────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "\${BASH_SOURCE[0]:-$0}")")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]:-$0}")")" && pwd)"
 
 # Detect runtime directory — supports both installed ($SCRIPT_DIR/runtime-scripts/)
 # and dev repo ($SCRIPT_DIR/../runtime/) layouts
