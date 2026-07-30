@@ -131,6 +131,14 @@ if [[ -L "$HOME/.local/bin/fusion-doctor" ]]; then
   rm -f "$HOME/.local/bin/fusion-doctor"
   echo "    Removed: ~/.local/bin/fusion-doctor"
 fi
+if [[ -L "$HOME/.local/bin/fusion360" ]]; then
+  rm -f "$HOME/.local/bin/fusion360"
+  echo "    Removed: ~/.local/bin/fusion360"
+fi
+if [[ -L "$HOME/.local/bin/fusion-uninstall" ]]; then
+  rm -f "$HOME/.local/bin/fusion-uninstall"
+  echo "    Removed: ~/.local/bin/fusion-uninstall"
+fi
 
 # 9. DPI log
 if [[ -f "$FUSION_DPI_LOG_FILE" ]]; then
