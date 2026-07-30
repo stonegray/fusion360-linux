@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # fusion-browser.sh: Fusion 360 browser bridge — writes URL requests
 # for the listener to process.  Called by Fusion via the BROWSER env var.
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -euo
 
 CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux/config"
 REQUEST_DIR="${BRIDGE_BROWSER_REQUEST_DIR:-/tmp/fusion360-browser-requests}"

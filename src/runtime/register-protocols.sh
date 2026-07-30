@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # runtime-scripts/register-protocols.sh — Register adsk:// and adskidmgr:// protocol handlers
-set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RUNTIME_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+set -euo pipefail 2>/dev/null || set -euo
+SCRIPT_DIR="$(cd "$(dirname "\${BASH_SOURCE[0]:-$0}")/.." && pwd)"
+RUNTIME_DIR="$(cd "$(dirname "\${BASH_SOURCE[0]:-$0}")" && pwd)"
 APPS="${F360_APPS_DIR:-$HOME/.local/share/applications/fusion360-linux}"
 mkdir -p "$APPS"
 

@@ -3,7 +3,7 @@
 # Removes Proton prefix, config, desktop files, icons, and bridge temp files.
 # Does NOT remove GE-Proton from compatibilitytools.d (other apps may use it).
 
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -euo
 
 # ── Root guard ─────────────────────────────────────────────────────────
 if [[ $EUID -eq 0 ]]; then
@@ -18,7 +18,8 @@ fi
 : "${HOME:?HOME must be set to run uninstall}"
 
 # Resolve script directory and source color/path constants
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_this_file="${BASH_SOURCE[0]:-$0}"
+SCRIPT_DIR="$(cd "$(dirname "$_this_file")" && pwd)"
 source "$SCRIPT_DIR/share/colors.fn"
 source "$SCRIPT_DIR/share/paths.fn"
 source "$SCRIPT_DIR/share/desktop.fn"

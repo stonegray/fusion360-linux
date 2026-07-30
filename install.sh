@@ -12,7 +12,7 @@
 #   ./install.sh --kill                                  # kill all Fusion/Wine/Proton processes
 #   ./install.sh --installer-path /path/to/downloader.exe  # step 5 with local file
 
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -euo
 
 if [[ $EUID -eq 0 ]]; then
   cat >&2 <<EOF
@@ -22,7 +22,8 @@ EOF
   exit 1
 fi
 LOCK_DIR="$(mktemp -d -t fusion360-install.XXXX)"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_this_file="${BASH_SOURCE[0]:-$0}"
+SCRIPT_DIR="$(cd "$(dirname "$_this_file")" && pwd)"
 if [[ "${1:-}" == "--kill" ]]; then
   source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
   kill_fusion_processes

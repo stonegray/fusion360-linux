@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # fusion-browser-listener.sh: Fusion 360 browser bridge Linux-side listener.
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -euo
 
 # Load share/ modules for path/interval constants
-_share_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../share" 2>/dev/null && pwd)" || true
+_share_dir="$(cd "$(dirname "\${BASH_SOURCE[0]:-$0}")/../share" 2>/dev/null && pwd)" || true
 if [[ -z "$_share_dir" ]]; then
-  _share_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../share" 2>/dev/null && pwd)" || true
+  _share_dir="$(cd "$(dirname "\${BASH_SOURCE[0]:-$0}")/../../share" 2>/dev/null && pwd)" || true
 fi
 unset _share_dir
 

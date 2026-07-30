@@ -1,8 +1,8 @@
 # ── Load share/ modules ──────────────────────────────────────
 # Resolve share/ directory relative to this file's location
-_share_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../share" 2>/dev/null && pwd)" || true
+_share_dir="$(cd "$(dirname "\${BASH_SOURCE[0]:-$0}")/../share" 2>/dev/null && pwd)" || true
 if [[ -z "$_share_dir" ]]; then
-  _share_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../share" 2>/dev/null && pwd)" || true
+  _share_dir="$(cd "$(dirname "\${BASH_SOURCE[0]:-$0}")/../../share" 2>/dev/null && pwd)" || true
 fi
 if [[ -d "$_share_dir" ]]; then
   source "$_share_dir/load.sh"
@@ -48,7 +48,7 @@ configure_with_file_browsers() {
   FUSION_USE_INTEL_VK_ICD="$FUSION_USE_INTEL_VK_ICD" \
   FUSION_ENABLE_OVERLAY_KILLER="$FUSION_ENABLE_OVERLAY_KILLER" \
   FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="$FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT" \
-  python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/launcher-config-user-interface.py" "$CONFIG_FILE" "$user_interface_mode"
+  python3 "$(cd "$(dirname "\${BASH_SOURCE[0]:-$0}")" && pwd)/launcher-config-user-interface.py" "$CONFIG_FILE" "$user_interface_mode"
 
   local config_user_interface_status=$?
   [[ $config_user_interface_status -eq 0 ]] || return "$config_user_interface_status"

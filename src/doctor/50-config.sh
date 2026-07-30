@@ -25,7 +25,7 @@ if [[ -f "$CONFIG_FILE" ]]; then
     fi
   done
   for var_name in BROWSER_LISTENER CALLBACK_HANDLER FUSION_OVERLAY_KILLER; do
-    val="${!var_name:-}"
+    val=$(eval "printf '%s' \"\${$var_name:-}\"" 2>/dev/null)
     if [[ -z "$val" ]]; then
       warn "$var_name is not set in config"
     elif [[ -x "$val" ]]; then

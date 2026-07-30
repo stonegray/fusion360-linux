@@ -3,7 +3,7 @@
 
 # Load share/ modules (path resolution: this file is at src/doctor/,
 # share/ is at the repo root)
-_share_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../share" 2>/dev/null && pwd)" || true
+_share_dir="$(cd "$(dirname "\${BASH_SOURCE[0]:-$0}")/../../share" 2>/dev/null && pwd)" || true
 if [[ -d "$_share_dir" ]]; then
   source "$_share_dir/load.sh"
 fi

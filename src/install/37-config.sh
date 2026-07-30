@@ -41,7 +41,7 @@ declare -a CONFIG_VALS=(
 
 if [[ -f "$CONFIG_FILE" ]]; then
   local wrote=0
-  for i in "${!CONFIG_KEYS[@]}"; do
+  for ((i = 0; i < ${#CONFIG_KEYS[@]}; i++)); do
     if ! grep -q "^${CONFIG_KEYS[$i]}=" "$CONFIG_FILE" 2>/dev/null; then
       printf '%s=%s\n' "${CONFIG_KEYS[$i]}" "$(config_quote "${CONFIG_VALS[$i]}")" >> "$CONFIG_FILE"
       log_info "  added missing ${CONFIG_KEYS[$i]}"
@@ -56,7 +56,7 @@ if [[ -f "$CONFIG_FILE" ]]; then
 fi
 
 mkdir -p "$CONFIG_DIR"
-for i in "${!CONFIG_KEYS[@]}"; do
+for ((i = 0; i < ${#CONFIG_KEYS[@]}; i++)); do
   printf '%s=%s\n' "${CONFIG_KEYS[$i]}" "$(config_quote "${CONFIG_VALS[$i]}")"
 done > "$CONFIG_FILE"
 chmod 600 "$CONFIG_FILE"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # fusion-callback-handler.sh: Fusion 360 Autodesk callback request writer.
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -euo
 
 CALLBACK_DIR="${BRIDGE_CALLBACK_REQUEST_DIR:-/tmp/fusion360-callback-requests}"
 LOG_FILE="${CALLBACK_HANDLER_LOG:-/tmp/fusion-callback-handler.log}"
