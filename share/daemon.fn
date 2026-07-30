@@ -24,6 +24,37 @@ BRIDGE_LISTENER_PID=""
 OVERLAY_KILLER_PID=""
 TOOLWINDOW_FIXER_PID=""
 
+# ── PID file helpers ──────────────────────────────────────────────────
+
+# Write a PID file at $FUSION_PID_DIR/<name>.pid
+daemon_write_pid() {
+  local name="${1:?daemon_write_pid: missing name}"
+  mkdir -p "$FUSION_PID_DIR"
+  printf "%s\n" "$2" > "$FUSION_PID_DIR/$name.pid"
+}
+
+# Check if a daemon is already running via its PID file.
+# Returns 0 (running) or 1 (not running).
+daemon_check_running() {
+  local name="${1:?daemon_check_running: missing name}"
+  local pid_file="$FUSION_PID_DIR/$name.pid"
+  [[ -f "$pid_file" ]] || return 1
+  local pid
+  pid="$(cat "$pid_file" 2>/dev/null || echo '')"
+  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
+}
+
+# Remove PID file for a daemon
+daemon_remove_pid() {
+  local name="${1:?daemon_remove_pid: missing name}"
+  rm -f "$FUSION_PID_DIR/$name.pid"
+}
+
+# Clean up all PID files on exit
+daemon_cleanup_all_pids() {
+  rm -rf "$FUSION_PID_DIR" 2>/dev/null || true
+}
+
 # ── Browser bridge listener ────────────────────────────────────────────
 # Start the browser bridge listener in background (nohup).
 # Clears stale bridge temp files first, then launches the listener.
