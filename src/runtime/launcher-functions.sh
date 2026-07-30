@@ -163,12 +163,7 @@ apply_launch_environment() {
       echo "launch-fusion.sh warning: Intel Vulkan ICD flag is enabled, but no Intel ICD file was found." >&2
     fi
   fi
-  # BROWSER intentionally NOT exported — Wine uses winebrowser.exe for URL
-  # opening. Exporting BROWSER causes Wine to spawn fusion-browser.sh via
-  # fork+exec, which inherits Proton's seccomp filter and crashes with
-  # SIGSYS (the dynamic linker's __brk is blocked). winebrowser.exe calls
-  # xdg-open through Wine's internal interface, bypassing fork+exec.
-  # export BROWSER
+  export BROWSER
   export BROWSER_LISTENER
   export CALLBACK_HANDLER
   export CHROME
