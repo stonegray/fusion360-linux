@@ -48,24 +48,11 @@ esac
 
 
 # Kill any running Fusion/Wine processes before removing files.
-# Use the nuclear kill from launcher-functions.sh if available.
 echo "  Stopping Fusion 360 processes..."
-if [[ -f "$HOME/.local/share/fusion360-linux/runtime-scripts/launcher-functions.sh" ]]; then
-  source "$HOME/.local/share/fusion360-linux/runtime-scripts/launcher-functions.sh"
-  kill_fusion_processes
-else
-  # Fallback: broad process kill
-  patterns=( wineserver wine proton Fusion360 FusionClientDownloader \
-    AdskIdentity adexmtsv steam.exe fusion-gray-overlay )
-  for pattern in "${patterns[@]}"; do
-    pkill -u "$(id -u)" -f "$pattern" 2>/dev/null || true
-  done
-  sleep 2
-  for pattern in "${patterns[@]}"; do
-    pkill -9 -u "$(id -u)" -f "$pattern" 2>/dev/null || true
-  done
-  echo "    Fusion/Wine processes killed."
-fi
+source "$SCRIPT_DIR/share/log.fn"
+source "$SCRIPT_DIR/share/process.fn"
+kill_fusion_processes || true
+echo "    Fusion/Wine processes killed."
 echo ""
 echo "Removing..."
 
