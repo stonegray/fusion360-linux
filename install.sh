@@ -29,9 +29,7 @@ if [[ "${1:-}" == "--kill" ]]; then
   kill_fusion_processes
   exit 0
 fi
-# Lock directory created by mktemp above — unique per run, no collision possible
-echo "Lock acquired: $LOCK_DIR"
-trap 'rm -rf "$LOCK_DIR"' EXIT INT TERM
+
 
 MODE="${1:-}"
 INSTALLER_PATH_OVERRIDE=""
@@ -43,8 +41,11 @@ if [[ "${1:-}" == "--installer-path" ]]; then
 fi
 
 source "$SCRIPT_DIR/src/install/00-common.sh"
-setup_traps
 
+
+# Trap — kill Fusion processes on Ctrl+C, clean up lock file on exit
+trap 'kill_fusion_processes 2>/dev/null || true; rm -rf "$LOCK_DIR" 2>/dev/null || true; exit 1' INT TERM
+trap 'rm -rf "$LOCK_DIR"' EXIT
 run_step() {
   source "$SCRIPT_DIR/src/install/$1"
 }
@@ -58,12 +59,10 @@ case "$MODE" in
     if [[ ! -f "$distro_file" ]]; then distro_file="$SCRIPT_DIR/src/install/distro/generic.txt"; fi
     PKGS=$(tr '\n' ' ' < "$distro_file" 2>/dev/null | sed 's/ *$//')
     run_step 10-deps.sh
-    clear_traps
     exit 0
     ;;
   --ge-proton-only)
     run_step 20-ge-proton.sh
-    clear_traps
     exit 0
     ;;
   --prefix-only)
@@ -82,13 +81,11 @@ case "$MODE" in
     exit 0
     ;;
   --uninstall)
-    clear_traps
     source "$SCRIPT_DIR/src/runtime/uninstall-select.sh"
     exit 0
     ;;
   --run-installer)
     run_step 40-fusion-installer.sh
-    clear_traps
     exit 0
     ;;
 esac
@@ -147,6 +144,5 @@ if [[ -x "$SCRIPT_DIR/src/doctor/doctor.sh" ]]; then
 fi
 echo ""
 
-clear_traps
 
 log_pass "Fusion 360 installation complete."

@@ -50,6 +50,41 @@ daemon_remove_pid() {
   rm -f "$FUSION_PID_DIR/$name.pid"
 }
 
+# ── Restart tracking — prevents runaway restart loops ──────────
+# Tracks restart count per daemon. Stops restarting if a daemon
+# has been restarted more than RESTART_MAX within RESTART_WINDOW seconds.
+RESTART_MAX=5
+RESTART_WINDOW=300  # 5 minutes
+
+# Check if a daemon is restarting too fast. Increments counter.
+# Returns 0 (ok to restart) or 1 (too many restarts, cool down).
+daemon_check_restart_ok() {
+  local name="${1:?daemon_check_restart_ok: missing name}"
+  mkdir -p "$FUSION_PID_DIR"
+  local counter_file="$FUSION_PID_DIR/$name.restart"
+  local now; now=$(date +%s)
+  local count=0
+  local first_seen="$now"
+  if [[ -f "$counter_file" ]]; then
+    read -r first_seen count < "$counter_file" 2>/dev/null || true
+    first_seen="${first_seen:-$now}"
+    count="${count:-0}"
+  fi
+  # Reset window if expired
+  if (( now - first_seen > RESTART_WINDOW )); then
+    first_seen="$now"
+    count=1
+  else
+    count=$((count + 1))
+  fi
+  printf "%s %s\n" "$first_seen" "$count" > "$counter_file"
+  if (( count > RESTART_MAX )); then
+    log_error "Daemon $name restarted ${count}x in $((now - first_seen))s — giving up"
+    return 1
+  fi
+  return 0
+}
+
 # Clean up all PID files on exit
 daemon_cleanup_all_pids() {
   rm -rf "$FUSION_PID_DIR" 2>/dev/null || true
