@@ -47,6 +47,9 @@ FUSION_OVERLAY_LOG_FILE="$FUSION_LOG_DIR/overlay-killer.log"
 FUSION_DOCTOR_REPORT_TEMPLATE="$FUSION_LOG_DIR/doctor-report-$(date +%Y%m%d-%H%M%S).txt"
 FUSION_TEMP_WILDCARD="$FUSION_LOG_DIR/temp/*"
 
+# Daemon PID files — transient, cleaned on boot
+FUSION_PID_DIR="/tmp/fusion360-pids"
+
 
 # Browser bridge directories
 BRIDGE_BROWSER_REQUEST_DIR="/tmp/fusion360-browser-requests"

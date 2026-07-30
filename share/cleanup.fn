@@ -25,12 +25,17 @@ clear_bridge_temp_files() {
 }
 
 # ── Main cleanup orchestrator ────────────────────────────────────────
-# Called on exit — kills tracked daemons and clears bridge temp files.
+# Called on exit — kills tracked daemons, clears PID files and bridge temp files.
 # If share/daemon.fn is loaded, uses stop_all_daemons() for PID tracking.
 cleanup() {
   # Kill daemons (if daemon module is loaded)
   if declare -F stop_all_daemons &>/dev/null; then
     stop_all_daemons
+  fi
+
+  # Remove PID file directory
+  if declare -F daemon_cleanup_all_pids &>/dev/null; then
+    daemon_cleanup_all_pids
   fi
 
   # Clear bridge temp files

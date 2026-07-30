@@ -24,16 +24,50 @@ BRIDGE_LISTENER_PID=""
 OVERLAY_KILLER_PID=""
 TOOLWINDOW_FIXER_PID=""
 
+# ── PID file helpers ──────────────────────────────────────────────────
+
+# Write a PID file at $FUSION_PID_DIR/<name>.pid
+daemon_write_pid() {
+  local name="${1:?daemon_write_pid: missing name}"
+  mkdir -p "$FUSION_PID_DIR"
+  printf "%s\n" "$2" > "$FUSION_PID_DIR/$name.pid"
+}
+
+# Check if a daemon is already running via its PID file.
+# Returns 0 (running) or 1 (not running).
+daemon_check_running() {
+  local name="${1:?daemon_check_running: missing name}"
+  local pid_file="$FUSION_PID_DIR/$name.pid"
+  [[ -f "$pid_file" ]] || return 1
+  local pid
+  pid="$(cat "$pid_file" 2>/dev/null || echo '')"
+  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
+}
+
+# Remove PID file for a daemon
+daemon_remove_pid() {
+  local name="${1:?daemon_remove_pid: missing name}"
+  rm -f "$FUSION_PID_DIR/$name.pid"
+}
+
+# Clean up all PID files on exit
+daemon_cleanup_all_pids() {
+  rm -rf "$FUSION_PID_DIR" 2>/dev/null || true
+}
+
 # ── Browser bridge listener ────────────────────────────────────────────
 # Start the browser bridge listener in background (nohup).
 # Clears stale bridge temp files first, then launches the listener.
 start_browser_listener() {
+  daemon_check_running "browser-listener" && { log_info "Browser listener already running"; return 0; }
   [[ -x "$BROWSER_LISTENER" ]] || { log_error "Browser listener not found or not executable: $BROWSER_LISTENER"; return 1; }
 
   clear_bridge_temp_files || true
 
-  "$BROWSER_LISTENER" &
-  BRIDGE_LISTENER_PID="$!"
+  (nohup setsid "$BROWSER_LISTENER" &) &>/dev/null
+  BRIDGE_LISTENER_PID=$!
+  disown 2>/dev/null || true
+  daemon_write_pid "browser-listener" "$BRIDGE_LISTENER_PID"
   log_info "Browser listener started (PID $BRIDGE_LISTENER_PID)"
 }
 
@@ -43,15 +77,18 @@ start_browser_listener() {
 # as env vars to the child process.
 start_overlay_killer() {
   _is_enabled "$FUSION_ENABLE_OVERLAY_KILLER" || return 0
+  daemon_check_running "overlay-killer" && { log_info "Overlay killer already running"; return 0; }
 
   if [[ ! -x "$FUSION_OVERLAY_KILLER" ]]; then
     log_warn "Overlay killer is enabled but not executable: $FUSION_OVERLAY_KILLER"
     return 0
   fi
 
-  FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="$FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT" \
-    "$FUSION_OVERLAY_KILLER" &
-  OVERLAY_KILLER_PID="$!"
+  (nohup setsid env FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="$FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT" \
+    "$FUSION_OVERLAY_KILLER" &) &>/dev/null
+  OVERLAY_KILLER_PID=$!
+  disown 2>/dev/null || true
+  daemon_write_pid "overlay-killer" "$OVERLAY_KILLER_PID"
   log_info "Overlay killer started (PID $OVERLAY_KILLER_PID)"
 }
 
@@ -61,6 +98,7 @@ start_overlay_killer() {
 # of override-redirect.  Fixes the "always on top" z-order bug.
 start_toolwindow_fixer() {
   _is_enabled "$FUSION_ENABLE_TOOLWINDOW_FIXER" || return 0
+  daemon_check_running "toolwindow-fixer" && { log_info "Toolwindow fixer already running"; return 0; }
 
   if [[ ! -x "$FUSION_TOOLWINDOW_FIXER" ]]; then
     log_warn "Toolwindow fixer is enabled but not executable: $FUSION_TOOLWINDOW_FIXER"
@@ -79,9 +117,11 @@ start_toolwindow_fixer() {
     return 0
   fi
 
-  WINEPREFIX="${STEAM_COMPAT_DATA_PATH:-${PFX_DIR:-$HOME/.fusion360-proton2}}/pfx" \
-    "$wine_bin" "$FUSION_TOOLWINDOW_FIXER" &
-  TOOLWINDOW_FIXER_PID="$!"
+  (nohup setsid env WINEPREFIX="${STEAM_COMPAT_DATA_PATH:-${PFX_DIR:-$HOME/.fusion360-proton2}}/pfx" \
+    "$wine_bin" "$FUSION_TOOLWINDOW_FIXER" &) &>/dev/null
+  TOOLWINDOW_FIXER_PID=$!
+  disown 2>/dev/null || true
+  daemon_write_pid "toolwindow-fixer" "$TOOLWINDOW_FIXER_PID"
   log_info "Toolwindow fixer started (PID $TOOLWINDOW_FIXER_PID)"
 }
 
@@ -93,6 +133,7 @@ stop_all_daemons() {
       wait "$OVERLAY_KILLER_PID" 2>/dev/null || true
     fi
     OVERLAY_KILLER_PID=""
+    daemon_remove_pid "overlay-killer"
   fi
 
   if [[ -n "$BRIDGE_LISTENER_PID" ]]; then
@@ -101,6 +142,7 @@ stop_all_daemons() {
       wait "$BRIDGE_LISTENER_PID" 2>/dev/null || true
     fi
     BRIDGE_LISTENER_PID=""
+    daemon_remove_pid "browser-listener"
   fi
 
   if [[ -n "$TOOLWINDOW_FIXER_PID" ]]; then
@@ -109,5 +151,30 @@ stop_all_daemons() {
       wait "$TOOLWINDOW_FIXER_PID" 2>/dev/null || true
     fi
     TOOLWINDOW_FIXER_PID=""
+    daemon_remove_pid "toolwindow-fixer"
   fi
+}
+
+# ── Health check — auto-restart dead daemons ─────────────────────────
+# Check tracked daemons and restart any that have died.
+# Called periodically from the launcher or a cron-style loop.
+# Returns the number of daemons that were restarted (0-3).
+daemon_health_check() {
+  local changes=0
+  if ! daemon_check_running "browser-listener" && [[ -x "$BROWSER_LISTENER" ]]; then
+    log_warn "Browser listener died — restarting"
+    start_browser_listener
+    changes=1
+  fi
+  if ! daemon_check_running "overlay-killer" && [[ -x "$FUSION_OVERLAY_KILLER" ]]; then
+    log_warn "Overlay killer died — restarting"
+    start_overlay_killer
+    changes=1
+  fi
+  if ! daemon_check_running "toolwindow-fixer" && [[ -x "$FUSION_TOOLWINDOW_FIXER" ]]; then
+    log_warn "Toolwindow fixer died — restarting"
+    start_toolwindow_fixer
+    changes=1
+  fi
+  return "$changes"
 }
