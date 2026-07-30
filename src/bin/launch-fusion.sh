@@ -164,6 +164,12 @@ while true; do
   daemon_health_check || true
 done &>/dev/null &
 disown 2>/dev/null || true
+
+# ── Check if Fusion is already running ──────────────────────────
+if pgrep -u "$(id -u)" -f Fusion360.exe &>/dev/null; then
+  echo "launch-fusion.sh: Fusion 360 is already running. Running two instances is unsupported." >&2
+  exit 0
+fi
 if (( ${#FUSION_ARGS[@]} > 0 )); then
   "$PROTON" run "$FUSION_EXE" "${FUSION_ARGS[@]}"
 else
@@ -171,5 +177,12 @@ else
 fi
 fusion_status=$?
 
-[[ $fusion_status -eq 0 ]] || fail "Fusion exited or crashed with status $fusion_status"
+if [[ $fusion_status -ne 0 ]]; then
+  # Check if Fusion exited because another instance is running
+  if pgrep -u "$(id -u)" -f Fusion360.exe &>/dev/null; then
+    echo "launch-fusion.sh: Fusion 360 is already running (another instance detected after launch)." >&2
+    exit 0
+  fi
+  fail "Fusion exited or crashed with status $fusion_status"
+fi
 exit 0
