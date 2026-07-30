@@ -20,7 +20,7 @@ _check_space() {
 _check_space "/tmp" 2500 "/tmp (download + extraction)" || return 1 2>/dev/null || true
 _check_space "$COMPAT_DIR" 2000 "$COMPAT_DIR (extraction target)" || return 1 2>/dev/null || true
 
-tarball="/tmp/${GE_PROTON_VERSION}.tar.gz"
+local tarball; tarball="$(mktemp -t fusion360-ge-proton.XXXX).tar.gz"
 if [[ ! -f "$tarball" ]]; then
   log_info " Downloading ${GE_PROTON_VERSION} (~500MB)..."
   wget --timeout=30 -c -O "$tarball" "$GE_PROTON_URL"
