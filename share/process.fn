@@ -53,6 +53,21 @@ kill_fusion_processes() {
     return 0
   fi
 
+
+  # Method 3: kill the Wine server for our prefix — cleanly terminates all
+  # Wine processes in that prefix (most thorough single-action shutdown).
+  if [[ -n "${PFX_DIR:-}" ]]; then
+    local ws="$PFX_DIR/pfx/.wineserver.lock"
+    if [[ -f "$ws" ]]; then
+      local ws_pid
+      ws_pid=$(head -1 "$ws" 2>/dev/null || true)
+      if [[ -n "$ws_pid" ]]; then
+        kill "$ws_pid" 2>/dev/null || true
+        log_info "   Killed wineserver PID $ws_pid for prefix $PFX_DIR"
+        sleep 0.5
+      fi
+    fi
+  fi
   log_info " Killing ${#unique[@]} Wine/Proton process(es)..."
 
   # Graceful TERM first
@@ -67,9 +82,7 @@ kill_fusion_processes() {
     kill -9 "$pid" 2>/dev/null || true
   done
 
-  sleep "$KILL_VERIFY_WAIT"
-
-  # Verify
+  # Verify — check for actual survivors (skip zombies)
   local survivors=0
   for proc in /proc/[0-9]*/exe; do
     exe=$(readlink "$proc" 2>/dev/null || true)
@@ -77,7 +90,13 @@ kill_fusion_processes() {
     if [[ "$exe" == *wine* ]] || [[ "$exe" == *proton* ]]; then
       pid=${proc%/exe}
       pid=${pid#/proc/}
-      log_info "   SURVIVED: PID $pid ($exe)"
+      local state
+      state=$(cat "/proc/$pid/status" 2>/dev/null | grep '^State:' | awk '{print $2}' || true)
+      if [[ "$state" == "Z" ]]; then
+        log_info "   ZOMBIE: PID $pid ($exe) — already dead, waiting for parent to reap"
+        continue
+      fi
+      log_info "   SURVIVED: PID $pid ($exe) state=$state"
       survivors=$((survivors + 1))
     fi
   done
