@@ -10,7 +10,7 @@
 #   WINE_BROWSER_REGISTER_LOG
 #   BRIDGE_BROWSER_REQUEST_DIR, BRIDGE_BROWSER_PROCESSED_DIR
 #   BRIDGE_CALLBACK_REQUEST_DIR, BRIDGE_CALLBACK_PROCESSED_DIR
-#
+#   FUSION_DOCTOR_REPORT_TEMPLATE, FUSION_TEMP_WILDCARD
 # Safe under set -e.
 
 : "${HOME:?HOME is not set — aborting}"
@@ -36,14 +36,16 @@ FUSION_BIN_DIR="$XDG_BIN_HOME"
 COMPAT_DIR="$HOME/.local/share/Steam/compatibilitytools.d"
 PFX_DIR="$HOME/.fusion360-proton2"
 
-# Log file locations
-FUSION_LOG_DIR="$PFX_DIR/pfx/drive_c/users/steamuser/AppData/Local/Autodesk"
-FUSION_DPI_LOG_FILE="/tmp/fusion360-dpi.log"
-BRIDGE_BROWSER_LOG="/tmp/fusion-browser-bridge.log"
-CALLBACK_HANDLER_LOG="/tmp/fusion-callback-handler.log"
-BRIDGE_LISTENER_LOG="/tmp/fusion-browser-listener.log"
-WINE_BROWSER_REGISTER_LOG="/tmp/fusion360-winebrowser-register.log"
-FUSION_OVERLAY_LOG_FILE="/tmp/fusion360-gray-overlay-event-killer.log"
+# Log files directory (under XDG cache for persistent logs)
+FUSION_LOG_DIR="$FUSION_CACHE_DIR"
+FUSION_DPI_LOG_FILE="$FUSION_LOG_DIR/dpi.log"
+BRIDGE_BROWSER_LOG="$FUSION_LOG_DIR/browser-bridge.log"
+CALLBACK_HANDLER_LOG="$FUSION_LOG_DIR/callback-handler.log"
+BRIDGE_LISTENER_LOG="$FUSION_LOG_DIR/browser-listener.log"
+WINE_BROWSER_REGISTER_LOG="$FUSION_LOG_DIR/winebrowser-register.log"
+FUSION_OVERLAY_LOG_FILE="$FUSION_LOG_DIR/overlay-killer.log"
+FUSION_DOCTOR_REPORT_TEMPLATE="$FUSION_LOG_DIR/doctor-report-$(date +%Y%m%d-%H%M%S).txt"
+FUSION_TEMP_WILDCARD="$FUSION_LOG_DIR/temp/*"
 
 
 # Browser bridge directories
@@ -51,3 +53,6 @@ BRIDGE_BROWSER_REQUEST_DIR="/tmp/fusion360-browser-requests"
 BRIDGE_BROWSER_PROCESSED_DIR="/tmp/fusion360-browser-processed"
 BRIDGE_CALLBACK_REQUEST_DIR="/tmp/fusion360-callback-requests"
 BRIDGE_CALLBACK_PROCESSED_DIR="/tmp/fusion360-callback-processed"
+
+# mktemp-based temporary directory — created at source time, cleaned up by traps.fn
+FUSION_TEMP_DIR="${FUSION_TEMP_DIR:-$(mktemp -d -t fusion360.XXXX)}"

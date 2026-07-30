@@ -3,7 +3,7 @@
 set -euo pipefail
 
 CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux/config"
-REPORT_FILE="${1:-/tmp/fusion-prefix-audit.txt}"
+REPORT_FILE="${1:-$(mktemp -t fusion360-prefix-audit.XXXX).txt}"
 
 if [[ -f "$CONFIG_FILE" ]]; then
   source "$CONFIG_FILE"

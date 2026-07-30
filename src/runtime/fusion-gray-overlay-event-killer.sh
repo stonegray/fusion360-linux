@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Load share/ modules for interval constants
+_share_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../share" 2>/dev/null && pwd)" || true
+if [[ -d "$_share_dir" ]]; then
+  source "$_share_dir/load.sh"
+fi
+unset _share_dir
 # fusion-gray-overlay-event-killer-parent-exit.sh:
 # Event-driven closer for Fusion 360's broken Wine grey modal overlay.
 #
@@ -177,6 +184,6 @@ else
 fi
 
 "${XPROP_COMMAND[@]}" 2>/dev/null | while IFS= read -r _event_line; do
-  sleep 0.05
+  sleep "$OVERLAY_KILLER_POLL_INTERVAL"
   close_gray_overlays
 done

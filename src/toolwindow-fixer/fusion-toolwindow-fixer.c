@@ -29,6 +29,8 @@
 /* Constants                                                          */
 /* ------------------------------------------------------------------ */
 #define IDLE_SLEEP_MS     5000   /* pause between scans (ms)          */
+/* FIXME: Read from FUSION_LOG_DIR env var at runtime for consistency with  */
+/* the rest of the stack. Currently hardcoded — Wine translates Unix paths. */
 #define LOG_FILE          L"/tmp/fusion-toolwindow-fixer.log"
 
 /* ------------------------------------------------------------------ */

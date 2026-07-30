@@ -1,6 +1,6 @@
 # share/traps.fn — Signal trap management
 #
-# Exports: setup_traps(), clear_traps()
+# Exports: setup_traps(), clear_traps(), cleanup_temp_files()
 #
 # Safe under set -e.
 
@@ -13,4 +13,9 @@ setup_traps() {
 # Remove signal traps
 clear_traps() {
 trap - EXIT INT TERM
+}
+
+# Remove mktemp-allocated temporary directories
+cleanup_temp_files() {
+  [[ -n "${FUSION_TEMP_DIR:-}" ]] && rm -rf "$FUSION_TEMP_DIR" || true
 }

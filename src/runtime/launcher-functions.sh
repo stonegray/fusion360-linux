@@ -154,13 +154,7 @@ apply_launch_environment() {
     fi
   fi
 
-  # NOT exporting BROWSER — it would cause Wine/Proton to spawn
-  # fusion-browser.sh as a child process that inherits seccomp,
-  # killing bash before it starts (SIGSYS on __brk in ld-linux).
-  # Wine uses winebrowser.exe -> xdg-open by default for URLs,
-  # and the callback protocol handler (adskidmgr://) continues to
-  # work through fusion-callback-handler.sh independently.
-  # export BROWSER
+  export BROWSER="${BROWSER:-xdg-open}"
   export BROWSER_LISTENER
   export CALLBACK_HANDLER
   export CHROME
