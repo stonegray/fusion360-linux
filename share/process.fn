@@ -18,7 +18,7 @@ kill_fusion_processes() {
 
   # Method 1: pgrep by cmdline patterns
   local pattern
-  for pattern in wineserver wine proton steam steam-runtime xalia streamer \
+  for pattern in wineserver wine proton steam-runtime xalia streamer \
     Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
     steam.exe node.exe fusion-gray-overlay; do
     while IFS= read -r pid; do
@@ -142,7 +142,7 @@ installer_is_running() {
 list_fusion_processes() {
   local user; user=$(id -u)
   local pattern
-  for pattern in wineserver wine proton steam steam-runtime xalia streamer \
+  for pattern in wineserver wine proton steam-runtime xalia streamer \
     Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
     steam.exe node.exe fusion-gray-overlay; do
     pgrep -u "$user" -af "$pattern" 2>/dev/null || true
