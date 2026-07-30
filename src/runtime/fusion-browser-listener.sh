@@ -2,6 +2,13 @@
 # fusion-browser-listener.sh: Fusion 360 browser bridge Linux-side listener.
 set -euo pipefail
 
+# Load share/ modules for path/interval constants
+_share_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../share" 2>/dev/null && pwd)" || true
+if [[ -d "$_share_dir" ]]; then
+  source "$_share_dir/load.sh"
+fi
+unset _share_dir
+
 CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux/config"
 
 BROWSER_REQUEST_DIR="${BRIDGE_BROWSER_REQUEST_DIR:-/tmp/fusion360-browser-requests}"
@@ -77,7 +84,7 @@ _try_open() {
   env -i $(_browser_env) "$bin" "$url" >> "$LOG_FILE" 2>&1 &
   local pid=$!
   disown 2>/dev/null || true
-  sleep 0.5
+  sleep "$LISTENER_BROWSER_CHECK_INTERVAL"
   if kill -0 "$pid" 2>/dev/null; then
     log_message "  $label OK (pid=$pid)"
     return 0
@@ -230,5 +237,5 @@ log_message "watching $CALLBACK_REQUEST_DIR"
 while true; do
   process_browser_requests
   process_callback_requests
-  sleep 0.2
+  sleep "$LISTENER_POLL_INTERVAL"
 done

@@ -3,6 +3,7 @@
 # Exports (set at source time):
 #   GE_PROTON_VERSION, GE_PROTON_URL, FUSION_BASE_URL, FUSION_CLIENT_ID
 #   MIN_DISK_SPACE_MB, WINE_BROWSER_REG_KEY
+#   All LISTENER_*, KILL_*, INSTALLER_*, OVERLAY_KILLER_*, PREFLIGHT_* intervals
 #   Plus all FUSION_* / PROTON_* / STEAM_* env var defaults
 #
 # Safe under set -e.
@@ -17,6 +18,17 @@ MIN_DISK_SPACE_MB=3000
 # ── Windows registry constants ─────────────────────────────────
 WINE_BROWSER_REG_KEY="HKCU\\Software\\Wine\\Browser"
 
+
+# ── Sleep / wait interval constants ────────────────────────────
+LISTENER_POLL_INTERVAL=0.2
+LISTENER_BROWSER_CHECK_INTERVAL=0.5
+KILL_ESCALATION_WAIT=2
+KILL_VERIFY_WAIT=1
+KILL_INSTALLER_WAIT=0.3
+INSTALLER_STARTUP_WAIT=3
+INSTALLER_TIMEOUT=10
+OVERLAY_KILLER_POLL_INTERVAL=0.05
+PREFLIGHT_WARN_WAIT=5
 # ── Env var defaults ───────────────────────────────────────────
 FUSION_WINE_DPI="${FUSION_WINE_DPI:-auto}"
 FUSION_WINE_SCALE_PERCENT="${FUSION_WINE_SCALE_PERCENT:-auto}"

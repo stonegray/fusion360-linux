@@ -95,7 +95,7 @@ PROTON_NO_SECCOMP=1 \
 "$proton" run "$INSTALLER_PATH" 2>/dev/null &
 INSTALLER_PID=$!
 
-sleep 3
+sleep "$INSTALLER_STARTUP_WAIT"
 if ! kill -0 "$INSTALLER_PID" 2>/dev/null; then
   log_fail " Fusion installer exited immediately."
   log_info " Possible causes:"
@@ -109,7 +109,7 @@ log_info " Attaching to installer PID $INSTALLER_PID..."
 
 MAX_WAIT=$((2 * 3600))
 while (( SECONDS < MAX_WAIT )); do
-  sleep 10
+  sleep "$INSTALLER_TIMEOUT"
   ELAPSED=$SECONDS
   if ! kill -0 "$INSTALLER_PID" 2>/dev/null; then
     if (( ELAPSED < 240 )); then

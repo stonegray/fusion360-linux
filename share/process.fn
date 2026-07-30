@@ -60,14 +60,14 @@ kill_fusion_processes() {
     kill "$pid" 2>/dev/null || true
   done
 
-  sleep 2
+  sleep "$KILL_ESCALATION_WAIT"
 
   # Hard KILL for survivors
   for pid in "${unique[@]}"; do
     kill -9 "$pid" 2>/dev/null || true
   done
 
-  sleep 1
+  sleep "$KILL_VERIFY_WAIT"
 
   # Verify
   local survivors=0
@@ -98,7 +98,7 @@ kill_installer() {
   # Kill tracked installer PID
   if [[ -n "${INSTALLER_PID:-}" ]] && kill -0 "$INSTALLER_PID" 2>/dev/null; then
     kill "$INSTALLER_PID" 2>/dev/null || true
-    sleep 0.3
+    sleep "$KILL_INSTALLER_WAIT"
     kill -9 "$INSTALLER_PID" 2>/dev/null || true
   fi
 
