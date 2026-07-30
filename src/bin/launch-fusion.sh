@@ -158,15 +158,12 @@ start_toolwindow_fixer
 
 # ── Background health monitor ─────────────────────────────────
 # Checks daemons every 30s and restarts any that died.
-(
-  while true; do
-    sleep 30
-    daemon_health_check || true
-  done &
-  HEALTH_MONITOR_PID=$!
-  disown 2>/dev/null || true
-) 2>/dev/null || true
-
+# Redirected to /dev/null so it never prints to terminal after exit.
+while true; do
+  sleep 30
+  daemon_health_check || true
+done &>/dev/null &
+disown 2>/dev/null || true
 if (( ${#FUSION_ARGS[@]} > 0 )); then
   "$PROTON" run "$FUSION_EXE" "${FUSION_ARGS[@]}"
 else
