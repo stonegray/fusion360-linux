@@ -1,6 +1,6 @@
 # src/install/99-uninstall.sh — Interactive selective uninstall
 # Sourced by install.sh --uninstall
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -euo
 : "${HOME:?HOME must be set to run selective uninstall}"
 
 echo "╔══════════════════════════════════════════════════════════════╗"

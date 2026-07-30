@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # runtime-scripts/health-check.sh — Quick health check before launching Fusion.
 # Exits 0 if everything looks good, 1 otherwise.
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -euo
 
 # Load share/ modules for PFX_DIR, find_proton(), etc.
 _share_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../share" 2>/dev/null && pwd)" || true

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # audit-fusion-prefix.sh: Read-only audit of the Fusion 360 Proton prefix.
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -euo
 
 CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux/config"
 REPORT_FILE="${1:-$(mktemp -t fusion360-prefix-audit.XXXX).txt}"

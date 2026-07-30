@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # launch-fusion.sh: Launch Fusion 360 through Proton with browser bridge support.
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -euo
 # ── Root guard ─────────────────────────────────────────────────────────
 if [[ $EUID -eq 0 ]]; then
   echo "ERROR: Do not run launch-fusion.sh as root. Run as a normal user." >&2

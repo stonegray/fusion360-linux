@@ -3,7 +3,7 @@
 # Removes Proton prefix, config, desktop files, icons, and bridge temp files.
 # Does NOT remove GE-Proton from compatibilitytools.d (other apps may use it).
 
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -euo
 
 # ── Root guard ─────────────────────────────────────────────────────────
 if [[ $EUID -eq 0 ]]; then

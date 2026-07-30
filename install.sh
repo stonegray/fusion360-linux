@@ -12,7 +12,7 @@
 #   ./install.sh --kill                                  # kill all Fusion/Wine/Proton processes
 #   ./install.sh --installer-path /path/to/downloader.exe  # step 5 with local file
 
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -euo
 
 if [[ $EUID -eq 0 ]]; then
   cat >&2 <<EOF

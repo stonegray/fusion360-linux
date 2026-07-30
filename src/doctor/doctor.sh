@@ -8,7 +8,7 @@
 #   ./doctor.sh --save       # save to /tmp/fusion360-doctor-<ts>.txt
 #   ./doctor.sh --quick      # condensed summary only
 
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -euo
 
 # ── Root guard ─────────────────────────────────────────────────────────
 if [[ $EUID -eq 0 ]]; then
