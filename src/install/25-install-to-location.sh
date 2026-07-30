@@ -11,6 +11,7 @@ mkdir -p "$F360_BIN_DIR"
 # Copy runtime scripts
 mkdir -p "$F360_DATA_DIR/runtime-scripts"
 cp -r "$SCRIPT_DIR/src/runtime/." "$F360_DATA_DIR/runtime-scripts/"
+cp -r "$SCRIPT_DIR/share" "$F360_DATA_DIR/"
 cp "$SCRIPT_DIR/src/bin/launch-fusion.sh" "$F360_DATA_DIR/"
 cp "$SCRIPT_DIR/src/doctor/doctor.sh" "$F360_DATA_DIR/"
 cp "$SCRIPT_DIR/Makefile" "$F360_DATA_DIR/" 2>/dev/null || true
