@@ -112,14 +112,25 @@ apply_launch_environment() {
     # causing slow UI panel rendering.  --use-angle=d3d11 forces the
     # D3D11 backend through ANGLE, which DXVK then translates to
     # Vulkan (same fast path as the 3D viewport).
+    #
+    # Wine compatibility flags:
+    # --disable-accelerated-2d-canvas  — 2D canvas on CPU, reduces D3D11 calls
+    # --disable-direct-composition    — avoid Wine's broken DirectComposition path
+    # --disable-features=VizDisplayCompositor — older compositor, fewer D3D11 draws
+    # --disable-gpu-vsync             — remove D3D11 VSync sync overhead
+    # --renderer-process-limit=2      — fewer D3D11 devices under DXVK
     webview_arguments+=("--ignore-gpu-blocklist")
     webview_arguments+=("--enable-gpu-rasterization")
     webview_arguments+=("--enable-zero-copy")
     webview_arguments+=("--use-angle=d3d11")
+    webview_arguments+=("--disable-accelerated-2d-canvas")
+    webview_arguments+=("--disable-direct-composition")
+    webview_arguments+=("--disable-features=VizDisplayCompositor")
+    webview_arguments+=("--disable-gpu-vsync")
+    webview_arguments+=("--renderer-process-limit=2")
   fi
   if is_enabled "$FUSION_WEBVIEW_DISABLE_GPU"; then
     webview_arguments+=("--disable-gpu")
-    webview_arguments+=("--disable-features=VizDisplayCompositor")
   fi
 
   if [[ ${#webview_arguments[@]} -gt 0 ]]; then
