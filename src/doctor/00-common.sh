@@ -19,7 +19,7 @@ parse_args() {
   SAVE="${1:-}"
   case "$SAVE" in
     --save)
-      REPORT_FILE="/tmp/fusion360-doctor-$(date +%Y%m%d-%H%M%S).txt"
+      REPORT_FILE="$FUSION_DOCTOR_REPORT_TEMPLATE"
       exec > >(tee "$REPORT_FILE") 2>&1 || exec > "$REPORT_FILE" 2>&1
       ;;
     --quick)
