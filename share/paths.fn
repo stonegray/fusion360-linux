@@ -51,3 +51,6 @@ BRIDGE_BROWSER_REQUEST_DIR="/tmp/fusion360-browser-requests"
 BRIDGE_BROWSER_PROCESSED_DIR="/tmp/fusion360-browser-processed"
 BRIDGE_CALLBACK_REQUEST_DIR="/tmp/fusion360-callback-requests"
 BRIDGE_CALLBACK_PROCESSED_DIR="/tmp/fusion360-callback-processed"
+
+# mktemp-based temporary directory — created at source time, cleaned up by traps.fn
+FUSION_TEMP_DIR="${FUSION_TEMP_DIR:-$(mktemp -d -t fusion360.XXXX)}"
