@@ -51,6 +51,7 @@ if [[ -f "$CONFIG_FILE" ]]; then
   if [[ $wrote -eq 0 ]]; then
     log_info "  already present, nothing to add"
   fi
+  chmod 600 "$CONFIG_FILE"
   return 0
 fi
 

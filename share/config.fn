@@ -66,13 +66,50 @@ config_set_defaults() {
   FUSION_DARK_MODE="${FUSION_DARK_MODE:-auto}"
 }
 
+# ── parse_config — Safe config parser (replaces `source`) ────
+# Reads KEY=VALUE lines, ignores comments (#) and blank lines.
+# Does NOT execute shell code — prevents injection via config file.
+# Supports:
+#   KEY=value        # simple values
+#   KEY="quoted"     # double-quoted values
+#   KEY='quoted'     # single-quoted values
+#   # comment        # ignored
+#   KEY=${OTHER:-default}  # NOT supported — logs a warning
+# Returns 0 on success, 1 if file not found.
+parse_config() {
+  local config_file="${1:?parse_config: missing config file path}"
+  [[ -f "$config_file" ]] || return 1
+  local line key val
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    # Strip leading/trailing whitespace
+    line="${line/#[[:space:]]/}"
+    line="${line/%[[:space:]]/}"
+    # Skip comments and blanks
+    case "$line" in ''|\#*) continue ;; esac
+    # Extract key (everything before first =)
+    key="${line%%=*}"
+    val="${line#*=}"
+    # Strip quotes from value
+    case "$val" in
+      \"*\") val="${val#\"}"; val="${val%\"}" ;;
+      \'*\') val="${val#\'}"; val="${val%\'}" ;;
+    esac
+    # Warn if value contains ${...} references (unsafe expansion)
+    if [[ "$val" == *'${'* ]]; then
+      log_warn "parse_config: '${key}' contains variable reference '${val}' — not supported, using literal"
+    fi
+    # Export the variable
+    export "$key=$val"
+  done < "$config_file"
+}
+
 # ── load_config — Source config file with defaults ────────────
 # Sources the config file if it exists, then fills in any missing
 # keys with sensible defaults.
 # Usage: load_config [config_file]
 load_config() {
   local config_file="${1:-${FUSION_CONFIG_FILE:-}}"
-  [[ -f "$config_file" ]] && source "$config_file" || true
+  parse_config "$config_file" || true
   config_set_defaults
 }
 
