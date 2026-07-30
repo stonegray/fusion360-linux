@@ -65,7 +65,7 @@ start_browser_listener() {
   clear_bridge_temp_files || true
 
   nohup setsid "$BROWSER_LISTENER" &>/dev/null &
-  disown 2>/dev/null || true
+  BRIDGE_LISTENER_PID=$!
   daemon_write_pid "browser-listener" "$BRIDGE_LISTENER_PID"
   log_info "Browser listener started (PID $BRIDGE_LISTENER_PID)"
 }
@@ -116,8 +116,8 @@ start_toolwindow_fixer() {
     return 0
   fi
 
-  (nohup setsid env WINEPREFIX="${STEAM_COMPAT_DATA_PATH:-${PFX_DIR:-$HOME/.fusion360-proton2}}/pfx" \
-    "$wine_bin" "$FUSION_TOOLWINDOW_FIXER" &) &>/dev/null
+  nohup setsid env WINEPREFIX="${STEAM_COMPAT_DATA_PATH:-${PFX_DIR:-$HOME/.fusion360-proton2}}/pfx" \
+    "$wine_bin" "$FUSION_TOOLWINDOW_FIXER" &>/dev/null &
   TOOLWINDOW_FIXER_PID=$!
   disown 2>/dev/null || true
   daemon_write_pid "toolwindow-fixer" "$TOOLWINDOW_FIXER_PID"
