@@ -10,7 +10,7 @@
 #   WINE_BROWSER_REGISTER_LOG
 #   BRIDGE_BROWSER_REQUEST_DIR, BRIDGE_BROWSER_PROCESSED_DIR
 #   BRIDGE_CALLBACK_REQUEST_DIR, BRIDGE_CALLBACK_PROCESSED_DIR
-#
+#   FUSION_DOCTOR_REPORT_TEMPLATE, FUSION_TEMP_WILDCARD
 # Safe under set -e.
 
 : "${HOME:?HOME is not set — aborting}"
@@ -44,6 +44,8 @@ CALLBACK_HANDLER_LOG="/tmp/fusion-callback-handler.log"
 BRIDGE_LISTENER_LOG="/tmp/fusion-browser-listener.log"
 WINE_BROWSER_REGISTER_LOG="/tmp/fusion360-winebrowser-register.log"
 FUSION_OVERLAY_LOG_FILE="/tmp/fusion360-gray-overlay-event-killer.log"
+FUSION_DOCTOR_REPORT_TEMPLATE="/tmp/fusion360-doctor-$(date +%Y%m%d-%H%M%S).txt"
+FUSION_TEMP_WILDCARD="/tmp/fusion360-*"
 
 
 # Browser bridge directories
