@@ -109,7 +109,7 @@ parse_config() {
 # Usage: load_config [config_file]
 load_config() {
   local config_file="${1:-${FUSION_CONFIG_FILE:-}}"
-  [[ -f "$config_file" ]] && source "$config_file" || true
+  parse_config "$config_file" || true
   config_set_defaults
 }
 
