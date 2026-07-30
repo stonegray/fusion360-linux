@@ -8,7 +8,7 @@ if [[ -d "$target" ]]; then
 return 0
 fi
 
-bootstrap="/tmp/MicrosoftEdgeWebview2Setup.exe"
+bootstrap="$(mktemp -t fusion360-webview2.XXXX).exe"
 if [[ ! -f "$bootstrap" ]]; then
   log_info " downloading..."
   wget -q -O "$bootstrap" "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
