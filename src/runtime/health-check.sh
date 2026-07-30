@@ -16,12 +16,12 @@ CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux"
 CONFIG_FILE="$CONFIG_DIR/config"
 
 all_ok=1
-
 check() {
+  local label="$1"; shift
   if "$@" &>/dev/null; then
-    echo "  [ok] $1"
+    echo "  [ok] $label"
   else
-    echo "  [!!] $1"
+    echo "  [!!] $label"
     all_ok=0
   fi
 }
@@ -33,7 +33,7 @@ check "Fusion360.exe found"     test -n "$(find "$PFX_DIR" -name Fusion360.exe -
 check "WebView2 installed"      test -d "$PFX_DIR/pfx/drive_c/Program Files (x86)/Microsoft/EdgeWebView"
 check "Config file exists"      test -f "$CONFIG_FILE"
 check "GE-Proton available"     test -n "$(find_proton "$COMPAT_DIR")"
-check "Callback handler"        test -f "$HOME/.local/share/applications/fusion360-callback-handler.desktop"
+check "Callback handler"        test -f "$HOME/.local/share/applications/fusion360-linux/fusion360-callback-handler.desktop"
 
 if (( all_ok )); then
   echo "All checks passed."
