@@ -133,6 +133,7 @@ stop_all_daemons() {
       wait "$OVERLAY_KILLER_PID" 2>/dev/null || true
     fi
     OVERLAY_KILLER_PID=""
+    daemon_remove_pid "overlay-killer"
   fi
 
   if [[ -n "$BRIDGE_LISTENER_PID" ]]; then
@@ -141,6 +142,7 @@ stop_all_daemons() {
       wait "$BRIDGE_LISTENER_PID" 2>/dev/null || true
     fi
     BRIDGE_LISTENER_PID=""
+    daemon_remove_pid "browser-listener"
   fi
 
   if [[ -n "$TOOLWINDOW_FIXER_PID" ]]; then
@@ -149,6 +151,7 @@ stop_all_daemons() {
       wait "$TOOLWINDOW_FIXER_PID" 2>/dev/null || true
     fi
     TOOLWINDOW_FIXER_PID=""
+    daemon_remove_pid "toolwindow-fixer"
   fi
 }
 
