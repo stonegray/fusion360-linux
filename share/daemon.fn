@@ -59,12 +59,15 @@ daemon_cleanup_all_pids() {
 # Start the browser bridge listener in background (nohup).
 # Clears stale bridge temp files first, then launches the listener.
 start_browser_listener() {
+  daemon_check_running "browser-listener" && { log_info "Browser listener already running"; return 0; }
   [[ -x "$BROWSER_LISTENER" ]] || { log_error "Browser listener not found or not executable: $BROWSER_LISTENER"; return 1; }
 
   clear_bridge_temp_files || true
 
-  "$BROWSER_LISTENER" &
-  BRIDGE_LISTENER_PID="$!"
+  (nohup setsid "$BROWSER_LISTENER" &) &>/dev/null
+  BRIDGE_LISTENER_PID=$!
+  disown 2>/dev/null || true
+  daemon_write_pid "browser-listener" "$BRIDGE_LISTENER_PID"
   log_info "Browser listener started (PID $BRIDGE_LISTENER_PID)"
 }
 
@@ -74,15 +77,18 @@ start_browser_listener() {
 # as env vars to the child process.
 start_overlay_killer() {
   _is_enabled "$FUSION_ENABLE_OVERLAY_KILLER" || return 0
+  daemon_check_running "overlay-killer" && { log_info "Overlay killer already running"; return 0; }
 
   if [[ ! -x "$FUSION_OVERLAY_KILLER" ]]; then
     log_warn "Overlay killer is enabled but not executable: $FUSION_OVERLAY_KILLER"
     return 0
   fi
 
-  FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="$FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT" \
-    "$FUSION_OVERLAY_KILLER" &
-  OVERLAY_KILLER_PID="$!"
+  (nohup setsid env FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="$FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT" \
+    "$FUSION_OVERLAY_KILLER" &) &>/dev/null
+  OVERLAY_KILLER_PID=$!
+  disown 2>/dev/null || true
+  daemon_write_pid "overlay-killer" "$OVERLAY_KILLER_PID"
   log_info "Overlay killer started (PID $OVERLAY_KILLER_PID)"
 }
 
@@ -92,6 +98,7 @@ start_overlay_killer() {
 # of override-redirect.  Fixes the "always on top" z-order bug.
 start_toolwindow_fixer() {
   _is_enabled "$FUSION_ENABLE_TOOLWINDOW_FIXER" || return 0
+  daemon_check_running "toolwindow-fixer" && { log_info "Toolwindow fixer already running"; return 0; }
 
   if [[ ! -x "$FUSION_TOOLWINDOW_FIXER" ]]; then
     log_warn "Toolwindow fixer is enabled but not executable: $FUSION_TOOLWINDOW_FIXER"
@@ -110,9 +117,11 @@ start_toolwindow_fixer() {
     return 0
   fi
 
-  WINEPREFIX="${STEAM_COMPAT_DATA_PATH:-${PFX_DIR:-$HOME/.fusion360-proton2}}/pfx" \
-    "$wine_bin" "$FUSION_TOOLWINDOW_FIXER" &
-  TOOLWINDOW_FIXER_PID="$!"
+  (nohup setsid env WINEPREFIX="${STEAM_COMPAT_DATA_PATH:-${PFX_DIR:-$HOME/.fusion360-proton2}}/pfx" \
+    "$wine_bin" "$FUSION_TOOLWINDOW_FIXER" &) &>/dev/null
+  TOOLWINDOW_FIXER_PID=$!
+  disown 2>/dev/null || true
+  daemon_write_pid "toolwindow-fixer" "$TOOLWINDOW_FIXER_PID"
   log_info "Toolwindow fixer started (PID $TOOLWINDOW_FIXER_PID)"
 }
 
