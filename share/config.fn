@@ -142,10 +142,11 @@ save_config() {
     )
     for key in "${keys[@]}"; do
       local val
-      val=$(printf "%q" "${!key}" 2>/dev/null || printf '%s' "${!key}")
+      eval "val=\"\${$key}\"" 2>/dev/null || val=""
+      val=$(printf "%q" "$val" 2>/dev/null || printf '%s' "$val")
       # bash 5.0+ printf %q outputs $'...' which older bash can't parse
       if [[ "$val" == \$* ]]; then
-        val=$(printf '%s' "${!key}" | sed "s/'/'\\\\''/g")
+        val=$(eval "printf '%s' \"\${$key}\"" 2>/dev/null | sed "s/'/'\\\\''/g")
         val="'$val'"
       fi
       printf '%s=%s\n' "$key" "$val"
@@ -172,7 +173,7 @@ config_validate_keys() {
     FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT
   )
   for key in "${keys[@]}"; do
-    if [[ -z "${!key:-}" ]]; then
+    if eval "test -z \"\${$key:-}\"" 2>/dev/null; then
       log_warn "Config key '$key' is missing or empty"
       missing=1
     fi

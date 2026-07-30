@@ -4,7 +4,7 @@ CONFIG_FILE="$F360_CONFIG_FILE"
 
 GE_PROTON=$(find_proton "$COMPAT_DIR")
 FUSION_EXE=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1 || true)
-local fusion_root=""
+fusion_root=""
 if [[ -n "$FUSION_EXE" ]]; then
   fusion_root="$(dirname "$(dirname "$FUSION_EXE")")"
 else
@@ -41,7 +41,7 @@ declare -a CONFIG_VALS=(
 
 if [[ -f "$CONFIG_FILE" ]]; then
   local wrote=0
-  for i in "${!CONFIG_KEYS[@]}"; do
+  for ((i = 0; i < ${#CONFIG_KEYS[@]}; i++)); do
     if ! grep -q "^${CONFIG_KEYS[$i]}=" "$CONFIG_FILE" 2>/dev/null; then
       printf '%s=%s\n' "${CONFIG_KEYS[$i]}" "$(config_quote "${CONFIG_VALS[$i]}")" >> "$CONFIG_FILE"
       log_info "  added missing ${CONFIG_KEYS[$i]}"
@@ -56,7 +56,7 @@ if [[ -f "$CONFIG_FILE" ]]; then
 fi
 
 mkdir -p "$CONFIG_DIR"
-for i in "${!CONFIG_KEYS[@]}"; do
+for ((i = 0; i < ${#CONFIG_KEYS[@]}; i++)); do
   printf '%s=%s\n' "${CONFIG_KEYS[$i]}" "$(config_quote "${CONFIG_VALS[$i]}")"
 done > "$CONFIG_FILE"
 chmod 600 "$CONFIG_FILE"
