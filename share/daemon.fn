@@ -151,3 +151,27 @@ stop_all_daemons() {
     TOOLWINDOW_FIXER_PID=""
   fi
 }
+
+# ── Health check — auto-restart dead daemons ─────────────────────────
+# Check tracked daemons and restart any that have died.
+# Called periodically from the launcher or a cron-style loop.
+# Returns the number of daemons that were restarted (0-3).
+daemon_health_check() {
+  local changes=0
+  if ! daemon_check_running "browser-listener" && [[ -x "$BROWSER_LISTENER" ]]; then
+    log_warn "Browser listener died — restarting"
+    start_browser_listener
+    changes=1
+  fi
+  if ! daemon_check_running "overlay-killer" && [[ -x "$FUSION_OVERLAY_KILLER" ]]; then
+    log_warn "Overlay killer died — restarting"
+    start_overlay_killer
+    changes=1
+  fi
+  if ! daemon_check_running "toolwindow-fixer" && [[ -x "$FUSION_TOOLWINDOW_FIXER" ]]; then
+    log_warn "Toolwindow fixer died — restarting"
+    start_toolwindow_fixer
+    changes=1
+  fi
+  return "$changes"
+}
