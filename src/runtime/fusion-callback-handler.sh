@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # fusion-callback-handler.sh: Fusion 360 Autodesk callback request writer.
-set -euo pipefail 2>/dev/null || set -euo
+set -euo pipefail
 
-CALLBACK_DIR="${BRIDGE_CALLBACK_REQUEST_DIR:-/tmp/fusion360-callback-requests}"
-LOG_FILE="${CALLBACK_HANDLER_LOG:-/tmp/fusion-callback-handler.log}"
+CALLBACK_DIR="/tmp/fusion360-callback-requests"
+LOG_FILE="/tmp/fusion-callback-handler.log"
 
 mkdir -p "$CALLBACK_DIR"
-chmod 0700 "$CALLBACK_DIR"
 
 {
   echo "============================================================"
@@ -27,11 +26,11 @@ chmod 0700 "$CALLBACK_DIR"
   done
 
   echo "--- env dump ---"
-  echo "KDE_SESSION_VERSION=${KDE_SESSION_VERSION:-}"
-  echo "WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}"
-  echo "DISPLAY=${DISPLAY:-}"
-  echo "XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-}"
-  echo "DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS:-}"
+  echo "KDE_SESSION_VERSION=$KDE_SESSION_VERSION"
+  echo "WAYLAND_DISPLAY=$WAYLAND_DISPLAY"
+  echo "DISPLAY=$DISPLAY"
+  echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR"
+  echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS"
   echo "============================================================"
   echo
 } >> "$LOG_FILE" 2>&1

@@ -1,35 +1,23 @@
 #!/usr/bin/env bash
 # fusion-browser-listener.sh: Fusion 360 browser bridge Linux-side listener.
-set -euo pipefail 2>/dev/null || set -euo
+set -euo pipefail
 
-# Load share/ modules for path/interval constants
-_share_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../share" 2>/dev/null && pwd)" || true
-if [[ -z "$_share_dir" ]]; then
-  _share_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../../share" 2>/dev/null && pwd)" || true
-fi
-if [[ -d "$_share_dir" ]]; then
-  source "$_share_dir/load.sh"
-fi
 CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux/config"
 
-BROWSER_REQUEST_DIR="${BRIDGE_BROWSER_REQUEST_DIR:-/tmp/fusion360-browser-requests}"
-BROWSER_PROCESSED_DIR="${BRIDGE_BROWSER_PROCESSED_DIR:-/tmp/fusion360-browser-processed}"
-CALLBACK_REQUEST_DIR="${BRIDGE_CALLBACK_REQUEST_DIR:-/tmp/fusion360-callback-requests}"
-CALLBACK_PROCESSED_DIR="${BRIDGE_CALLBACK_PROCESSED_DIR:-/tmp/fusion360-callback-processed}"
-LOG_FILE="${BRIDGE_LISTENER_LOG:-/tmp/fusion-browser-listener.log}"
+BROWSER_REQUEST_DIR="/tmp/fusion360-browser-requests"
+BROWSER_PROCESSED_DIR="/tmp/fusion360-browser-processed"
+CALLBACK_REQUEST_DIR="/tmp/fusion360-callback-requests"
+CALLBACK_PROCESSED_DIR="/tmp/fusion360-callback-processed"
+LOG_FILE="/tmp/fusion-browser-listener.log"
 
 if [[ -f "$CONFIG_FILE" ]]; then
   source "$CONFIG_FILE"
 fi
 
 mkdir -p "$BROWSER_REQUEST_DIR"
-chmod 0700 "$BROWSER_REQUEST_DIR"
 mkdir -p "$BROWSER_PROCESSED_DIR"
-chmod 0700 "$BROWSER_PROCESSED_DIR"
 mkdir -p "$CALLBACK_REQUEST_DIR"
-chmod 0700 "$CALLBACK_REQUEST_DIR"
 mkdir -p "$CALLBACK_PROCESSED_DIR"
-chmod 0700 "$CALLBACK_PROCESSED_DIR"
 
 log_message() {
   printf "%s\n" "$*" >> "$LOG_FILE"
@@ -85,7 +73,7 @@ _try_open() {
   env -i $(_browser_env) "$bin" "$url" >> "$LOG_FILE" 2>&1 &
   local pid=$!
   disown 2>/dev/null || true
-  sleep "$LISTENER_BROWSER_CHECK_INTERVAL"
+  sleep 0.5
   if kill -0 "$pid" 2>/dev/null; then
     log_message "  $label OK (pid=$pid)"
     return 0
@@ -113,25 +101,6 @@ open_browser_url() {
     echo "url_first300=${url:0:300}"
     echo "url_last300=${url: -300}"
   } >> "$LOG_FILE" 2>&1
-
-# Classify URL for debugging (auth vs callback vs other)
-{
-  case "$url" in
-    *authorize*|*logout*|*token*|*code=*)
-      echo "--- AUTH URL ---"
-      echo "source=browser-bridge"
-      echo "url_type=auth"
-      ;;
-    adskidmgr://*|adsk://*)
-      echo "--- CALLBACK URL ---"
-      echo "source=browser-bridge"
-      echo "url_type=callback"
-      ;;
-    *)
-      echo "url_type=other"
-      ;;
-  esac
-} >> "$LOG_FILE" 2>&1
 
   cd "$HOME" || { log_message "ERROR: cd $HOME failed"; mv "$request_file" "$processed_file"; return 1; }
 
@@ -257,5 +226,5 @@ log_message "watching $CALLBACK_REQUEST_DIR"
 while true; do
   process_browser_requests
   process_callback_requests
-  sleep "$LISTENER_POLL_INTERVAL"
+  sleep 0.2
 done
