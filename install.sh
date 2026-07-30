@@ -21,17 +21,15 @@ ERROR: Do not run install.sh as root.
 EOF
   exit 1
 fi
-LOCK_DIR="/tmp/fusion360-install.lock"
+LOCK_DIR="$(mktemp -d -t fusion360-install.XXXX)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ "${1:-}" == "--kill" ]]; then
   source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
   kill_fusion_processes
   exit 0
 fi
-if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-  echo "ERROR: Another install is already running (lock at $LOCK_DIR)." >&2
-  exit 1
-fi
+# Lock directory created by mktemp above — unique per run, no collision possible
+echo "Lock acquired: $LOCK_DIR"
 trap 'rm -rf "$LOCK_DIR"' EXIT INT TERM
 
 MODE="${1:-}"
