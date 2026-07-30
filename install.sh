@@ -52,6 +52,12 @@ run_step() {
 
 case "$MODE" in
   --deps-only)
+    log_info " Detecting operating system..."
+    local distro; distro="$(detect_distro)"
+    INSTALL_CMD="sudo $(distro_install_cmd "$distro")"
+    local distro_file="$SCRIPT_DIR/src/install/distro/${distro}.txt"
+    if [[ ! -f "$distro_file" ]]; then distro_file="$SCRIPT_DIR/src/install/distro/generic.txt"; fi
+    PKGS=$(tr '\n' ' ' < "$distro_file" 2>/dev/null | sed 's/ *$//')
     run_step 10-deps.sh
     clear_traps
     exit 0
@@ -62,6 +68,13 @@ case "$MODE" in
     exit 0
     ;;
   --prefix-only)
+    log_info " Detecting operating system..."
+    local distro; distro="$(detect_distro)"
+    INSTALL_CMD="sudo $(distro_install_cmd "$distro")"
+    local distro_file="$SCRIPT_DIR/src/install/distro/${distro}.txt"
+    if [[ ! -f "$distro_file" ]]; then distro_file="$SCRIPT_DIR/src/install/distro/generic.txt"; fi
+    PKGS=$(tr '\n' ' ' < "$distro_file" 2>/dev/null | sed 's/ *$//')
+    log_info " Distro: $distro -- using: $INSTALL_CMD"
     pre_flight
     run_step 10-deps.sh
     run_step 20-ge-proton.sh
