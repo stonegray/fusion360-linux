@@ -113,6 +113,25 @@ open_browser_url() {
     echo "url_last300=${url: -300}"
   } >> "$LOG_FILE" 2>&1
 
+# Classify URL for debugging (auth vs callback vs other)
+{
+  case "$url" in
+    *authorize*|*logout*|*token*|*code=*)
+      echo "--- AUTH URL ---"
+      echo "source=browser-bridge"
+      echo "url_type=auth"
+      ;;
+    adskidmgr://*|adsk://*)
+      echo "--- CALLBACK URL ---"
+      echo "source=browser-bridge"
+      echo "url_type=callback"
+      ;;
+    *)
+      echo "url_type=other"
+      ;;
+  esac
+} >> "$LOG_FILE" 2>&1
+
   cd "$HOME" || { log_message "ERROR: cd $HOME failed"; mv "$request_file" "$processed_file"; return 1; }
 
   # Stratified fallback chain — each attempt must stay alive >0.5s
