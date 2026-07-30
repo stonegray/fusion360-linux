@@ -5,6 +5,10 @@
 
 log_info " Setting Windows build number in registry..."
 
+local proton
+proton="$(find_proton "$COMPAT_DIR")"
+[[ -n "$proton" ]] || { log_info " Proton not found — skipping Windows build number config."; return 0; }
+
 local wine_bin
 wine_bin="$(proton_wine_bin "$proton")"
 if [[ ! -x "$wine_bin" ]]; then
