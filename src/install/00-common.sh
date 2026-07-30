@@ -46,7 +46,7 @@ pre_flight() {
   if [[ $avail_gb -lt 15 ]]; then
     echo "WARNING: Only ${avail_gb}GB free on $HOME. Fusion needs ~10GB."
     echo "  Press Ctrl+C to abort, or wait 5s to continue..."
-    sleep 5
+    sleep "$PREFLIGHT_WARN_WAIT"
   fi
 }
 

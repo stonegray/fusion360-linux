@@ -40,7 +40,7 @@ add_comp() {
   fi
 }
 
-add_comp "Proton prefix (Fusion install)" "$HOME/.fusion360-proton2"
+add_comp "Proton prefix (Fusion install)" "$PFX_DIR"
 
 for g in "$HOME/.local/share/Steam/compatibilitytools.d"/GE-Proton*; do
   [[ -d "$g" ]] || continue
