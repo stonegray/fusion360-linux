@@ -36,7 +36,7 @@ if [[ "${1:-}" == "--kill" ]]; then
   # Broad kill by process patterns
   for pattern in fusion360 fusion Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
     fusion-browser fusion-gray-overlay fusion-toolwindow fusion-callback \
-    wineserver wine-preloader wine64 wine proton xalia streamer steam.exe node.exe; do
+    wineserver wine-preloader wine64 wine proton steam steam-runtime xalia streamer steam.exe node.exe; do
     pkill -9 -u "$(id -u)" -f "$pattern" 2>/dev/null || true
   done
   # Nuclear: kill every process with /proc/*/exe matching wine/proton
