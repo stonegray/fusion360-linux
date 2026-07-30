@@ -576,6 +576,8 @@ def write_config_values():
     with open(config_file, "w", encoding="utf-8") as config:
         for key in CONFIG_KEYS:
             config.write(f"{key}={shlex.quote(values.get(key, ''))}\n")
+    os.chmod(config_file, 0o600)
+
 
     saved_values.update(collect_display_values())
     update_all_dirty_indicators()
