@@ -4,9 +4,9 @@
 set -euo pipefail
 
 # Load share/ modules for PFX_DIR, find_proton(), etc.
-_share_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../share" 2>/dev/null && pwd)" || true
-if [[ -d "$_share_dir" ]]; then
-  source "$_share_dir/load.sh"
+_share_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../share" 2>/dev/null && pwd)" || true
+if [[ -z "$_share_dir" ]]; then
+  _share_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../share" 2>/dev/null && pwd)"
 fi
 unset _share_dir
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux"
