@@ -152,3 +152,35 @@ saturation, then Hang Detection → crash.
 `~/.config/fusion360-linux/config` to disable the z-order daemon.  The
 "always on top" panel bug returns, but no process leak.  Also ensure only one
 `launch-fusion.sh` is running before launching.
+
+---
+
+## Assistant scripts fail: `RuntimeError: 2 : InternalValidationError` on `SketchLines.addByTwoPoints`
+
+**Root cause:** A Fusion 360 API port bug (build 2704.1.36): the **Point2D**
+overload of `SketchLines.addByTwoPoints(start, end)` always fails on the
+first call with
+
+```
+RuntimeError: 2 : InternalValidationError :
+Xl::Fusion::SketchCurves::getAcGePoint3D(startPoint, acStartPoint, &pStartPoint)
+```
+
+Minimal repro (any valid 2D coords, e.g. a 1" square — fails on the first
+line, sketch created but 0 curves committed).  The **Point3D** overload of the
+same method works fine.
+
+**Fix (workaround):** In assistant/script code, convert `Point2D` → `Point3D`
+before calling `addByTwoPoints`:
+
+```python
+def p2d(x, y):
+    return adsk.core.Point3D.create(x, y, 0.0)
+
+lines.addByTwoPoints(p2d(0.0, 0.0), p2d(2.54, 0.0))
+```
+
+The unhandled script error can also destabilize the MCP/scripting thread
+(crash stack `nsmcp10`/`nafusion10`/`v8`) — see the ICU 77 entry above; keep
+`FUSION_FIX_ICU77=1` so the script-execution helpers don't abort on top of
+the API error.
