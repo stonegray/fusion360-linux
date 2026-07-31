@@ -157,21 +157,25 @@ saturation, then Hang Detection → crash.
 
 ## Assistant scripts fail: `RuntimeError: 2 : InternalValidationError` on `SketchLines.addByTwoPoints`
 
-**Root cause:** A Fusion 360 API port bug (build 2704.1.36): the **Point2D**
-overload of `SketchLines.addByTwoPoints(start, end)` always fails on the
-first call with
+**Root cause:** The script used the **legacy, undocumented Point2D overload**.
+`SketchLines.addByTwoPoints(start, end)` (see the docstring in the bundled
+`adsk/fusion.py`) documents **SketchPoint or Point3D** as the only input
+types.  The Point2D form comes from old tutorials; the C++ binding still
+*attempts* the Point2D → AcGePoint3D coercion, and that conversion path is
+broken, so it fails on the first call with
 
 ```
 RuntimeError: 2 : InternalValidationError :
 Xl::Fusion::SketchCurves::getAcGePoint3D(startPoint, acStartPoint, &pStartPoint)
 ```
 
-Minimal repro (any valid 2D coords, e.g. a 1" square — fails on the first
-line, sketch created but 0 curves committed).  The **Point3D** overload of the
-same method works fine.
+This is not a regression of the documented API — the **Point3D** (and
+`SketchPoint`) inputs work fine.  (The error type is misleading: an
+unsupported type should raise `TypeError`, not an internal validation
+error — minor API hygiene issue.)
 
-**Fix (workaround):** In assistant/script code, convert `Point2D` → `Point3D`
-before calling `addByTwoPoints`:
+**Fix (workaround):** Use the documented input types.  Convert `Point2D` →
+`Point3D` before calling `addByTwoPoints`:
 
 ```python
 def p2d(x, y):
