@@ -33,6 +33,7 @@ Fusion appears in your application launcher as a native app.
 | **Cloud sign-in** | dotnet48 + winhttp winetricks, DLL overrides for telemetry suppression, callback protocol handlers |
 | **Auto dark mode** | Detects KDE/GNOME/GTK dark scheme via `kreadconfig5`/`gsettings`/`settings.ini`, writes Windows registry `AppsUseLightTheme=0` — Fusion matches your desktop theme |
 | **IE proxy fix** | Applies `winhttp=b` DLL override to skip Windows IE proxy detection API — saves ~10s of startup time on every launch |
+| **ICU 77 native DLL override** | Fusion ships real ICU 77 (`icuuc.dll`, `icuin.dll`) for its embedded WebView2 / `node.exe`; Wine's 32 KB stub aborts on `icu_77` symbols.  Launcher forces `icuuc,icuin,icudt=n,b` (`FUSION_FIX_ICU77`, default on) |
 | **Preflight checks** | Step 2 validates Vulkan driver, disk space, and existing prefix before proceeding |
 | **Doctor diagnostic** | `./doctor.sh` — full system check with `--quick` summary, `--save` report, and color output |
 | **Graceful process kill** | `kill_fusion_processes()` sends SIGTERM, waits 2s, escalates to SIGKILL — used by cleanup and uninstall |
@@ -121,6 +122,37 @@ Instead of patching Wine, we apply three complementary workarounds:
 
 These settings are applied at install time (Wine prefix registry) and
 re-applied at every launch, ensuring they survive prefix resets.
+
+## ICU 77 Native DLL Override
+
+Fusion 360 bundles **ICU 77** (International Components for Unicode) as
+`icuuc.dll` / `third_party_icu_icui18n.dll` next to `Fusion360.exe`, and its
+embedded Node.js runtime (`NODEJS/node.exe`, used by the Autodesk Assistant /
+FremontJs) imports `icuuc.dll` directly.  Wine ships only a 32 KB stub
+`icuuc.dll` with no `icu_77` symbols, so any `icu_77::*` call aborts:
+
+```
+wine: Call from 00006FFFFFF5C8C0 to unimplemented function
+      icuuc.dll.??0Locale@icu_77@@QEAA@XZ, aborting
+```
+
+The aborted process is usually the assistant's `node.exe` (dies silently at
+startup) or the embedded WebView2 renderer (later hang → native crash in the
+Neutron core).  Fix, in two parts:
+
+1. **Install the real ICU 77 DLLs into the prefix** (done once, or re-run
+   after a prefix reset):
+   ```bash
+   P="$HOME/.fusion360-proton2/pfx/drive_c/users/steamuser/AppData/Local/Autodesk/webdeploy/production"/*/
+   cp "$P/icuuc.dll" ~/.fusion360-proton2/pfx/drive_c/windows/system32/icuuc.dll
+   cp "$P/third_party_icu_icui18n.dll" ~/.fusion360-proton2/pfx/drive_c/windows/system32/icuin.dll
+   ```
+2. **Force native-first resolution** — the launcher and the browser listener
+   export `WINEDLLOVERRIDES="...icuuc,icuin,icudt=n,b"` (flag
+   `FUSION_FIX_ICU77`, enabled by default; set `FUSION_FIX_ICU77=0` to
+   disable).
+
+The override is re-applied at every launch, so it survives config changes.
 
 ## File Type Associations
 

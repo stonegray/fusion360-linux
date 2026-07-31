@@ -183,7 +183,7 @@ send_callback_to_identity_manager() {
   export PROTON_USE_XALIA=0
   export DXVK_ASYNC=1
   export NO_AT_BRIDGE=1
-  export WINEDLLOVERRIDES="bcp47langs="
+  export WINEDLLOVERRIDES="bcp47langs=;icuuc,icuin,icudt=n,b"
   export WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--no-sandbox"
   export STEAM_COMPAT_DATA_PATH
   export STEAM_COMPAT_CLIENT_INSTALL_PATH

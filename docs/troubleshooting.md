@@ -103,3 +103,52 @@ STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
 **Root cause:** The Wine registry key for the browser bridge already exists or Proton is not fully initialized.
 
 **Fix:** This warning is non-fatal. If sign-in works, ignore it. If not, delete the Proton prefix and re-run Phase 2.
+
+---
+
+## `wine: Call ... to unimplemented function icuuc.dll.??0Locale@icu_77@@QEAA@XZ, aborting`
+
+**Root cause:** Fusion bundles real ICU 77 DLLs next to `Fusion360.exe`, but
+`NODEJS/node.exe` (the Autodesk Assistant / FremontJs runtime) and the embedded
+WebView2 resolve `icuuc.dll` to Wine's 32 KB stub, which has no `icu_77`
+symbols.  The process aborts; `node.exe` dies silently at startup and the
+WebView2 renderer crash later shows up as a hang → native crash in the Neutron
+core (`nsplatform10` / `cer` stack on the main thread).
+
+**Fix:** See "ICU 77 Native DLL Override" in the README — copy the real
+`icuuc.dll` / `third_party_icu_icui18n.dll` from the Fusion production
+directory into the prefix `system32/`, and keep `FUSION_FIX_ICU77=1` (default)
+so the launcher forces `icuuc,icuin,icudt=n,b`.
+
+---
+
+## Fusion freezes ~1 min after launch, then UI appears after ~50 min (assistant)
+
+**Root cause:** The saved window layout
+(`.../Neutron Platform/Options/<user-hash>/NULastDisplayedLayout.xml`) contains
+the Autodesk Assistant dock panels (`AAPalette`/`AAHostWindow` and
+`ChatPalette`/`ChatSupport`).  Fusion recreates them at startup and the
+embedded assistant host blocks the UI thread until it times out (~50 min) —
+the log goes silent after `[ADP] PanelCreateAssistant` while LaunchDarkly
+stream retries fail.
+
+**Fix:** Strip the two assistant `<Area>` blocks from
+`NULastDisplayedLayout.xml` (it is UTF-16 LE — convert to UTF-8, edit, convert
+back, or regenerate by deleting the file).  Back the file up first.  Fusion
+still logs `PanelCreateAssistant` but no longer hangs on it.
+
+---
+
+## `fusion-toolwindow-fixer.exe` processes accumulate (hundreds), then Fusion hangs
+
+**Root cause:** `start_toolwindow_fixer()` spawns two Wine instances per call
+but only records one PID; the health monitor (`daemon_health_check`, every 30 s)
+restarts the daemon whenever the pidfile PID is dead, and each stale
+`launch-fusion.sh` instance runs its own monitor.  Multiple launches or a
+dying fixer turns into a respawn loop — hundreds of Wine processes, CPU
+saturation, then Hang Detection → crash.
+
+**Fix (workaround):** Set `FUSION_ENABLE_TOOLWINDOW_FIXER=0` in
+`~/.config/fusion360-linux/config` to disable the z-order daemon.  The
+"always on top" panel bug returns, but no process leak.  Also ensure only one
+`launch-fusion.sh` is running before launching.

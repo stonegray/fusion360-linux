@@ -157,6 +157,12 @@ apply_launch_environment() {
   if is_enabled "${FUSION_FIX_WINHTTP_PROXY:-1}"; then
     dll_overrides="${dll_overrides:+$dll_overrides,}winhttp=b"
   fi
+  # ICU 77: Fusion bundles a real icuuc.dll/icuin.dll (ICU 77, needed by the
+  # embedded webview/node.exe); Wine's 32KB stub aborts on icu_77 symbols.
+  # Prefer the native copies installed in the prefix system32.
+  if is_enabled "${FUSION_FIX_ICU77:-1}"; then
+    dll_overrides="${dll_overrides:+$dll_overrides,}icuuc,icuin,icudt=n,b"
+  fi
   if [[ -n "$dll_overrides" ]]; then
     export WINEDLLOVERRIDES="$dll_overrides"
   else
