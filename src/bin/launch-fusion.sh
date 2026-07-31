@@ -147,6 +147,7 @@ apply_fusion_wine_dpi
 apply_fusion_wine_dark_mode
 install_callback_protocol_handlers
 register_wine_browser_bridge
+register_wine_dll_overrides
 start_browser_listener
 start_overlay_killer
 

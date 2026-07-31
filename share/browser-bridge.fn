@@ -25,6 +25,26 @@ register_wine_browser_bridge() {
   }
 }
 
+# Set Wine DLL overrides so every process in the prefix (including helpers
+# spawned by Fusion's script/assistant paths that may not inherit the
+# launcher environment) resolves icuuc/icuin/icudt native-first.  Fusion
+# bundles real ICU 77 DLLs; Wine's 32 KB stub aborts on icu_77 symbols.
+#
+# Requires: PROTON, STEAM_COMPAT_DATA_PATH
+register_wine_dll_overrides() {
+  [[ -n "${PROTON:-}" ]] || { echo "launch-fusion.sh warning: PROTON is not set — cannot register Wine DLL overrides" >&2; return 1; }
+  [[ -n "${STEAM_COMPAT_DATA_PATH:-}" ]] || { echo "launch-fusion.sh warning: STEAM_COMPAT_DATA_PATH is not set — cannot register Wine DLL overrides" >&2; return 1; }
+  is_enabled "${FUSION_FIX_ICU77:-1}" || return 0
+  local wine_bin
+  wine_bin="$(proton_wine_bin "$PROTON")"
+  [[ -x "$wine_bin" ]] || { echo "launch-fusion.sh warning: wine binary not found at $wine_bin" >&2; return 1; }
+  local pfx="$STEAM_COMPAT_DATA_PATH/pfx"
+  for dll in icuuc icuin icudt; do
+    WINEPREFIX="$pfx" "$wine_bin" reg add 'HKCU\Software\Wine\DllOverrides' \
+      /v "$dll" /d 'native,builtin' /f &>/dev/null || true
+  done
+}
+
 # Install adsk:// and adskidmgr:// protocol handler .desktop files.
 # Creates a desktop entry for the callback handler and registers the
 # protocol MIME types via xdg-mime.

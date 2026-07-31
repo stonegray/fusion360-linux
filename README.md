@@ -137,8 +137,9 @@ wine: Call from 00006FFFFFF5C8C0 to unimplemented function
 ```
 
 The aborted process is usually the assistant's `node.exe` (dies silently at
-startup) or the embedded WebView2 renderer (later hang → native crash in the
-Neutron core).  Fix, in two parts:
+startup), a helper spawned by the assistant's script-execution path (MCP), or
+the embedded WebView2 renderer (later hang → native crash in the Neutron
+core).  Fix, in three parts:
 
 1. **Install the real ICU 77 DLLs into the prefix** (done once, or re-run
    after a prefix reset):
@@ -147,12 +148,20 @@ Neutron core).  Fix, in two parts:
    cp "$P/icuuc.dll" ~/.fusion360-proton2/pfx/drive_c/windows/system32/icuuc.dll
    cp "$P/third_party_icu_icui18n.dll" ~/.fusion360-proton2/pfx/drive_c/windows/system32/icuin.dll
    ```
-2. **Force native-first resolution** — the launcher and the browser listener
-   export `WINEDLLOVERRIDES="...icuuc,icuin,icudt=n,b"` (flag
-   `FUSION_FIX_ICU77`, enabled by default; set `FUSION_FIX_ICU77=0` to
-   disable).
+2. **Force native-first resolution via environment** — the launcher and the
+   browser listener export `WINEDLLOVERRIDES="...icuuc,icuin,icudt=n,b"`
+   (flag `FUSION_FIX_ICU77`, enabled by default; set `FUSION_FIX_ICU77=0`
+   to disable).
+3. **Force native-first resolution via the prefix registry** — the launcher
+   also writes `HKCU\Software\Wine\DllOverrides` → `icuuc` / `icuin` /
+   `icudt` = `native,builtin` at every launch.  This covers processes spawned
+   by Fusion's script/assistant paths that do not inherit the launcher's
+   environment (e.g. the MCP `executeScript` helper that otherwise aborts
+   with the `icu_77` error mid-session and takes the scripting thread down
+   with it).
 
-The override is re-applied at every launch, so it survives config changes.
+Both overrides are re-applied at every launch, so they survive config changes
+and prefix resets.
 
 ## File Type Associations
 
