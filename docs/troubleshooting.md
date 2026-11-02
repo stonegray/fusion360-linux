@@ -2,6 +2,25 @@
 
 Known issues and their fixes when running Autodesk Fusion 360 on Linux through Proton.
 
+## Computer remains slow after closing Fusion
+
+The launcher supervises the actual `Fusion360.exe` process instead of waiting
+indefinitely for Proton's wrapper. Once Fusion has exited for five seconds,
+it shuts down the dedicated prefix's Wine server and remaining background
+processes, including WebView2 and Linux bridge/overlay helpers. Remaining
+processes receive TERM, then KILL if necessary; the supervisor checks that the
+prefix is empty and reports survivors rather than silently claiming success.
+
+Cleanup matches the current user's processes by their exact `WINEPREFIX` or
+`STEAM_COMPAT_DATA_PATH`. An explicit different `WINEPREFIX` takes precedence,
+so unrelated Wine prefixes are preserved. Process start times are checked before
+sending signals to avoid acting on recycled PIDs. The dedicated Fusion prefix
+must not be shared with unrelated Windows applications.
+
+The live shutdown test removed all observed Fusion prefix processes and allowed
+the launcher and repaint helper to exit normally. Disposable-process tests also
+verify forced cleanup of a stuck helper and preservation of another prefix.
+
 ## Sketch midpoint hints or dimension changes appear only after Alt-Tab
 
 On the tested NVIDIA/GE-Proton11-3/Xwayland setup, midpoint hints could remain
