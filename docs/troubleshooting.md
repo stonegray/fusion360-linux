@@ -2,6 +2,23 @@
 
 Known issues and their fixes when running Autodesk Fusion 360 on Linux through Proton.
 
+## Sketch midpoint hints or dimension changes appear only after Alt-Tab
+
+On the tested NVIDIA/GE-Proton11-3/Xwayland setup, midpoint hints could remain
+stale even though clicking the midpoint worked. Refocusing Fusion displayed the
+correct hint. A live test sending X11 Expose events restored immediate feedback.
+
+Set `FUSION_ENABLE_REDRAW_HELPER=1` in the launcher configuration to enable the
+repaint workaround. It requests repaints at 10 Hz for Fusion-owned X11 windows
+and their descendants while Fusion is foreground. It never changes focus,
+injects mouse/key input, or changes geometry. Window discovery runs once per
+second. It stops when the tracked Fusion process or launcher exits.
+
+The helper requires Python 3 and libX11. It is disabled by default because the
+workaround has only been verified on the affected setup. Setting
+`FUSION_ENABLE_REDRAW_HELPER=0` disables it on the next launch. This addresses
+stale feedback; the underlying Wine/compositor redraw defect is not yet located.
+
 ## Gray canvas and invisible solid bodies while sketches remain visible
 
 On the tested GE-Proton11-3/NVIDIA setup, using Fusion's bundled native

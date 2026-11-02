@@ -157,6 +157,7 @@ if [[ "${1:-}" == "--service-util" ]]; then
   exec "$PROTON" run "$FUSION_EXE" -serviceUtil
 fi
 start_toolwindow_fixer
+start_redraw_helper
 
 # ── Background health monitor ─────────────────────────────────
 # Checks daemons every 30s and restarts any that died.

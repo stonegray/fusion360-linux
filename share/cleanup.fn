@@ -27,6 +27,11 @@ clear_bridge_temp_files() {
 # ── Main cleanup orchestrator ────────────────────────────────────────
 # Called on exit — kills tracked daemons, clears PID files and bridge temp files.
 cleanup() {
+  if [[ -n "${REDRAW_HELPER_PID:-}" ]]; then
+    kill "$REDRAW_HELPER_PID" 2>/dev/null || true
+    wait "$REDRAW_HELPER_PID" 2>/dev/null || true
+  fi
+
   # Kill daemons (if daemon module is loaded)
   if declare -F stop_all_daemons &>/dev/null; then
     stop_all_daemons

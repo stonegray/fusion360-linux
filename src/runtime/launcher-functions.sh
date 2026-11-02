@@ -48,6 +48,7 @@ configure_with_file_browsers() {
   FUSION_USE_INTEL_VK_ICD="$FUSION_USE_INTEL_VK_ICD" \
   FUSION_ENABLE_OVERLAY_KILLER="$FUSION_ENABLE_OVERLAY_KILLER" \
   FUSION_NATIVE_D3DCOMPILER="${FUSION_NATIVE_D3DCOMPILER:-1}" \
+  FUSION_ENABLE_REDRAW_HELPER="${FUSION_ENABLE_REDRAW_HELPER:-0}" \
   FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="$FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT" \
   python3 "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/launcher-config-user-interface.py" "$CONFIG_FILE" "$user_interface_mode"
 
@@ -216,6 +217,8 @@ apply_launch_environment() {
   export PROTON
 }
 
+REDRAW_HELPER_PID=""
+
 prepare_native_shader_compiler() {
   is_enabled "${FUSION_NATIVE_D3DCOMPILER:-1}" || return 0
   local compiler="$FUSION_DIR/d3dcompiler_v2/d3dcompiler_47.dll"
@@ -237,4 +240,17 @@ prepare_native_shader_compiler() {
     return 1
   fi
   echo "launch-fusion.sh: installed Fusion's native shader compiler"
+}
+
+start_redraw_helper() {
+  is_enabled "${FUSION_ENABLE_REDRAW_HELPER:-0}" || return 0
+  [[ -n "${DISPLAY:-}" ]] || return 0
+  if ! command -v python3 >/dev/null 2>&1 || [[ ! -f "$RUNTIME_DIR/fusion-redraw-helper.py" ]]; then
+    echo "launch-fusion.sh warning: redraw helper requires Python 3 and fusion-redraw-helper.py" >&2
+    return 0
+  fi
+  python3 "$RUNTIME_DIR/fusion-redraw-helper.py" \
+    --prefix "$STEAM_COMPAT_DATA_PATH/pfx" --parent-pid "$$" &
+  REDRAW_HELPER_PID=$!
+  echo "launch-fusion.sh: redraw helper started with PID $REDRAW_HELPER_PID"
 }
