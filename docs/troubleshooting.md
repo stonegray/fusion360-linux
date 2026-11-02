@@ -2,6 +2,25 @@
 
 Known issues and their fixes when running Autodesk Fusion 360 on Linux through Proton.
 
+## Gray canvas and invisible solid bodies while sketches remain visible
+
+On the tested GE-Proton11-3/NVIDIA setup, using Fusion's bundled native
+`d3dcompiler_47.dll` in the prefix's `windows/system32` restored solid-body
+rendering. Previously, Wine's compiler was also loaded and logged incomplete
+shader-reflection calls. The issue was intermittent, so repeated launches and
+longer crash testing are still needed to establish reliability.
+
+The launcher now copies `d3dcompiler_v2/d3dcompiler_47.dll` from the selected
+Fusion installation into system32 and selects native loading. Existing compilers
+are backed up under `shader-compiler-backups` in the compatibility-data directory.
+Identical copies are left alone; the compiler is refreshed when the bundled copy
+changes. Set `FUSION_NATIVE_D3DCOMPILER=0` in the launcher configuration to disable
+this preparation and the native override (this does not restore an earlier DLL).
+
+Run `bash helpers/debug-fusion.sh` from the repository for diagnostic logs under
+`debug-logs/`. Logs can contain document names and account information; review
+them before sharing.
+
 ---
 
 ## "You need Microsoft WebView2 component"

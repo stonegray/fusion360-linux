@@ -47,6 +47,7 @@ configure_with_file_browsers() {
   FUSION_WEBVIEW_DISABLE_GPU="$FUSION_WEBVIEW_DISABLE_GPU" \
   FUSION_USE_INTEL_VK_ICD="$FUSION_USE_INTEL_VK_ICD" \
   FUSION_ENABLE_OVERLAY_KILLER="$FUSION_ENABLE_OVERLAY_KILLER" \
+  FUSION_NATIVE_D3DCOMPILER="${FUSION_NATIVE_D3DCOMPILER:-1}" \
   FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="$FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT" \
   python3 "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/launcher-config-user-interface.py" "$CONFIG_FILE" "$user_interface_mode"
 
@@ -142,9 +143,9 @@ apply_launch_environment() {
   # DXVK tuning for UI rendering — reduces swapchain latency and
   # sets optimal shader compiler threads (half of logical cores)
   local dxvk_cfg="dxgi.syncInterval=0"
-  dxvk_cfg="${dxvk_cfg},dxvk.tearFree=1"
-  dxvk_cfg="${dxvk_cfg},dxgi.numBackBuffers=3"
-  dxvk_cfg="${dxvk_cfg},dxvk.numCompilerThreads=$(( $(nproc 2>/dev/null || echo 4) / 2 ))"
+  dxvk_cfg="${dxvk_cfg};dxvk.tearFree=1"
+  dxvk_cfg="${dxvk_cfg};dxgi.numBackBuffers=3"
+  dxvk_cfg="${dxvk_cfg};dxvk.numCompilerThreads=$(( $(nproc 2>/dev/null || echo 4) / 2 ))"
   export DXVK_CONFIG="$dxvk_cfg"
 
 
@@ -155,13 +156,16 @@ apply_launch_environment() {
     dll_overrides=""
   fi
   if is_enabled "${FUSION_FIX_WINHTTP_PROXY:-1}"; then
-    dll_overrides="${dll_overrides:+$dll_overrides,}winhttp=b"
+    dll_overrides="${dll_overrides:+$dll_overrides;}winhttp=b"
   fi
   # ICU 77: Fusion bundles a real icuuc.dll/icuin.dll (ICU 77, needed by the
   # embedded webview/node.exe); Wine's 32KB stub aborts on icu_77 symbols.
   # Prefer the native copies installed in the prefix system32.
   if is_enabled "${FUSION_FIX_ICU77:-1}"; then
-    dll_overrides="${dll_overrides:+$dll_overrides,}icuuc,icuin,icudt=n,b"
+    dll_overrides="${dll_overrides:+$dll_overrides;}icuuc,icuin,icudt=n,b"
+  fi
+  if is_enabled "${FUSION_NATIVE_D3DCOMPILER:-1}"; then
+    dll_overrides="${dll_overrides:+$dll_overrides;}d3dcompiler_47=n"
   fi
   if [[ -n "$dll_overrides" ]]; then
     export WINEDLLOVERRIDES="$dll_overrides"
@@ -210,4 +214,27 @@ apply_launch_environment() {
   export STEAM_COMPAT_DATA_PATH
   export STEAM_COMPAT_CLIENT_INSTALL_PATH
   export PROTON
+}
+
+prepare_native_shader_compiler() {
+  is_enabled "${FUSION_NATIVE_D3DCOMPILER:-1}" || return 0
+  local compiler="$FUSION_DIR/d3dcompiler_v2/d3dcompiler_47.dll"
+  local target="$STEAM_COMPAT_DATA_PATH/pfx/drive_c/windows/system32/d3dcompiler_47.dll"
+  [[ -f "$compiler" ]] || { echo "Native shader compiler missing: $compiler" >&2; return 1; }
+  cmp -s "$compiler" "$target" && return 0
+
+  local backup_dir="$STEAM_COMPAT_DATA_PATH/shader-compiler-backups"
+  local backup temporary
+  mkdir -p "$backup_dir"
+  if [[ -e "$target" ]]; then
+    backup="$(mktemp "$backup_dir/d3dcompiler_47-XXXXXX.dll")" || return 1
+    cp -pL "$target" "$backup" || return 1
+    echo "launch-fusion.sh: previous shader compiler backed up to $backup"
+  fi
+  temporary="$(mktemp "${target}.XXXXXX")" || return 1
+  if ! cp "$compiler" "$temporary" || ! mv -f "$temporary" "$target"; then
+    unlink "$temporary" 2>/dev/null || true
+    return 1
+  fi
+  echo "launch-fusion.sh: installed Fusion's native shader compiler"
 }

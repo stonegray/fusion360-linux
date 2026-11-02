@@ -120,6 +120,7 @@ FUSION_EXE="$(find "$FUSION_ROOT" -maxdepth 2 -name Fusion360.exe -print | sort 
 [[ -n "$FUSION_EXE" ]] || fail "Fusion360.exe was not found under $FUSION_ROOT"
 
 FUSION_DIR="$(dirname "$FUSION_EXE")"
+prepare_native_shader_compiler || fail "Could not prepare the native shader compiler"
 PRODUCTION_CONFIG="$FUSION_DIR/Applications/Fusion/Fusion360App/ApplicationOptions.production.json"
 SERVER_CONFIG="$FUSION_DIR/Fusion 360.server.config"
 
