@@ -153,7 +153,13 @@ log_step "Step 13/13: Health check"
 if [[ -x "$SCRIPT_DIR/src/doctor/doctor.sh" ]]; then
   "$SCRIPT_DIR/src/doctor/doctor.sh" --quick || true
 fi
-echo ""
 
+# The Fusion installer spawns background processes (streamer, AdskIdentity,
+# Fusion360.exe) asynchronously and can bring them back up after step 10's
+# kill. Sweep again now that every step has finished, so the user is not
+# left with a stray Wine stack running after "installation complete".
+log_info " Cleaning up installer processes..."
+kill_fusion_processes || log_warn " Some processes may still be running. Use ./install.sh --kill to force."
+echo ""
 
 log_pass "Fusion 360 installation complete."

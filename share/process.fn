@@ -21,11 +21,13 @@ kill_fusion_processes() {
   # only the Wine processes lets the launcher's watchdog respawn the whole
   # stack a few seconds later, silently undoing the kill.
   local pattern
-  for pattern in wineserver wine proton steam-runtime xalia streamer \
+  for pattern in wineserver wine wine64 wine-preloader proton steam-runtime xalia streamer \
     Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
-    steam.exe node.exe fusion-gray-overlay \
+    steam.exe node.exe explorer.exe services.exe winedevice.exe \
+    msedgewebview2 fusion-gray-overlay \
     launch-fusion fusion-browser-listener fusion-browser fusion-callback \
-    fusion-toolwindow fusion-gray-overlay-event-killer; do
+    fusion-toolwindow fusion-session fusion-redraw-helper \
+    fusion-gray-overlay-event-killer; do
     while IFS= read -r pid; do
       [[ "$pid" == "$$" ]] && continue
       pids+=("$pid")
@@ -107,8 +109,10 @@ kill_fusion_processes() {
     [[ -z "$cmd" ]] && continue
     case "$cmd" in
       *launch-fusion*|*Fusion360*|*fusion-toolwindow*|*fusion-browser*|\
-      *fusion-callback*|*fusion-gray-overlay*|*wineserver*|*winedevice*|\
-      *"proton run"*|*AdskIdentity*|*adexmtsv*|*FusionClientDownloader*)
+      *fusion-callback*|*fusion-gray-overlay*|*fusion-session*|\
+      *fusion-redraw-helper*|*wineserver*|*winedevice*|*explorer.exe*|\
+      *services.exe*|*msedgewebview2*|*"proton run"*|*AdskIdentity*|\
+      *adexmtsv*|*FusionClientDownloader*)
         ;;
       *) continue ;;
     esac
