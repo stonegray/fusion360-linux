@@ -124,6 +124,7 @@ FUSION_EXE="$(find "$FUSION_ROOT" -maxdepth 2 -name Fusion360.exe -print | sort 
 
 FUSION_DIR="$(dirname "$FUSION_EXE")"
 prepare_native_shader_compiler || fail "Could not prepare the native shader compiler"
+prepare_native_dialog_shim || true
 PRODUCTION_CONFIG="$FUSION_DIR/Applications/Fusion/Fusion360App/ApplicationOptions.production.json"
 SERVER_CONFIG="$FUSION_DIR/Fusion 360.server.config"
 

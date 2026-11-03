@@ -168,6 +168,15 @@ apply_launch_environment() {
   if is_enabled "${FUSION_NATIVE_D3DCOMPILER:-1}"; then
     dll_overrides="${dll_overrides:+$dll_overrides;}d3dcompiler_47=n"
   fi
+  # Native file dialogs: route Fusion's Open dialog to kdialog instead of
+  # Wine's Win32 widget dialog. Requires the shim installed app-local next to
+  # Fusion360.exe (comdlg32 is a KnownDLL, so a plain override cannot reach
+  # it — see install_native_dialog_shim).
+  if is_enabled "${FUSION_NATIVE_DIALOGS:-1}"; then
+    if [[ -f "$(native_dialog_shim_dir)/comdlg32.dll" ]]; then
+      dll_overrides="${dll_overrides:+$dll_overrides;}comdlg32=n"
+    fi
+  fi
   if [[ -n "$dll_overrides" ]]; then
     export WINEDLLOVERRIDES="$dll_overrides"
   else
@@ -240,6 +249,50 @@ prepare_native_shader_compiler() {
     return 1
   fi
   echo "launch-fusion.sh: installed Fusion's native shader compiler"
+}
+
+# Directory holding the app-local comdlg32 shim, next to Fusion360.exe.
+native_dialog_shim_dir() {
+  printf '%s\n' "$FUSION_DIR"
+}
+
+# Install the native file-dialog shim app-local and make it loadable.
+#
+# comdlg32 is a KnownDLL: Wine resolves it from the known-DLL section and
+# ignores both the app directory and the system32 copy. So this must (a) drop
+# the shim beside Fusion360.exe and (b) remove the KnownDLL entry, otherwise
+# WINEDLLOVERRIDES="comdlg32=n" cannot reach it at all (verified: with the
+# entry present the override is silently ignored).
+prepare_native_dialog_shim() {
+  is_enabled "${FUSION_NATIVE_DIALOGS:-1}" || return 0
+
+  local source="$RUNTIME_DIR/../native-dialogs/comdlg32.dll"
+  local target
+  target="$(native_dialog_shim_dir)/comdlg32.dll"
+
+  [[ -f "$source" ]] || { echo "launch-fusion.sh warning: native dialog shim not found at $source" >&2; return 0; }
+  command -v kdialog >/dev/null 2>&1 || { echo "launch-fusion.sh warning: kdialog not installed; keeping Windows file dialogs" >&2; return 0; }
+
+  if ! cmp -s "$source" "$target" 2>/dev/null; then
+    local temporary
+    temporary="$(mktemp "${target}.XXXXXX")" || return 1
+    if cp "$source" "$temporary" && chmod 644 "$temporary" && mv -f "$temporary" "$target"; then
+      echo "launch-fusion.sh: installed native file-dialog shim"
+    else
+      unlink "$temporary" 2>/dev/null || true
+      echo "launch-fusion.sh warning: could not install native file-dialog shim" >&2
+      return 0
+    fi
+  fi
+
+  # Drop the KnownDLL entry so the app-local copy is consulted.
+  local wine_bin
+  wine_bin="$(proton_wine_bin "$PROTON")"
+  if [[ -x "$wine_bin" ]]; then
+    WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx" "$wine_bin" reg delete \
+      'HKLM\System\CurrentControlSet\Control\Session Manager\KnownDLLs' \
+      /v comdlg32 /f &>/dev/null || true
+  fi
 }
 
 start_redraw_helper() {

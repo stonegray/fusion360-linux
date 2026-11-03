@@ -1,0 +1,6 @@
+; Export these by name. qwindows.dll resolves both by name (its "Hint/Ord"
+; values 12/14 are lib hints, not ordinals — see comdlg32.c header).
+LIBRARY comdlg32.dll
+EXPORTS
+    GetOpenFileNameW
+    GetSaveFileNameW
