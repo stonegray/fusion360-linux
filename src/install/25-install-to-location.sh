@@ -12,11 +12,15 @@ mkdir -p "$F360_BIN_DIR"
 mkdir -p "$F360_DATA_DIR/runtime-scripts"
 cp -r "$SCRIPT_DIR/src/runtime/." "$F360_DATA_DIR/runtime-scripts/"
 cp -r "$SCRIPT_DIR/share" "$F360_DATA_DIR/"
-# Prebuilt PE artifacts used by the launcher (native dialog shim).
+# Native dialog shim sources. The binaries are built by 26-runtime-patches.sh
+# rather than installed from the repo — a committed PE artifact drifts from
+# its own source and the drift is invisible until runtime.
 if [[ -d "$SCRIPT_DIR/src/native-dialogs" ]]; then
   mkdir -p "$F360_DATA_DIR/native-dialogs"
-  cp "$SCRIPT_DIR/src/native-dialogs/dlgshim.dll" "$F360_DATA_DIR/native-dialogs/"
-  cp "$SCRIPT_DIR/src/native-dialogs/hostrunner" "$F360_DATA_DIR/native-dialogs/"
+  cp "$SCRIPT_DIR/src/native-dialogs/"*.c \
+     "$SCRIPT_DIR/src/native-dialogs/"*.h \
+     "$SCRIPT_DIR/src/native-dialogs/dlgshim.def" \
+     "$F360_DATA_DIR/native-dialogs/"
 fi
 cp "$SCRIPT_DIR/src/bin/launch-fusion.sh" "$F360_DATA_DIR/"
 cp "$SCRIPT_DIR/src/doctor/doctor.sh" "$F360_DATA_DIR/"
@@ -43,3 +47,4 @@ fi
 
 log_info " Runtime scripts installed to $F360_DATA_DIR"
 log_info " CLI symlinks in $F360_BIN_DIR: launch-fusion, fusion360, fusion-doctor, fusion-uninstall"
+log_info " Native dialogs are built in step 5 (26-runtime-patches.sh), not shipped prebuilt."

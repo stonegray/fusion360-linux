@@ -165,8 +165,16 @@ runfusion() {
 #
 # Install it, then verify the registry actually points at it. Wine keeps the
 # registry in memory, so wineserver has to be down before system.reg is read.
-SHIM="$(cd "$(dirname "$0")" && pwd)/dlgshim.dll"
-[[ -f "$SHIM" ]] || { echo "error: build dlgshim.dll first" >&2; exit 1; }
+#
+# The artifacts are generated, so build them here rather than expecting a
+# committed DLL: a checked-in binary silently drifts from its own source.
+HERE="$(cd "$(dirname "$0")" && pwd)"
+if ! make -C "$HERE" >/dev/null 2>&1; then
+  echo "error: build failed — run 'make -C $HERE' to see why" >&2
+  exit 1
+fi
+SHIM="$HERE/dlgshim.dll"
+[[ -f "$SHIM" ]] || { echo "error: make did not produce dlgshim.dll" >&2; exit 1; }
 FUSION_DIR="$PREFIX/drive_c/users/steamuser/AppData/Local/Autodesk/webdeploy/production/39e8a3d5e919c70b05ef3ebfe9c6bfc8d9ee001e"
 cp "$SHIM" "$FUSION_DIR/dlgshim.dll" || exit 1
 cp "$(dirname "$0")/hostrunner" "$FUSION_DIR/hostrunner" 2>/dev/null

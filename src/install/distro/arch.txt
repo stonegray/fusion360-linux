@@ -7,4 +7,4 @@ wget
 xdg-utils
 desktop-file-utils
 winetricks
-imagemagick
+imagemagick mingw-w64-gcc

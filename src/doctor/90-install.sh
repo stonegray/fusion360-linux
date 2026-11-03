@@ -60,3 +60,25 @@ fi
 if [[ $stuck_found -eq 0 ]]; then
   pass "No stuck-install indicators detected"
 fi
+
+# Native dialog shim: built at install time by 26-runtime-patches.sh. A missing
+# or stale pair means Fusion silently falls back to Wine's Windows-style dialog
+# (or, worse, loads a shim built from different sources).
+nd_dir="$F360_DATA_DIR/native-dialogs"
+shim_cfg="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux/config"
+shim_wanted=0
+[[ -f "$shim_cfg" ]] && grep -qE '^FUSION_NATIVE_DIALOGS=1' "$shim_cfg" && shim_wanted=1
+
+if [[ $shim_wanted -eq 1 ]]; then
+  if [[ ! -f "$nd_dir/dlgshim.dll" || ! -x "$nd_dir/hostrunner" ]]; then
+    warn "Native dialogs enabled but shim is missing from $nd_dir — run ./install.sh"
+    ((stuck_found++)) || true
+  elif [[ -f "$nd_dir/dlgshim.dll" && -f "$nd_dir/comdlg32.c" ]] &&
+       [[ "$nd_dir/comdlg32.c" -nt "$nd_dir/dlgshim.dll" ]]; then
+    warn "dlgshim.dll is older than its source — rebuild with ./install.sh"
+    ((stuck_found++)) || true
+  else
+    pass "Native dialog shim present and up to date"
+  fi
+  command -v kdialog &>/dev/null || warn "kdialog not installed — native dialogs will not appear"
+fi
