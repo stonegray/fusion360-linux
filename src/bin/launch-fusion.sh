@@ -109,6 +109,9 @@ fi
 
 apply_launch_environment
 
+[[ -f "$RUNTIME_DIR/fusion-session.py" ]] || fail "Fusion session supervisor is missing; reinstall runtime scripts."
+command -v python3 >/dev/null 2>&1 || fail "Python 3 is required for session cleanup."
+
 [[ -x "$PROTON" ]] || fail "Proton was not found or is not executable: $PROTON. Run $0 --configure to select it."
 [[ -x "$BROWSER" ]] || fail "Browser bridge was not found or is not executable: $BROWSER"
 [[ -x "$BROWSER_LISTENER" ]] || fail "Browser listener was not found or is not executable: $BROWSER_LISTENER"
@@ -120,6 +123,7 @@ FUSION_EXE="$(find "$FUSION_ROOT" -maxdepth 2 -name Fusion360.exe -print | sort 
 [[ -n "$FUSION_EXE" ]] || fail "Fusion360.exe was not found under $FUSION_ROOT"
 
 FUSION_DIR="$(dirname "$FUSION_EXE")"
+prepare_native_shader_compiler || fail "Could not prepare the native shader compiler"
 PRODUCTION_CONFIG="$FUSION_DIR/Applications/Fusion/Fusion360App/ApplicationOptions.production.json"
 SERVER_CONFIG="$FUSION_DIR/Fusion 360.server.config"
 
@@ -153,9 +157,11 @@ start_overlay_killer
 
 # ── Service Utility mode ──────────────────────────────────────
 if [[ "${1:-}" == "--service-util" ]]; then
-  exec "$PROTON" run "$FUSION_EXE" -serviceUtil
+  "$PROTON" run "$FUSION_EXE" -serviceUtil
+  exit $?
 fi
 start_toolwindow_fixer
+start_redraw_helper
 
 # ── Background health monitor ─────────────────────────────────
 # Checks daemons every 30s and restarts any that died.
@@ -164,26 +170,22 @@ while true; do
   sleep 30
   daemon_health_check || true
 done &>/dev/null &
-disown 2>/dev/null || true
+HEALTH_MONITOR_PID=$!
 
 # ── Check if Fusion is already running ──────────────────────────
 if pgrep -u "$(id -u)" -f Fusion360.exe &>/dev/null; then
   echo "launch-fusion.sh: Fusion 360 is already running. Running two instances is unsupported." >&2
   exit 0
 fi
+fusion_status=0
+SESSION_COMMAND=(python3 "$RUNTIME_DIR/fusion-session.py"
+  --prefix "$STEAM_COMPAT_DATA_PATH/pfx"
+  --wineserver "$(dirname "$PROTON")/files/bin/wineserver"
+  -- "$PROTON" run "$FUSION_EXE")
 if (( ${#FUSION_ARGS[@]} > 0 )); then
-  "$PROTON" run "$FUSION_EXE" "${FUSION_ARGS[@]}"
+  "${SESSION_COMMAND[@]}" "${FUSION_ARGS[@]}" || fusion_status=$?
 else
-  "$PROTON" run "$FUSION_EXE" "$@"
+  "${SESSION_COMMAND[@]}" "$@" || fusion_status=$?
 fi
-fusion_status=$?
-
-if [[ $fusion_status -ne 0 ]]; then
-  # Check if Fusion exited because another instance is running
-  if pgrep -u "$(id -u)" -f Fusion360.exe &>/dev/null; then
-    echo "launch-fusion.sh: Fusion 360 is already running (another instance detected after launch)." >&2
-    exit 0
-  fi
-  fail "Fusion exited or crashed with status $fusion_status"
-fi
+[[ $fusion_status -eq 0 ]] || fail "Fusion exited or crashed with status $fusion_status"
 exit 0
