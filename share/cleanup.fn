@@ -27,15 +27,20 @@ clear_bridge_temp_files() {
 # ── Main cleanup orchestrator ────────────────────────────────────────
 # Called on exit — kills tracked daemons, clears PID files and bridge temp files.
 cleanup() {
+  local pid
+  for pid in "${HEALTH_MONITOR_PID:-}" "${REDRAW_HELPER_PID:-}"; do
+    [[ -n "$pid" ]] || continue
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+  done
+
   # Kill daemons (if daemon module is loaded)
   if declare -F stop_all_daemons &>/dev/null; then
     stop_all_daemons
   fi
 
-  # Kill Fusion/Wine/Proton processes
-  if declare -F kill_fusion_processes &>/dev/null; then
-    kill_fusion_processes || true
-  fi
+  # Prefix cleanup is handled by fusion-session.py after Fusion exits.
+  # Never call the user-wide nuclear kill routine during normal shutdown.
 
   # Remove PID file directory
   if declare -F daemon_cleanup_all_pids &>/dev/null; then
