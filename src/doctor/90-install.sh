@@ -15,7 +15,7 @@ bootstrap="/tmp/MicrosoftEdgeWebview2Setup.exe"
 if [[ -f "$bootstrap" ]]; then
   webview_dir="$PFX_DIR/pfx/drive_c/Program Files (x86)/Microsoft/EdgeWebView"
   if [[ ! -d "$webview_dir" ]]; then
-    warn "WebView2 bootstrapper downloaded but runtime not installed yet — run setup-fusion.sh"
+    warn "WebView2 bootstrapper downloaded but runtime not installed yet — run ./install.sh"
     ((stuck_found++)) || true
   fi
 fi

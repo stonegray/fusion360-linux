@@ -46,7 +46,7 @@ if [[ -d "$webview_dir" ]]; then
   webview_size=$(du -sh "$webview_dir" 2>/dev/null | cut -f1)
   info "WebView2 size: $webview_size"
 else
-  fail "WebView2 runtime not installed — run setup-fusion.sh"
+  fail "WebView2 runtime not installed — run ./install.sh"
 fi
 
 check_dll() {

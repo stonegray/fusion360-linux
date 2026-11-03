@@ -39,6 +39,6 @@ if (( all_ok )); then
   echo "All checks passed."
   exit 0
 else
-  echo "Some checks failed. Run setup-fusion.sh to fix."
+  echo "Some checks failed. Run ./install.sh to fix."
   exit 1
 fi

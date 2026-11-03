@@ -164,5 +164,5 @@ EOF
   log_info " Desktop entry installed."
 else
   log_info " Fusion360.exe not found yet. Install may still be in progress."
-  log_info " Run ./setup-fusion.sh once Fusion360.exe exists."
+  log_info " Run ././install.sh once Fusion360.exe exists."
 fi

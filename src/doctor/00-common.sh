@@ -61,7 +61,7 @@ print_summary() {
     echo "  △ $SECTION_FAIL minor issue(s). Likely launchable but some features may be affected."
     exit 1
   else
-    echo "  ✗ $SECTION_FAIL critical issue(s). Run install.sh and setup-fusion.sh before launching."
+    echo "  ✗ $SECTION_FAIL critical issue(s). Re-run ./install.sh from the repo before launching."
     exit 2
   fi
 }

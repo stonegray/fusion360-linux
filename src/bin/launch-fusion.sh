@@ -20,7 +20,7 @@ fi
 
 if [[ -x "$RUNTIME_DIR/health-check.sh" ]]; then
   if ! "$RUNTIME_DIR/health-check.sh" &>/dev/null; then
-    echo "launch-fusion.sh warning: health check failed. Run ./setup-fusion.sh to fix." >&2
+    echo "launch-fusion.sh warning: health check failed. Run ././install.sh to fix." >&2
   fi
 fi
 

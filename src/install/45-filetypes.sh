@@ -109,11 +109,31 @@ if command -v xdg-mime &>/dev/null; then
   done
 fi
 
-# Re-assert protocol handlers — Wine/Fusion installer may have registered its own
+# Install the callback handler's desktop entry, then point the schemes at it.
+#
+# `xdg-mime default` only records the association — it does not create the
+# .desktop file. Registering the schemes without writing the handler leaves
+# mimeapps.list naming a nonexistent application, so sign-in callbacks are
+# silently dropped. register-protocols.sh builds the same file, but nothing
+# in the install pipeline called it, so build it here.
 if command -v xdg-mime &>/dev/null; then
-  xdg-mime default fusion360-callback-handler.desktop x-scheme-handler/adsk 2>/dev/null || true
-  xdg-mime default fusion360-callback-handler.desktop x-scheme-handler/adskidmgr 2>/dev/null || true
-  log_info " Protocol handlers (adsk://, adskidmgr://) re-registered."
+  callback_desktop="$F360_APPS_DIR/fusion360-callback-handler.desktop"
+  mkdir -p "$F360_APPS_DIR"
+  cat > "$callback_desktop" <<EOF
+[Desktop Entry]
+Name=Fusion 360 Autodesk Callback Handler
+Exec=$F360_DATA_DIR/runtime-scripts/fusion-callback-handler.sh %u
+Type=Application
+NoDisplay=true
+MimeType=x-scheme-handler/adsk;x-scheme-handler/adskidmgr;
+EOF
+  chmod +x "$F360_DATA_DIR/runtime-scripts/fusion-callback-handler.sh" 2>/dev/null || true
+  for scheme in adsk adskidmgr; do
+    xdg-mime default fusion360-callback-handler.desktop "x-scheme-handler/$scheme" 2>/dev/null || true
+  done
+  command -v update-desktop-database &>/dev/null && \
+    update-desktop-database "$F360_APPS_DIR" 2>/dev/null || true
+  log_info " Protocol handlers (adsk://, adskidmgr://) registered."
 fi
 
 # Regenerate global desktop database to flush stale Wine entries

@@ -37,7 +37,7 @@ if [[ -f "$CONFIG_FILE" ]]; then
     fi
   done
 else
-  fail "Config file not found — run setup-fusion.sh or launch-fusion.sh --configure"
+  fail "Config file not found — run ./install.sh or launch-fusion.sh --configure"
 fi
 
 app_dir="$HOME/.local/share/applications/fusion360-linux"
@@ -49,7 +49,7 @@ if [[ -f "$app_dir/fusion360-callback-handler.desktop" ]]; then
       warn "Callback desktop entry has validation issues"
   fi
 else
-  fail "Callback handler desktop entry missing — run setup-fusion.sh"
+  fail "Callback handler desktop entry missing — run ./install.sh"
 fi
 
 if [[ -f "$app_dir/autodesk-fusion360.desktop" ]]; then
@@ -60,7 +60,7 @@ if [[ -f "$app_dir/autodesk-fusion360.desktop" ]]; then
       warn "Fusion360 desktop entry has validation issues"
   fi
 else
-  fail "Fusion360 desktop entry missing — run setup-fusion.sh"
+  fail "Fusion360 desktop entry missing — run ./install.sh"
 fi
 
 for scheme in adsk adskidmgr; do
@@ -83,5 +83,5 @@ done
 if [[ $icon_found -eq 1 ]]; then
   pass "Application icons installed"
 else
-  warn "Application icons not installed — run setup-fusion.sh"
+  warn "Application icons not installed — run ./install.sh"
 fi

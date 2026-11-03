@@ -6,7 +6,7 @@ if command -v wget &>/dev/null; then
   if wget -q --timeout=5 --spider https://go.microsoft.com/fwlink/p/?LinkId=2124703 2>/dev/null; then
     pass "Can reach Microsoft CDN (WebView2 download)"
   else
-    warn "Cannot reach Microsoft CDN — WebView2 install will fail during setup-fusion.sh"
+    warn "Cannot reach Microsoft CDN — WebView2 install will fail during ./install.sh"
   fi
   if wget -q --timeout=5 --spider https://github.com 2>/dev/null; then
     pass "Can reach GitHub (GE-Proton downloads)"
