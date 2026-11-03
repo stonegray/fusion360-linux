@@ -31,6 +31,7 @@
 #include <wchar.h>
 
 extern char *shim_run_picker(const WCHAR *initial_dir, const WCHAR *filter_spec);
+extern WCHAR *shim_win_path_to_unix_wide(const WCHAR *wpath);
 extern char *shim_filter_from_pairs(const WCHAR **labels, const WCHAR **patterns, UINT count);
 
 /* {DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7} */
@@ -148,11 +149,32 @@ static HRESULT WINAPI si_GetDisplayName(IShellItem *iface, SIGDN sigdn, LPWSTR *
     return S_OK;
 }
 
+/* Qt imports SHCreateItemFromParsingName/SHCreateItemFromIDList and inspects
+ * the item it gets back, so returning E_NOTIMPL here makes a selected file
+ * look like nothing at all — the dialog closes and the caller discards it.
+ * Report the attributes that are actually true for any path that exists. */
 static HRESULT WINAPI si_GetAttributes(IShellItem *iface, SFGAOF mask, SFGAOF *out)
 {
-    (void)iface;
-    if (out) *out = 0;
-    return E_NOTIMPL;
+    if (!out) return E_POINTER;
+    ShellItem *item = (ShellItem *)iface;
+
+    DWORD attrs = GetFileAttributesW(item->path);
+    if (attrs == INVALID_FILE_ATTRIBUTES) return HRESULT_FROM_WIN32(GetLastError());
+
+    SFGAOF result = 0;
+    if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
+        result |= SFGAO_FOLDER | SFGAO_FILESYSANCESTOR;
+        if (!(attrs & FILE_ATTRIBUTE_HIDDEN)) result |= SFGAO_STORAGEANCESTOR;
+    } else {
+        result |= SFGAO_STREAM | SFGAO_CANCOPY | SFGAO_CANDELETE | SFGAO_CANLINK;
+    }
+    result |= SFGAO_FILESYSTEM;
+    if (attrs & FILE_ATTRIBUTE_DIRECTORY) result |= SFGAO_STORAGE;
+    if (attrs & FILE_ATTRIBUTE_READONLY) result |= SFGAO_READONLY;
+    if (attrs & FILE_ATTRIBUTE_HIDDEN) result |= SFGAO_HIDDEN;
+
+    *out = result & mask;
+    return S_OK;
 }
 
 static HRESULT WINAPI si_Compare(IShellItem *iface, IShellItem *other, SICHINTF hint, int *order)
@@ -219,8 +241,13 @@ static WCHAR *path_from_shell_item(IShellItem *item)
 {
     if (!item) return NULL;
     LPWSTR name = NULL;
-    if (FAILED(IShellItem_GetDisplayName(item, SIGDN_FILESYSPATH, &name)) || !name)
-        return NULL;
+    HRESULT hr = IShellItem_GetDisplayName(item, SIGDN_FILESYSPATH, &name);
+    if (FAILED(hr) || !name) {
+        /* Some shell items only answer SIGDN_NORMALDISPLAY (e.g. virtual or
+         * non-filesystem items). Try that before giving up. */
+        hr = IShellItem_GetDisplayName(item, SIGDN_NORMALDISPLAY, &name);
+        if (FAILED(hr) || !name) return NULL;
+    }
 
     size_t len = wcslen(name) + 1;
     WCHAR *copy = (WCHAR *)malloc(len * sizeof(WCHAR));
@@ -237,9 +264,15 @@ static HRESULT WINAPI fo_Show(IFileOpenDialog *iface, HWND owner)
     free(d->picked);
     d->picked = NULL;
 
-    char *picked = shim_run_picker(d->initial_folder, d->filter_spec);
-    if (!picked)
+    /* d->initial_folder is a Windows path (Fusion passes
+     * C:\users\steamuser\Downloads). kdialog is a Linux binary and cannot
+     * open that, so translate before handing it over. */
+    WCHAR *unix_folder = shim_win_path_to_unix_wide(d->initial_folder);
+    char *picked = shim_run_picker(unix_folder, d->filter_spec);
+    free(unix_folder);
+    if (!picked) {
         return HRESULT_FROM_WIN32(ERROR_CANCELLED);
+    }
 
     /* kdialog returns a Unix path; report it back as a Windows path. */
     size_t need = strlen(picked) + 4;
@@ -454,15 +487,133 @@ static HRESULT WINAPI fo_SetFilter(IFileOpenDialog *iface, IShellItemFilter *fil
     return S_OK;
 }
 
-static HRESULT WINAPI fo_GetResults(IFileOpenDialog *iface, IShellItemArray **items)
+/* ── IShellItemArray, one element ─────────────────────────────────────
+ * Qt's QWindowsNativeOpenFileDialog::selectedFiles reads the selection back
+ * through an item array, not GetResult. Returning E_NOTIMPL here means the
+ * dialog closes successfully and Fusion receives no filename at all — which
+ * is exactly the "picker works, file never opens" symptom.
+ */
+typedef struct ShellItemArray {
+    IShellItemArray IShellItemArray_iface;
+    LONG ref;
+    IShellItem *item;
+} ShellItemArray;
+
+static HRESULT WINAPI sia_QueryInterface(IShellItemArray *iface, REFIID riid, void **out)
+{
+    if (!out) return E_POINTER;
+    if (IsEqualIID(riid, &IID_IUnknown) || IsEqualIID(riid, &IID_IShellItemArray)) {
+        *out = iface;
+        InterlockedIncrement(&((ShellItemArray *)iface)->ref);
+        return S_OK;
+    }
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI sia_AddRef(IShellItemArray *iface)
+{
+    return (ULONG)InterlockedIncrement(&((ShellItemArray *)iface)->ref);
+}
+
+static ULONG WINAPI sia_Release(IShellItemArray *iface)
+{
+    LONG r = InterlockedDecrement(&((ShellItemArray *)iface)->ref);
+    if (r == 0) {
+        ShellItemArray *a = (ShellItemArray *)iface;
+        if (a->item) IShellItem_Release(a->item);
+        free(a);
+    }
+    return (ULONG)r;
+}
+
+static HRESULT WINAPI sia_BindToHandler(IShellItemArray *iface, IBindCtx *ctx,
+                                        REFGUID handler, REFIID riid, void **out)
+{
+    (void)iface; (void)ctx; (void)handler; (void)riid;
+    if (out) *out = NULL;
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI sia_GetPropertyStore(IShellItemArray *iface, GETPROPERTYSTOREFLAGS f,
+                                           REFIID riid, void **out)
+{
+    (void)iface; (void)f; (void)riid;
+    if (out) *out = NULL;
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI sia_GetPropertyDescriptionList(IShellItemArray *iface, REFPROPERTYKEY key,
+                                                     REFIID riid, void **out)
+{
+    (void)iface; (void)key; (void)riid;
+    if (out) *out = NULL;
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI sia_GetAttributes(IShellItemArray *iface, SIATTRIBFLAGS flags,
+                                        SFGAOF mask, SFGAOF *out)
+{
+    (void)iface; (void)flags;
+    if (!out) return E_POINTER;
+    *out = 0;
+    return S_OK;
+}
+
+static HRESULT WINAPI sia_GetCount(IShellItemArray *iface, DWORD *count)
+{
+    if (!count) return E_POINTER;
+    *count = ((ShellItemArray *)iface)->item ? 1 : 0;
+    return S_OK;
+}
+
+static HRESULT WINAPI sia_GetItemAt(IShellItemArray *iface, DWORD index, IShellItem **item)
+{
+    if (!item) return E_POINTER;
+    *item = NULL;
+    ShellItemArray *a = (ShellItemArray *)iface;
+    if (index != 0 || !a->item) return E_INVALIDARG;
+    *item = a->item;
+    IShellItem_AddRef(a->item);
+    return S_OK;
+}
+
+static HRESULT WINAPI sia_EnumItems(IShellItemArray *iface, IEnumShellItems **out)
 {
     (void)iface;
+    if (out) *out = NULL;
+    return E_NOTIMPL;   /* GetItemAt/GetCount cover the single-item case */
+}
+
+static IShellItemArrayVtbl ShellItemArrayVtbl = {
+    sia_QueryInterface, sia_AddRef, sia_Release,
+    sia_BindToHandler, sia_GetPropertyStore, sia_GetPropertyDescriptionList,
+    sia_GetAttributes, sia_GetCount, sia_GetItemAt, sia_EnumItems
+};
+
+static HRESULT make_item_array(const WCHAR *path, IShellItemArray **out)
+{
+    *out = NULL;
+    IShellItem *item = shell_item_create(path);
+    if (!item) return E_OUTOFMEMORY;
+
+    ShellItemArray *a = (ShellItemArray *)calloc(1, sizeof(ShellItemArray));
+    if (!a) { IShellItem_Release(item); return E_OUTOFMEMORY; }
+
+    a->IShellItemArray_iface.lpVtbl = &ShellItemArrayVtbl;
+    a->ref = 1;
+    a->item = item;
+    *out = &a->IShellItemArray_iface;
+    return S_OK;
+}
+
+static HRESULT WINAPI fo_GetResults(IFileOpenDialog *iface, IShellItemArray **items)
+{
+    FileOpenDialog *d = (FileOpenDialog *)iface;
     if (!items) return E_POINTER;
-    /* Single-selection only: this shim asks kdialog for one path. Returning
-     * E_NOTIMPL would make multi-select callers fail; returning an
-     * unimplemented array would be worse. Callers get a clear error. */
     *items = NULL;
-    return E_NOTIMPL;
+    if (!d->picked) return E_UNEXPECTED;
+    return make_item_array(d->picked, items);
 }
 
 static HRESULT WINAPI fo_GetSelectedItems(IFileOpenDialog *iface, IShellItemArray **items)

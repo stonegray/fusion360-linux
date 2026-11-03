@@ -224,34 +224,37 @@ static const WCHAR *host_kdialog(void)
     }
     return found;
 }
-/* Convert a Windows path (C:\x\y, Z:\home\me) to a Unix path using
- * Wine's drive mapping: drive Z: is "/". Other drives need `winepath`.
- * Returns malloc'd string, or NULL if it cannot be resolved. */
-static char *win_path_to_unix(const WCHAR *wpath)
+/* Convert a Windows path to the Unix path a Linux binary can open.
+ *
+ * Use Wine's own converter rather than mapping drive letters by hand:
+ * wine_get_unix_file_name() knows every mapping in the prefix (C:\ ->
+ * drive_c, Z:\ -> /), so it cannot drift from the dosdevices layout. A
+ * hand-rolled version handled only Z: and returned NULL for Fusion's
+ * C:\users\...\Downloads start folder, which made kdialog fail to open and
+ * exit with no output — surfacing to Fusion as "user cancelled".
+ */
+char *shim_win_path_to_unix(const WCHAR *wpath)
 {
-    char *utf8 = NULL;
-    int n = WideCharToMultiByte(CP_UTF8, 0, wpath, -1, NULL, 0, NULL, NULL);
-    if (n <= 0) return NULL;
-    utf8 = (char *)malloc((size_t)n);
-    if (!utf8) return NULL;
-    WideCharToMultiByte(CP_UTF8, 0, wpath, -1, utf8, n, NULL, NULL);
+    if (!wpath || !*wpath) return NULL;
 
-    /* Fast path: Z:\... is /...  (Wine's default roots mapping). */
-    if ((utf8[0] == 'Z' || utf8[0] == 'z') && utf8[1] == ':' && (utf8[2] == '\\' || utf8[2] == '/')) {
-        char *unix_path = (char *)malloc(strlen(utf8) + 1);
-        if (!unix_path) { free(utf8); return NULL; }
-        strcpy(unix_path, utf8 + 2);
-        for (char *p = unix_path; *p; p++) if (*p == '\\') *p = '/';
-        free(utf8);
-        return unix_path;
+    typedef char *(__cdecl *p_convert)(LPCWSTR);
+    static p_convert convert = NULL;
+    static int resolved = 0;
+
+    if (!resolved) {
+        resolved = 1;
+        convert = (p_convert)(void *)GetProcAddress(
+            GetModuleHandleW(L"kernel32.dll"), "wine_get_unix_file_name");
     }
+    if (!convert) return NULL;
 
-    /* Anything else (C:, network drives): we cannot map it without winepath,
-     * and the last-resort fallback is simply to start in $HOME. Returning
-     * NULL makes the caller do exactly that, which is better than handing
-     * kdialog a Windows path it will silently treat as a relative name. */
-    free(utf8);
-    return NULL;
+    const char *unix_path = convert(wpath);
+    if (!unix_path || !*unix_path) return NULL;
+
+    size_t len = strlen(unix_path) + 1;
+    char *copy = (char *)malloc(len);
+    if (copy) memcpy(copy, unix_path, len);
+    return copy;
 }
 
 /* Convert a Windows filter string to a kdialog filter argument.
@@ -398,6 +401,23 @@ char *shim_run_picker_str(const char *initial_dir, const char *filter)
     return run_host_capture(argv);
 }
 
+/* Wide wrapper: convert a Windows path for a Linux binary and hand it back
+ * as WCHAR, since the COM path keeps its data wide throughout. */
+WCHAR *shim_win_path_to_unix_wide(const WCHAR *wpath)
+{
+    char *unix_path = shim_win_path_to_unix(wpath);
+    if (!unix_path) return NULL;
+
+    int n = MultiByteToWideChar(CP_UTF8, 0, unix_path, -1, NULL, 0);
+    if (n <= 0) { free(unix_path); return NULL; }
+
+    WCHAR *wide = (WCHAR *)malloc((size_t)n * sizeof(WCHAR));
+    if (wide)
+        MultiByteToWideChar(CP_UTF8, 0, unix_path, -1, wide, n);
+    free(unix_path);
+    return wide;
+}
+
 /* WCHAR wrapper used by the COM path. */
 char *shim_run_picker(const WCHAR *initial_dir, const WCHAR *filter)
 {
@@ -432,7 +452,7 @@ BOOL WINAPI GetOpenFileNameW(LPOPENFILENAMEW lpofn)
 
     char *unix_initial = NULL;
     if (lpofn->lpstrInitialDir && *lpofn->lpstrInitialDir)
-        unix_initial = win_path_to_unix(lpofn->lpstrInitialDir);
+        unix_initial = shim_win_path_to_unix(lpofn->lpstrInitialDir);
     if (!unix_initial)
         unix_initial = strdup(getenv("HOME") ? getenv("HOME") : "/");
 
