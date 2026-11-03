@@ -16,9 +16,19 @@ fi
 
 local hosts_file="$PFX_DIR/pfx/drive_c/windows/system32/drivers/etc/hosts"
 if [[ -f "$hosts_file" ]] && ! grep -qs "clientstream.launchdarkly.com" "$hosts_file" 2>/dev/null; then
-  sed -i '/^::1 /i\
-0.0.0.0 clientstream.launchdarkly.com\t# suppress LD streaming noise' "$hosts_file"
-  log_info " Added clientstream.launchdarkly.com -> 0.0.0.0 in prefix hosts"
+  # Append rather than inserting at a fixed anchor. The previous form
+  # (`sed -i '/^::1 /i\...'`) only fires if the file already has an ::1
+  # line; Wine's default hosts file does not, so the edit matched nothing,
+  # returned 0, and the "Added" message below reported a change that never
+  # happened. Trailing newline guard: Wine writes the file without one, and
+  # a missing final newline would splice our entry onto the last line.
+  [[ -n "$(tail -c1 "$hosts_file" 2>/dev/null)" ]] && echo >> "$hosts_file"
+  printf '0.0.0.0 clientstream.launchdarkly.com\t# suppress LD streaming noise\n' >> "$hosts_file"
+  if grep -qs "clientstream.launchdarkly.com" "$hosts_file"; then
+    log_info " Added clientstream.launchdarkly.com -> 0.0.0.0 in prefix hosts"
+  else
+    log_warn " Could not write LD streaming entry to $hosts_file"
+  fi
 elif [[ -f "$hosts_file" ]]; then
   log_info " LD streaming host entry already present."
 else
