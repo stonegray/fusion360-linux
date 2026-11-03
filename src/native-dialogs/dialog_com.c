@@ -29,6 +29,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <wchar.h>
+#include <stdarg.h>
 
 extern char *shim_run_picker(const WCHAR *initial_dir, const WCHAR *filter_spec);
 extern WCHAR *shim_win_path_to_unix_wide(const WCHAR *wpath);
@@ -37,6 +38,7 @@ extern char *shim_filter_from_pairs(const WCHAR **labels, const WCHAR **patterns
 /* {DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7} */
 static const GUID CLSID_FusionFileOpenDialog =
     { 0xDC1C5A9C, 0xE88A, 0x4DDE, { 0xA5, 0xA1, 0x60, 0xF8, 0x2A, 0x20, 0xAE, 0xF7 } };
+
 
 typedef struct FileOpenDialog {
     IFileOpenDialog IFileOpenDialog_iface;

@@ -18,6 +18,13 @@ dlgshim.dll: $(SRCS) dlgshim.def
 	$(CC) $(CFLAGS) -o $@ $(SRCS) dlgshim.def $(LDFLAGS)
 
 clean:
-	rm -f dlgshim.dll
+	rm -f dlgshim.dll hostrunner hostrunner.exe
 
 .PHONY: all clean
+
+# hostrunner: Unix helper that runs the picker and writes an exit marker.
+# See run_host_capture in comdlg32.c for why this is not optional.
+hostrunner: hostrunner.c
+	gcc -O2 -Wall -o hostrunner $<
+
+all: dlgshim.dll hostrunner

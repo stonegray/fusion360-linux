@@ -16,6 +16,7 @@ cp -r "$SCRIPT_DIR/share" "$F360_DATA_DIR/"
 if [[ -d "$SCRIPT_DIR/src/native-dialogs" ]]; then
   mkdir -p "$F360_DATA_DIR/native-dialogs"
   cp "$SCRIPT_DIR/src/native-dialogs/dlgshim.dll" "$F360_DATA_DIR/native-dialogs/"
+  cp "$SCRIPT_DIR/src/native-dialogs/hostrunner" "$F360_DATA_DIR/native-dialogs/"
 fi
 cp "$SCRIPT_DIR/src/bin/launch-fusion.sh" "$F360_DATA_DIR/"
 cp "$SCRIPT_DIR/src/doctor/doctor.sh" "$F360_DATA_DIR/"

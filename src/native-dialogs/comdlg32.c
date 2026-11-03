@@ -43,6 +43,9 @@
 
 #define PATH_MAX_W 4096
 
+/* This DLL's own module handle, captured at load. */
+static HMODULE shim_module = NULL;
+
 /* Resolve the real Wine implementation lazily. We are loaded as comdlg32, so
  * the genuine DLL sits elsewhere on the search path under the same name. */
 __declspec(dllexport) BOOL WINAPI GetOpenFileNameW(LPOPENFILENAMEW);
@@ -78,114 +81,186 @@ static void load_real_dll(void)
  * argv must be NULL-terminated. Returns malloc'd UTF-8 stdout on success, or
  * NULL on spawn failure, non-zero exit (cancel), or empty output.
  */
+/* Forward declarations: run_host_capture uses these before their definitions
+ * because the module is ordered simple-helper-first for readability. */
+char *shim_win_path_to_unix(const WCHAR *wpath);
+static const WCHAR *host_kdialog(void);
+
+/* Read a whole file into a NUL-terminated UTF-8 buffer. Caller frees. */
+static char *read_file_utf8(const WCHAR *path)
+{
+    HANDLE in = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL,
+                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (in == INVALID_HANDLE_VALUE) return NULL;
+
+    LARGE_INTEGER size;
+    if (!GetFileSizeEx(in, &size) || size.QuadPart <= 0) { CloseHandle(in); return NULL; }
+
+    size_t cap = (size_t)size.QuadPart + 1;
+    char *buf = (char *)malloc(cap);
+    if (!buf) { CloseHandle(in); return NULL; }
+
+    size_t len = 0;
+    DWORD got = 0;
+    while (len + 1 < cap && ReadFile(in, buf + len, (DWORD)(cap - 1 - len), &got, NULL) && got > 0)
+        len += got;
+    CloseHandle(in);
+
+    buf[len] = 0;
+    return buf;
+}
+
+/* Locate hostrunner, shipped beside this DLL. It exists because neither
+ * process waiting nor output polling can tell "still running" from "done" —
+ * see run_host_capture. */
+static const WCHAR *host_runner(void)
+{
+    static WCHAR path[MAX_PATH];
+    static int state = 0;      /* 0 = not tried, 1 = found, -1 = missing */
+    if (state) return state > 0 ? path : NULL;
+    state = -1;
+
+    /* Use the module handle captured in DllMain. GetModuleFileNameW with a
+     * function address as the "handle" returns 0 under Wine — that trap has
+     * bitten this file twice now (here and in the drive_c derivation). */
+    DWORD got = GetModuleFileNameW(shim_module, path, MAX_PATH);
+    if (got == 0 || got >= MAX_PATH) return NULL;
+
+    WCHAR *slash = wcsrchr(path, L'\\');
+    if (!slash) return NULL;
+    wcscpy(slash + 1, L"hostrunner");
+
+    if (GetFileAttributesW(path) == INVALID_FILE_ATTRIBUTES) return NULL;
+
+    /* Hand the runner back as a Unix path. Wine only executes a Unix binary
+     * when it is addressed as one; a C:\...\hostrunner path (no .exe) is
+     * treated as a missing program and the spawn silently does nothing. */
+    char *unix_self = shim_win_path_to_unix(path);
+    if (!unix_self) return NULL;
+    MultiByteToWideChar(CP_UTF8, 0, unix_self, -1, path, MAX_PATH);
+    free(unix_self);
+
+    state = 1;
+    return path;
+}
+
+/* Run a host (Unix) binary, capture stdout, and wait for it to really finish.
+ *
+ * Two Wine behaviours make the obvious implementations wrong, both verified
+ * with timing instrumentation:
+ *
+ *   1. WaitForSingleObject on a Unix child returns in ~4ms for an 8s process
+ *      (GetExitCodeProcess likewise returns a constant, never the real
+ *      status). Process waiting is unavailable.
+ *   2. Polling the output file for content cannot distinguish "still running"
+ *      from "exited with no output" — both leave it at zero bytes. A bounded
+ *      poll therefore races the human: kdialog writes nothing until a file is
+ *      picked, so any timeout is a coin flip against think-time.
+ *
+ * So the command runs under hostrunner, a tiny helper that waits for kdialog
+ * and then writes an exit-status marker. We poll for the marker, which is a
+ * real completion signal, with no assumption about how long the user takes.
+ *
+ * argv must be NULL-terminated. Returns malloc'd UTF-8 stdout, or NULL when
+ * the picker was cancelled, failed to launch, or exited with no output.
+ */
 static char *run_host_capture(const WCHAR *const *argv)
 {
+    const WCHAR *runner = host_runner();
+    const WCHAR *kd = host_kdialog();
+    if (!runner || !kd) return NULL;
+
+    /* The runner is a Unix binary: it opens these paths with open(2), so it
+     * needs Unix paths, not Z:\... forms. Fusion-visible paths (for our own
+     * file checks) stay in Windows form. */
+    WCHAR tmpfile[MAX_PATH], donefile[MAX_PATH];
+    DWORD seed = GetTickCount();
+    char tmp_unix[PATH_MAX_W], done_unix[PATH_MAX_W];
+    snprintf(tmp_unix, sizeof tmp_unix, "/tmp/fusion-cdl-%lu-%lu.out",
+             (unsigned long)GetCurrentProcessId(), (unsigned long)seed);
+    snprintf(done_unix, sizeof done_unix, "/tmp/fusion-cdl-%lu-%lu.done",
+             (unsigned long)GetCurrentProcessId(), (unsigned long)seed);
+    swprintf(tmpfile, MAX_PATH, L"Z:\\tmp\\fusion-cdl-%lu-%lu.out",
+             (unsigned long)GetCurrentProcessId(), (unsigned long)seed);
+    swprintf(donefile, MAX_PATH, L"Z:\\tmp\\fusion-cdl-%lu-%lu.done",
+             (unsigned long)GetCurrentProcessId(), (unsigned long)seed);
+    DeleteFileW(tmpfile);
+    DeleteFileW(donefile);
+
+    WCHAR wtmp_unix[PATH_MAX_W], wdone_unix[PATH_MAX_W];
+    MultiByteToWideChar(CP_UTF8, 0, tmp_unix, -1, wtmp_unix, PATH_MAX_W);
+    MultiByteToWideChar(CP_UTF8, 0, done_unix, -1, wdone_unix, PATH_MAX_W);
+
+    /* Build: runner <out> <done> <kdialog> <args...> */
     WCHAR cmdline[4096];
     size_t pos = 0;
     cmdline[0] = 0;
 
-    for (int i = 0; argv[i]; i++) {
-        const WCHAR *a = argv[i];
-        if (pos + wcslen(a) + 4 > 4096) return NULL;
+    const WCHAR *head[3] = { runner, wtmp_unix, wdone_unix };
+    for (int i = 0; i < 3; i++) {
         if (i) cmdline[pos++] = L' ';
         cmdline[pos++] = L'"';
-        for (; *a; a++) {
-            /* Double embedded quotes per the standard Windows argv rule. */
+        for (const WCHAR *a = head[i]; *a; a++) cmdline[pos++] = *a;
+        cmdline[pos++] = L'"';
+        cmdline[pos] = 0;
+    }
+    for (int i = 0; argv[i]; i++) {
+        /* argv[0] is the picker itself: the runner execs it, so it must be a
+         * Unix path. A Z:\... path makes execvp fail and the runner reports
+         * exit 127 with no output, which looked exactly like a cancel. */
+        WCHAR unix_buf[MAX_PATH];
+        const WCHAR *a0 = argv[i];
+        if (i == 0) {
+            char *u = shim_win_path_to_unix(argv[0]);
+            if (u) {
+                MultiByteToWideChar(CP_UTF8, 0, u, -1, unix_buf, MAX_PATH);
+                free(u);
+                a0 = unix_buf;
+            }
+        }
+        cmdline[pos++] = L' ';
+        cmdline[pos++] = L'"';
+        for (const WCHAR *a = a0; *a; a++) {
             if (*a == L'"') cmdline[pos++] = L'"';
-            if (pos + 3 > 4096) return NULL;
             cmdline[pos++] = *a;
         }
         cmdline[pos++] = L'"';
         cmdline[pos] = 0;
     }
 
-    /* Redirect stdout to a temp FILE rather than an anonymous pipe.
-     * Wine's CreateProcessW does not reliably hand an inherited pipe handle
-     * to a Unix binary — the child starts, but writes nowhere and the read
-     * side sees 0 bytes. A real file on disk is inherited correctly. */
-    /* Must live on the Unix filesystem. GetTempPathW returns the Windows temp
-     * dir (C:\users\...\Temp), and a Unix child inheriting a handle opened
-     * there gets a zero-byte file — the redirect silently produces nothing.
-     * /tmp (Z:\tmp) works. */
-    WCHAR tmpfile[MAX_PATH];
-    swprintf(tmpfile, MAX_PATH, L"Z:\\tmp\\fusion-cdl-%lu-%lu.tmp",
-             (unsigned long)GetCurrentProcessId(), (unsigned long)GetTickCount());
-
-    SECURITY_ATTRIBUTES sa = { sizeof sa, NULL, TRUE };
-    HANDLE out = CreateFileW(tmpfile, GENERIC_WRITE | GENERIC_READ,
-                             FILE_SHARE_READ | FILE_SHARE_WRITE, &sa,
-                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (out == INVALID_HANDLE_VALUE) return NULL;
-
     STARTUPINFOW si;
     PROCESS_INFORMATION pi;
     ZeroMemory(&si, sizeof si);
     ZeroMemory(&pi, sizeof pi);
     si.cb = sizeof si;
-    si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdOutput = out;
-    si.hStdError = out;
-    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
 
-    BOOL ok = CreateProcessW(NULL, cmdline, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
-    if (!ok) {
-        CloseHandle(out);
-        DeleteFileW(tmpfile);
+    if (!CreateProcessW(NULL, cmdline, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
         return NULL;
-    }
-    WaitForSingleObject(pi.hProcess, INFINITE);
-    DWORD code = 1;
-    GetExitCodeProcess(pi.hProcess, &code);
-    CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
-    CloseHandle(out);
 
-    /* Read the captured output back. */
-    size_t cap = 512, len = 0;
-    char *buf = (char *)malloc(cap);
-    if (!buf) { DeleteFileW(tmpfile); return NULL; }
+    /* Poll for the completion marker. No timeout on the user's behalf: the
+     * runner writes it as soon as kdialog exits, however long that takes.
+     * The ceiling exists only so a wedged runner cannot hang Fusion forever. */
+    int done = 0;
+    for (int attempt = 0; attempt < 36000; attempt++) {     /* ~10 min */
+        if (GetFileAttributesW(donefile) != INVALID_FILE_ATTRIBUTES) { done = 1; break; }
+        Sleep(50);
+    }
+    CloseHandle(pi.hProcess);
+    if (!done) { DeleteFileW(tmpfile); DeleteFileW(donefile); return NULL; }
 
-    /* Wine can report the process as exited before the Unix child's buffered
-     * writes land. Retry briefly rather than returning a spurious cancel. */
-    HANDLE in = INVALID_HANDLE_VALUE;
-    for (int attempt = 0; attempt < 50; attempt++) {
-        in = CreateFileW(tmpfile, GENERIC_READ, FILE_SHARE_READ, NULL,
-                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (in != INVALID_HANDLE_VALUE) {
-            LARGE_INTEGER sz;
-            if (GetFileSizeEx(in, &sz) && sz.QuadPart > 0) break;
-            CloseHandle(in);
-            in = INVALID_HANDLE_VALUE;
-        }
-        Sleep(20);
-    }
-    if (in != INVALID_HANDLE_VALUE) {
-        for (;;) {
-            DWORD got = 0;
-            if (cap - len < 2) {
-                char *nb = (char *)realloc(buf, cap * 2);
-                if (!nb) break;
-                buf = nb; cap *= 2;
-            }
-            if (!ReadFile(in, buf + len, (DWORD)(cap - len - 1), &got, NULL) || got == 0)
-                break;
-            len += got;
-        }
-        CloseHandle(in);
-    }
+    char *buf = read_file_utf8(tmpfile);
     DeleteFileW(tmpfile);
+    DeleteFileW(donefile);
 
     if (!buf) return NULL;
-    buf[len] = 0;
+
+    /* Trim trailing newline(s); kdialog prints exactly one line. */
+    size_t len = strlen(buf);
     while (len > 0 && (buf[len - 1] == '\n' || buf[len - 1] == '\r'))
         buf[--len] = 0;
 
-    /* Do NOT trust the exit code: Wine cannot report a Unix child's status.
-     * Observed values are constant (28671 / 4106) regardless of whether the
-     * child exited 0 or 1. kdialog prints the picked path and nothing on
-     * cancel, so empty output is the only reliable cancel signal. */
-    (void)code;
-    if (len == 0) { free(buf); return NULL; }
+    if (len == 0) { free(buf); return NULL; }   /* user cancelled */
     return buf;
 }
 
@@ -538,6 +613,14 @@ HRESULT WINAPI ShimDllGetClassObject(REFCLSID clsid, REFIID riid, void **out);
 /* Fusion's Open dialog goes through CoCreateInstance(CLSID_FileOpenDialog),
  * not GetOpenFileNameW, so the class object is what actually matters.
  * Unregistered CLSIDs get CLASS_E_CLASSNOTAVAILABLE and fall back. */
+BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
+{
+    (void)reserved;
+    if (reason == DLL_PROCESS_ATTACH)
+        shim_module = instance;
+    return TRUE;
+}
+
 HRESULT WINAPI DllGetClassObject(REFCLSID clsid, REFIID riid, void **out)
 {
     return ShimDllGetClassObject(clsid, riid, out);

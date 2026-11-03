@@ -266,6 +266,7 @@ prepare_native_dialog_shim() {
   # dispatches CoCreateInstance to its own builtin class table and never calls
   # ours (verified with a marker file). Any other name works.
   local source="$RUNTIME_DIR/../native-dialogs/dlgshim.dll"
+  local runner_source="$RUNTIME_DIR/../native-dialogs/hostrunner"
   local target
   target="$(native_dialog_shim_dir)/dlgshim.dll"
 
@@ -282,6 +283,13 @@ prepare_native_dialog_shim() {
       echo "launch-fusion.sh warning: could not install native file-dialog shim" >&2
       return 0
     fi
+  fi
+
+  # hostrunner must sit beside the shim: the shim locates it relative to its
+  # own module path.
+  if [[ -f "$runner_source" ]] && ! cmp -s "$runner_source" "$(native_dialog_shim_dir)/hostrunner"; then
+    cp "$runner_source" "$(native_dialog_shim_dir)/hostrunner" 2>/dev/null &&
+      chmod 755 "$(native_dialog_shim_dir)/hostrunner" || true
   fi
 
   local wine_bin
