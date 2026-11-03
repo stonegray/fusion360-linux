@@ -10,7 +10,10 @@
 
 # ── Kill all Fusion/Wine/Proton processes ───────────────────────────────
 # Uses /proc/*/exe scanning to match Proton processes.
-# SIGTERM -> sleep 2 -> SIGKILL escalation.
+# Shutdown order: wineserver first (it reaps its own children, avoiding
+# orphans/zombies), then SIGTERM, then SIGKILL for survivors.
+: "${WINESERVER_GRACE:=25}"
+
 kill_fusion_processes() {
   local user; user=$(id -u)
   local pids=()
@@ -62,8 +65,16 @@ kill_fusion_processes() {
   fi
 
 
-  # Method 3: kill the Wine server for our prefix — cleanly terminates all
-  # Wine processes in that prefix (most thorough single-action shutdown).
+  # Method 3: shutdown via the prefix's wineserver FIRST, and let it finish.
+  #
+  # wineserver owns every process in the prefix and tears them down in order,
+  # reaping each child. Blanket-sending SIGKILL to the process list instead
+  # orphons Wine's helper processes (CrGpuMain, ADPClientService,
+  # OFU::loadCloudF, ...) — a SIGKILLed parent never runs its wait(), so the
+  # children are reparented to systemd and linger as zombies, which also leaves
+  # stale window records in the compositor. Give wineserver the time to do it
+  # properly before escalating.
+  local ws_killed=0
   if [[ -n "${PFX_DIR:-}" ]]; then
     local ws="$PFX_DIR/pfx/.wineserver.lock"
     if [[ -f "$ws" ]]; then
@@ -71,17 +82,36 @@ kill_fusion_processes() {
       ws_pid=$(head -1 "$ws" 2>/dev/null || true)
       if [[ -n "$ws_pid" ]]; then
         /bin/kill "$ws_pid" 2>/dev/null || command kill "$ws_pid" 2>/dev/null || true
-        log_info "   Killed wineserver PID $ws_pid for prefix $PFX_DIR"
-        sleep 0.5
+        log_info "   Sent SIGTERM to wineserver PID $ws_pid for prefix $PFX_DIR"
+        ws_killed=1
       fi
     fi
   fi
-  log_info " Killing ${#unique[@]} Wine/Proton process(es)..."
 
   # NOTE: use /bin/kill explicitly. A shell builtin named `kill` can shadow
   # the binary and reject numeric signals ("invalid signal name"), leaving
   # processes alive while this function reports success.
   _kill() { /bin/kill "$@" 2>/dev/null || command kill "$@" 2>/dev/null; }
+
+  # Wait for wineserver to reap its own children. Only fall through to the
+  # generic TERM/KILL ladder for whatever is still alive afterwards.
+  if (( ws_killed )); then
+    local waited=0
+    while (( waited < WINESERVER_GRACE )); do
+      local alive=0
+      for pid in "${unique[@]}"; do
+        [[ -d "/proc/$pid" ]] || continue
+        local st
+        st=$(awk '/^State:/{print $2}' "/proc/$pid/status" 2>/dev/null || true)
+        [[ "$st" == "Z" ]] || alive=$((alive + 1))
+      done
+      (( alive == 0 )) && break
+      sleep 0.2
+      waited=$((waited + 1))
+    done
+  fi
+
+  log_info " Killing ${#unique[@]} Wine/Proton process(es)..."
 
   # Graceful TERM first
   for pid in "${unique[@]}"; do
