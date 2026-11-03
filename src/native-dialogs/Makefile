@@ -10,7 +10,7 @@ CC      := x86_64-w64-mingw32-gcc
 CFLAGS  := -O2 -Wall -Wextra -Wno-cast-function-type -Wno-unused-parameter
 LDFLAGS := -s -shared -lole32 -luuid
 
-SRCS := comdlg32.c dialog_com.c
+SRCS := comdlg32.c dialog_com.c shim_log.c
 
 all: dlgshim.dll
 

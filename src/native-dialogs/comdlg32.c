@@ -39,6 +39,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
+#include "shim_log.h"
 #include <stdio.h>
 
 #define PATH_MAX_W 4096
@@ -234,8 +235,11 @@ static char *run_host_capture(const WCHAR *const *argv)
     ZeroMemory(&pi, sizeof pi);
     si.cb = sizeof si;
 
-    if (!CreateProcessW(NULL, cmdline, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+    if (!CreateProcessW(NULL, cmdline, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+        shim_log("warn", "CreateProcess failed err=%lu for runner %ls cmdline %ls",
+                 GetLastError(), runner, cmdline);
         return NULL;
+    }
     CloseHandle(pi.hThread);
 
     /* Poll for the completion marker. No timeout on the user's behalf: the
@@ -247,7 +251,12 @@ static char *run_host_capture(const WCHAR *const *argv)
         Sleep(50);
     }
     CloseHandle(pi.hProcess);
-    if (!done) { DeleteFileW(tmpfile); DeleteFileW(donefile); return NULL; }
+    if (!done) {
+        shim_log("warn", "runner produced no completion marker within the ceiling");
+        DeleteFileW(tmpfile);
+        DeleteFileW(donefile);
+        return NULL;
+    }
 
     char *buf = read_file_utf8(tmpfile);
     DeleteFileW(tmpfile);
@@ -260,7 +269,7 @@ static char *run_host_capture(const WCHAR *const *argv)
     while (len > 0 && (buf[len - 1] == '\n' || buf[len - 1] == '\r'))
         buf[--len] = 0;
 
-    if (len == 0) { free(buf); return NULL; }   /* user cancelled */
+    if (len == 0) { free(buf); shim_log("val", "picker exited with empty output (cancelled)"); return NULL; }
     return buf;
 }
 
@@ -324,6 +333,7 @@ char *shim_win_path_to_unix(const WCHAR *wpath)
     if (!convert) return NULL;
 
     const char *unix_path = convert(wpath);
+    shim_log("val", "win->unix: %ls => %s", wpath, unix_path ? unix_path : "(null)");
     if (!unix_path || !*unix_path) return NULL;
 
     size_t len = strlen(unix_path) + 1;
@@ -474,6 +484,84 @@ char *shim_run_picker_str(const char *initial_dir, const char *filter)
     argv[ai] = NULL;
 
     return run_host_capture(argv);
+}
+
+/* Convert a Unix path to the Windows path Wine would use for it.
+ *
+ * Uses wine_get_dos_file_name so the result carries the drive letter Wine
+ * itself picks. Blindly prefixing Z: produced
+ * Z:\home\...\pfx\drive_c\users\... for files that live on C:\, which is a
+ * different string from the C:\users\... form the rest of Fusion uses.
+ * Falls back to the Z: mapping only if Wine cannot map the path.
+ */
+WCHAR *unix_to_win_path(const char *unix_path)
+{
+    /* Map without spawning anything. winepath would be authoritative, but it
+     * must run through run_host_capture, which itself needs this DLL's path —
+     * so calling it from here recurses.
+     *
+     * Wine's layout is fixed and simple: <prefix>/drive_c/... is C:\... and
+     * anything else is reachable as Z:\. Derive the prefix from this DLL's
+     * own module path, which always lives under drive_c by construction. */
+    if (!unix_path || unix_path[0] != '/') return NULL;
+
+    /* GetModuleFileName returns a WINDOWS path (C:/users/...), so it has to
+     * be mapped to Unix before any "/drive_c/" logic can work. Using it
+     * directly was why the C: branch never matched. */
+    WCHAR wself[MAX_PATH * 2];
+    DWORD got = GetModuleFileNameW(shim_module, wself, MAX_PATH * 2);
+    if (got == 0 || got >= MAX_PATH * 2) return NULL;
+
+    char *unix_self = shim_win_path_to_unix(wself);
+    if (!unix_self) return NULL;
+    char self[MAX_PATH * 2];
+    strncpy(self, unix_self, sizeof self - 1);
+    self[sizeof self - 1] = 0;
+    free(unix_self);
+
+    /* ".../pfx/drive_c/users/..." -> prefix root is everything before /drive_c */
+    char *marker = strstr(self, "/drive_c/");
+    /* Keep ".../drive_c" WITHOUT the trailing slash, so prefix compares
+     * against "/drive_c" and the following character is the path separator. */
+    if (marker) marker[8] = 0;
+
+    WCHAR prefix[MAX_PATH];
+    MultiByteToWideChar(CP_UTF8, 0, self, -1, prefix, MAX_PATH);
+
+    WCHAR wunix[MAX_PATH];
+    if (MultiByteToWideChar(CP_UTF8, 0, unix_path, -1, wunix, MAX_PATH) <= 0)
+        return NULL;
+
+    const WCHAR *rest = NULL;
+    WCHAR drive[3] = { 0, 0, 0 };
+
+    if (marker && wcsncmp(wunix, prefix, wcslen(prefix)) == 0 && wunix[wcslen(prefix)] == L'/') {
+        /* Inside the prefix: strip "<prefix>/drive_c" and use C: */
+        const WCHAR *p = wunix + wcslen(prefix);   /* points at '/' */
+        drive[0] = L'C'; drive[1] = L':';
+        rest = p;
+    } else {
+        drive[0] = L'Z'; drive[1] = L':';
+        rest = wunix;
+    }
+
+    size_t len = wcslen(rest) + 3;
+    WCHAR *out = (WCHAR *)malloc(len * sizeof(WCHAR));
+    if (!out) return NULL;
+    swprintf(out, len, L"%ls%ls", drive, rest);
+    for (WCHAR *q = out; *q; q++) if (*q == L'/') *q = L'\\';
+    /* rest begins with the separator; ensure the drive is followed by one */
+    if (out[2] != L'\\' && out[2] != 0) {
+        size_t l2 = wcslen(out) + 2;
+        WCHAR *fixed = (WCHAR *)malloc(l2 * sizeof(WCHAR));
+        if (fixed) {
+            fixed[0] = out[0]; fixed[1] = out[1]; fixed[2] = L'\\';
+            wcscpy(fixed + 3, out + 2);
+            free(out);
+            out = fixed;
+        }
+    }
+    return out;
 }
 
 /* Wide wrapper: convert a Windows path for a Linux binary and hand it back

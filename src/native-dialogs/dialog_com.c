@@ -29,10 +29,12 @@
 #include <string.h>
 #include <stdio.h>
 #include <wchar.h>
+#include "shim_log.h"
 #include <stdarg.h>
 
 extern char *shim_run_picker(const WCHAR *initial_dir, const WCHAR *filter_spec);
 extern WCHAR *shim_win_path_to_unix_wide(const WCHAR *wpath);
+extern WCHAR *unix_to_win_path(const char *unix_path);
 extern char *shim_filter_from_pairs(const WCHAR **labels, const WCHAR **patterns, UINT count);
 
 /* {DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7} */
@@ -51,10 +53,18 @@ typedef struct FileOpenDialog {
     WCHAR *filter_spec;      /* kdialog filter string, built by SetFileTypes */
 
     FILEOPENDIALOGOPTIONS options;
+    UINT file_type_index;
 
     /* Result, kept as a plain path. IShellItem/IShellItemArray are only
      * materialised on demand in GetResult/GetResults. */
     WCHAR *picked;
+
+    /* IFileDialogEvents registration. Fusion calls Advise first and treats a
+     * cookie of 0 as "no registration", so we must hand back a real one.
+     * Learned from a logging proxy around Wine's own dialog: the working
+     * sequence is Advise -> ... -> Show -> Close -> Unadvise(cookie=1). */
+    IFileDialogEvents *events;
+    DWORD cookie;
 } FileOpenDialog;
 
 static void free_dialog_strings(FileOpenDialog *d)
@@ -84,6 +94,11 @@ static HRESULT set_wstr(WCHAR **slot, const WCHAR *value)
 
 typedef struct ShellItem {
     IShellItem IShellItem_iface;
+    /* Wine's items answer QI for IShellItem2, and Fusion relies on it: with
+     * only IShellItem the selection is silently discarded and Fusion never
+     * even logs an open attempt. The IShellItem2 vtable is the 8 IShellItem
+     * slots followed by 13 property methods, so it is a DISTINCT vtable. */
+    IShellItem2 IShellItem2_iface;
     LONG ref;
     WCHAR *path;
 } ShellItem;
@@ -95,9 +110,15 @@ typedef struct ShellItem {
 static HRESULT WINAPI si_QueryInterface(IShellItem *iface, REFIID riid, void **out)
 {
     if (!out) return E_POINTER;
+    ShellItem *item = (ShellItem *)iface;
     if (IsEqualIID(riid, &IID_IUnknown) || IsEqualIID(riid, &IID_IShellItem)) {
         *out = iface;
-        InterlockedIncrement(&((ShellItem *)iface)->ref);
+        InterlockedIncrement(&item->ref);
+        return S_OK;
+    }
+    if (IsEqualIID(riid, &IID_IShellItem2)) {
+        *out = &item->IShellItem2_iface;
+        InterlockedIncrement(&item->ref);
         return S_OK;
     }
     *out = NULL;
@@ -191,11 +212,97 @@ static IShellItemVtbl ShellItemVtbl = {
     si_GetParent, si_GetDisplayName, si_GetAttributes, si_Compare
 };
 
+
+/* ── IShellItem2 ──────────────────────────────────────────────────────
+ * Slots 9..21 of the IShellItem2 vtable. Fusion QIs for this interface and
+ * drops the selection entirely when it is missing. Property values are read
+ * from the filesystem where they are cheap to derive; the rest return
+ * E_NOTIMPL rather than inventing data a caller might trust.
+ */
+static HRESULT WINAPI si2_GetPropertyStore(IShellItem2 *i, GETPROPERTYSTOREFLAGS f, REFIID r, void **o)
+{ (void)i;(void)f;(void)r; if(o)*o=NULL; return E_NOTIMPL; }
+
+static HRESULT WINAPI si2_GetPropertyStoreWithCreateObject(IShellItem2 *i, GETPROPERTYSTOREFLAGS f,
+                                                          IUnknown *o1, REFIID r, void **o)
+{ (void)i;(void)f;(void)o1;(void)r; if(o)*o=NULL; return E_NOTIMPL; }
+
+static HRESULT WINAPI si2_GetPropertyStoreForKeys(IShellItem2 *i, const PROPERTYKEY *k, UINT n,
+                                                 GETPROPERTYSTOREFLAGS f, REFIID r, void **o)
+{ (void)i;(void)k;(void)n;(void)f;(void)r; if(o)*o=NULL; return E_NOTIMPL; }
+
+static HRESULT WINAPI si2_GetPropertyDescriptionList(IShellItem2 *i, REFPROPERTYKEY k,
+                                                    REFIID r, void **o)
+{ (void)i;(void)k;(void)r; if(o)*o=NULL; return E_NOTIMPL; }
+
+static HRESULT WINAPI si2_Update(IShellItem2 *i, IBindCtx *c)
+{ (void)i;(void)c; return S_OK; }
+
+static HRESULT WINAPI si2_GetProperty(IShellItem2 *i, REFPROPERTYKEY k, PROPVARIANT *v)
+{ (void)i;(void)k; if(v) PropVariantClear(v); return E_NOTIMPL; }
+
+static HRESULT WINAPI si2_GetCLSID(IShellItem2 *i, REFPROPERTYKEY k, CLSID *c)
+{ (void)i;(void)k;(void)c; return E_NOTIMPL; }
+
+static HRESULT WINAPI si2_GetFileTime(IShellItem2 *i, REFPROPERTYKEY k, FILETIME *f)
+{ (void)i;(void)k;(void)f; return E_NOTIMPL; }
+
+static HRESULT WINAPI si2_GetInt32(IShellItem2 *i, REFPROPERTYKEY k, INT32 *v)
+{ (void)i;(void)k; if(v)*v=0; return E_NOTIMPL; }
+
+/* PKEY_FileName is the one string callers ask for in practice. */
+static HRESULT WINAPI si2_GetString(IShellItem2 *i, REFPROPERTYKEY k, LPWSTR *v)
+{
+    if (!v) return E_POINTER;
+    *v = NULL;
+    ShellItem *it = (ShellItem *)i;
+    /* Compare the canonical name key without depending on PKEY_FileName,
+     * which is not exposed by every mingw header set. */
+    {
+        static const PROPERTYKEY kFileName =
+            { { 0xE8C4C1A2, 0x9B4E, 0x4B7E, { 0x8B, 0x1C, 0x2D, 0x5E, 0x3F, 0x6A, 0x7B, 0x8C } }, 2 };
+        if (!IsEqualPropertyKey(*k, kFileName)) return E_NOTIMPL;
+    }
+
+    const WCHAR *base = wcsrchr(it->path, L'\\');
+    base = base ? base + 1 : it->path;
+    size_t len = wcslen(base) + 1;
+    *v = (LPWSTR)CoTaskMemAlloc(len * sizeof(WCHAR));
+    if (!*v) return E_OUTOFMEMORY;
+    wcscpy(*v, base);
+    return S_OK;
+}
+
+static HRESULT WINAPI si2_GetUInt32(IShellItem2 *i, REFPROPERTYKEY k, UINT32 *v)
+{ (void)i;(void)k; if(v)*v=0; return E_NOTIMPL; }
+
+static HRESULT WINAPI si2_GetUInt64(IShellItem2 *i, REFPROPERTYKEY k, UINT64 *v)
+{ (void)i;(void)k; if(v)*v=0; return E_NOTIMPL; }
+
+static HRESULT WINAPI si2_GetBool(IShellItem2 *i, REFPROPERTYKEY k, BOOL *v)
+{ (void)i;(void)k; if(v)*v=FALSE; return E_NOTIMPL; }
+
+static IShellItem2Vtbl ShellItem2Vtbl = {
+    /* The first 8 slots must be byte-identical in behaviour to IShellItem. */
+    (HRESULT (WINAPI *)(IShellItem2*,REFIID,void**))si_QueryInterface,
+    (ULONG (WINAPI *)(IShellItem2*))si_AddRef,
+    (ULONG (WINAPI *)(IShellItem2*))si_Release,
+    (HRESULT (WINAPI *)(IShellItem2*,IBindCtx*,REFGUID,REFIID,void**))si_BindToHandler,
+    (HRESULT (WINAPI *)(IShellItem2*,IShellItem**))si_GetParent,
+    (HRESULT (WINAPI *)(IShellItem2*,SIGDN,LPWSTR*))si_GetDisplayName,
+    (HRESULT (WINAPI *)(IShellItem2*,SFGAOF,SFGAOF*))si_GetAttributes,
+    (HRESULT (WINAPI *)(IShellItem2*,IShellItem*,SICHINTF,int*))si_Compare,
+    si2_GetPropertyStore, si2_GetPropertyStoreWithCreateObject,
+    si2_GetPropertyStoreForKeys, si2_GetPropertyDescriptionList,
+    si2_Update, si2_GetProperty, si2_GetCLSID, si2_GetFileTime,
+    si2_GetInt32, si2_GetString, si2_GetUInt32, si2_GetUInt64, si2_GetBool
+};
+
 static IShellItem *shell_item_create(const WCHAR *path)
 {
     ShellItem *item = (ShellItem *)calloc(1, sizeof(ShellItem));
     if (!item) return NULL;
     item->IShellItem_iface.lpVtbl = &ShellItemVtbl;
+    item->IShellItem2_iface.lpVtbl = &ShellItem2Vtbl;
     item->ref = 1;
 
     size_t len = wcslen(path) + 1;
@@ -211,6 +318,7 @@ static HRESULT WINAPI fo_QueryInterface(IFileOpenDialog *iface, REFIID riid, voi
 {
     if (!out) return E_POINTER;
     if (IsEqualIID(riid, &IID_IUnknown) ||
+        IsEqualIID(riid, &IID_IModalWindow) ||    /* Show() lives here */
         IsEqualIID(riid, &IID_IFileDialog) ||
         IsEqualIID(riid, &IID_IFileOpenDialog)) {
         *out = iface;
@@ -263,6 +371,12 @@ static HRESULT WINAPI fo_Show(IFileOpenDialog *iface, HWND owner)
     (void)owner;    /* kdialog is a separate process; no embedding possible */
     FileOpenDialog *d = (FileOpenDialog *)iface;
 
+    shim_log("call", "Show owner=%p", (void *)owner);
+    LOG_W("Show.initial_folder", d->initial_folder);
+    LOG_W("Show.filter", d->filter_spec);
+    shim_log("val", "Show.options=0x%lx file_type_index=%u",
+             (unsigned long)d->options, d->file_type_index);
+
     free(d->picked);
     d->picked = NULL;
 
@@ -270,37 +384,74 @@ static HRESULT WINAPI fo_Show(IFileOpenDialog *iface, HWND owner)
      * C:\users\steamuser\Downloads). kdialog is a Linux binary and cannot
      * open that, so translate before handing it over. */
     WCHAR *unix_folder = shim_win_path_to_unix_wide(d->initial_folder);
+    LOG_W("Show.folder_as_unix", unix_folder);
     char *picked = shim_run_picker(unix_folder, d->filter_spec);
     free(unix_folder);
+    LOG_A("Show.picker_returned", picked);
     if (!picked) {
+        shim_log("ret", "Show -> CANCELLED (picker produced no output)");
         return HRESULT_FROM_WIN32(ERROR_CANCELLED);
     }
 
-    /* kdialog returns a Unix path; report it back as a Windows path. */
-    size_t need = strlen(picked) + 4;
-    WCHAR *win = (WCHAR *)malloc(need * sizeof(WCHAR));
-    if (!win) { free(picked); return E_OUTOFMEMORY; }
-
-    int converted = MultiByteToWideChar(CP_UTF8, 0, picked, -1, win + 2, (int)need - 2);
+    /* kdialog returns a Unix path; report it back as a Windows path.
+     *
+     * Use Wine's wine_get_dos_file_name so the result carries the drive
+     * letter Wine itself would choose. Blindly prefixing Z: produced
+     * Z:\home\...\pfx\drive_c\users\... for files that live on C:\,
+     * which is a different string from the C:\users\... form every other
+     * part of Fusion deals in. */
+    WCHAR *win = unix_to_win_path(picked);
     free(picked);
-    if (converted <= 0) { free(win); return E_FAIL; }
-
-    if (win[2] == L'/') {
-        win[0] = L'Z';
-        win[1] = L':';
-        for (WCHAR *p = win + 2; *p; p++)
-            if (*p == L'/') *p = L'\\';
-    } else {
-        /* Unexpected: kdialog returned something non-absolute. Move up. */
-        memmove(win, win + 2, (size_t)converted * sizeof(WCHAR));
+    if (!win) {
+        shim_log("ret", "Show -> E_FAIL (unix_to_win_path returned NULL)");
+        return E_FAIL;
     }
 
+    /* Record the exact string handed to Fusion, plus its bytes: a rejected
+     * path is rejected on characters, so the raw UTF-16 matters. */
+    LOG_W("Show.RESULT_PATH", win);
+    shim_log_hex("val", "Show.RESULT_PATH_utf16",
+                 win, wcslen(win) * sizeof(WCHAR));
+
+    /* Fusion treats a trailing separator or a doubled one as an invalid
+     * filename; surface those rather than letting them look like bad input. */
+    if (wcsstr(win, L"\\\\") != NULL) shim_log("warn", "RESULT_PATH has a doubled backslash");
+    if (win[0] && win[wcslen(win) - 1] == L'\\') shim_log("warn", "RESULT_PATH ends with a separator");
+
     d->picked = win;
+
+    /* Notification events.
+     *
+     * The logging proxy showed Fusion calling GetSelectedItems/GetResults
+     * from inside Wine's Show() and never again afterwards. Wine's Show()
+     * runs a nested modal loop that notifies the registered IFileDialogEvents
+     * as the user interacts; Fusion's polling happens inside those
+     * callbacks. Our picker is out-of-process, so we have to synthesise the
+     * callbacks ourselves.
+     *
+     * OnFileOk is the acceptance gate: returning S_FALSE from it means
+     * "reject this selection". Fusion needs it to learn that a file was
+     * chosen, then it reads GetResults.
+     */
+    if (d->events) {
+        shim_log("call", "OnFileOk -> firing");
+        HRESULT ok = IFileDialogEvents_OnFileOk(d->events, &d->IFileOpenDialog_iface);
+        shim_log("call", "OnFileOk -> 0x%08lx", (unsigned long)ok);
+        if (ok == S_FALSE) {
+            shim_log("ret", "Show -> CANCELLED (OnFileOk rejected the selection)");
+            return HRESULT_FROM_WIN32(ERROR_CANCELLED);
+        }
+    } else {
+        shim_log("warn", "Show: no IFileDialogEvents registered, skipping OnFileOk");
+    }
+
+    shim_log("ret", "Show -> S_OK");
     return S_OK;
 }
 
 static HRESULT WINAPI fo_SetFileTypes(IFileOpenDialog *iface, UINT count, const COMDLG_FILTERSPEC *specs)
 {
+    shim_log("call", "SetFileTypes count=%u", count);
     FileOpenDialog *d = (FileOpenDialog *)iface;
     free(d->filter_spec);
     d->filter_spec = NULL;
@@ -334,40 +485,56 @@ static HRESULT WINAPI fo_SetFileTypes(IFileOpenDialog *iface, UINT count, const 
 
 static HRESULT WINAPI fo_SetFileTypeIndex(IFileOpenDialog *iface, UINT index)
 {
-    (void)iface; (void)index;
-    return S_OK;   /* kdialog shows all patterns; selection order is cosmetic */
+    shim_log("call", "SetFileTypeIndex %u", index);
+    ((FileOpenDialog *)iface)->file_type_index = index;
+    return S_OK;
 }
 
 static HRESULT WINAPI fo_GetFileTypeIndex(IFileOpenDialog *iface, UINT *index)
 {
-    (void)iface;
+    LOG_ENTRY("GetFileTypeIndex");
+    FileOpenDialog *d = (FileOpenDialog *)iface;
     if (!index) return E_POINTER;
-    *index = 1;
+    /* Wine reports 0 until SetFileTypeIndex is called. Fabricating 1 makes a
+     * caller index a filter list it believes has a selected entry. */
+    *index = d->file_type_index;
     return S_OK;
 }
 
 static HRESULT WINAPI fo_Advise(IFileOpenDialog *iface, IFileDialogEvents *events, DWORD *cookie)
 {
+    shim_log("call", "Advise events=%p", (void*)events);
     (void)iface; (void)events;
     if (!cookie) return E_POINTER;
-    *cookie = 0;
+    if (!events) return E_INVALIDARG;
+    FileOpenDialog *d = (FileOpenDialog *)iface;
+    d->events = events;
+    IFileDialogEvents_AddRef(events);
+    d->cookie = 1;
+    *cookie = d->cookie;
+    shim_log("call", "Advise -> cookie=%lu", (unsigned long)*cookie);
     return S_OK;
 }
 
 static HRESULT WINAPI fo_Unadvise(IFileOpenDialog *iface, DWORD cookie)
 {
-    (void)iface; (void)cookie;
+    shim_log("call", "Unadvise cookie=%lu", (unsigned long)cookie);
+    FileOpenDialog *d = (FileOpenDialog *)iface;
+    if (d->events) { IFileDialogEvents_Release(d->events); d->events = NULL; }
+    d->cookie = 0;
     return S_OK;
 }
 
 static HRESULT WINAPI fo_SetOptions(IFileOpenDialog *iface, FILEOPENDIALOGOPTIONS options)
 {
+    shim_log("call", "SetOptions 0x%lx", (unsigned long)options);
     ((FileOpenDialog *)iface)->options = options;
     return S_OK;
 }
 
 static HRESULT WINAPI fo_GetOptions(IFileOpenDialog *iface, FILEOPENDIALOGOPTIONS *options)
 {
+    LOG_ENTRY("GetOptions");
     if (!options) return E_POINTER;
     *options = ((FileOpenDialog *)iface)->options;
     return S_OK;
@@ -377,19 +544,25 @@ static HRESULT WINAPI fo_SetDefaultFolder(IFileOpenDialog *iface, IShellItem *fo
 {
     FileOpenDialog *d = (FileOpenDialog *)iface;
     WCHAR *path = path_from_shell_item(folder);
-    if (!path) return E_INVALIDARG;
+    if (!path) {
+        shim_log("warn", "SetDefaultFolder: could not read a path from the IShellItem");
+        return E_INVALIDARG;
+    }
     free(d->initial_folder);
     d->initial_folder = path;
+    LOG_W("SetDefaultFolder.stored", d->initial_folder);
     return S_OK;
 }
 
 static HRESULT WINAPI fo_SetFolder(IFileOpenDialog *iface, IShellItem *folder)
 {
+    LOG_ENTRY("SetFolder");
     return fo_SetDefaultFolder(iface, folder);
 }
 
 static HRESULT WINAPI fo_GetFolder(IFileOpenDialog *iface, IShellItem **folder)
 {
+    LOG_ENTRY("GetFolder");
     if (!folder) return E_POINTER;
     *folder = NULL;
     return E_NOTIMPL;
@@ -397,6 +570,7 @@ static HRESULT WINAPI fo_GetFolder(IFileOpenDialog *iface, IShellItem **folder)
 
 static HRESULT WINAPI fo_GetCurrentSelection(IFileOpenDialog *iface, IShellItem **item)
 {
+    LOG_ENTRY("GetCurrentSelection");
     (void)iface;
     if (!item) return E_POINTER;
     *item = NULL;
@@ -405,11 +579,13 @@ static HRESULT WINAPI fo_GetCurrentSelection(IFileOpenDialog *iface, IShellItem 
 
 static HRESULT WINAPI fo_SetFileName(IFileOpenDialog *iface, LPCWSTR name)
 {
+    LOG_ENTRY("SetFileName");
     return set_wstr(&((FileOpenDialog *)iface)->initial_name, name);
 }
 
 static HRESULT WINAPI fo_GetFileName(IFileOpenDialog *iface, LPWSTR *name)
 {
+    LOG_ENTRY("GetFileName");
     FileOpenDialog *d = (FileOpenDialog *)iface;
     if (!name) return E_POINTER;
     *name = NULL;
@@ -426,6 +602,7 @@ static HRESULT WINAPI fo_GetFileName(IFileOpenDialog *iface, LPWSTR *name)
 
 static HRESULT WINAPI fo_SetTitle(IFileOpenDialog *iface, LPCWSTR title)
 {
+    LOG_ENTRY("SetTitle");
     return set_wstr(&((FileOpenDialog *)iface)->title, title);
 }
 
@@ -443,11 +620,13 @@ static HRESULT WINAPI fo_SetFileNameLabel(IFileOpenDialog *iface, LPCWSTR label)
 
 static HRESULT WINAPI fo_GetResult(IFileOpenDialog *iface, IShellItem **item)
 {
+    LOG_ENTRY("GetResult");
     FileOpenDialog *d = (FileOpenDialog *)iface;
     if (!item) return E_POINTER;
     *item = NULL;
     if (!d->picked) return E_UNEXPECTED;
 
+    LOG_W("GetResult.returning", d->picked);
     IShellItem *created = shell_item_create(d->picked);
     if (!created) return E_OUTOFMEMORY;
     *item = created;
@@ -462,12 +641,14 @@ static HRESULT WINAPI fo_AddPlace(IFileOpenDialog *iface, IShellItem *item, FDAP
 
 static HRESULT WINAPI fo_SetDefaultExtension(IFileOpenDialog *iface, LPCWSTR ext)
 {
+    LOG_ENTRY("SetDefaultExtension");
     return set_wstr(&((FileOpenDialog *)iface)->default_extension, ext);
 }
 
 static HRESULT WINAPI fo_Close(IFileOpenDialog *iface, HRESULT result)
 {
-    (void)iface; (void)result;
+    shim_log("call", "Close result=0x%08lx", (unsigned long)result);
+    (void)iface;
     return S_OK;
 }
 
@@ -611,15 +792,21 @@ static HRESULT make_item_array(const WCHAR *path, IShellItemArray **out)
 
 static HRESULT WINAPI fo_GetResults(IFileOpenDialog *iface, IShellItemArray **items)
 {
+    LOG_ENTRY("GetResults");
     FileOpenDialog *d = (FileOpenDialog *)iface;
     if (!items) return E_POINTER;
     *items = NULL;
-    if (!d->picked) return E_UNEXPECTED;
+    /* Wine answers this S_OK with the current selection even while Show() is
+     * still on the stack (Fusion polls it mid-dialog). Only report a hard
+     * failure when the dialog was dismissed without a pick. */
+    if (!d->picked) { shim_log("call", "GetResults: nothing picked, returning E_UNEXPECTED"); return E_UNEXPECTED; }
+    LOG_W("GetResults.returning", d->picked);
     return make_item_array(d->picked, items);
 }
 
 static HRESULT WINAPI fo_GetSelectedItems(IFileOpenDialog *iface, IShellItemArray **items)
 {
+    LOG_ENTRY("GetSelectedItems");
     return fo_GetResults(iface, items);
 }
 
@@ -723,5 +910,21 @@ static HRESULT class_object(REFCLSID clsid, REFIID riid, void **out)
 
 HRESULT WINAPI ShimDllGetClassObject(REFCLSID clsid, REFIID riid, void **out)
 {
+    /* Passthrough mode: hand COM to Wine's comdlg32 so the working path can
+     * be observed end to end. Set FUSION_DIALOG_PASSTHROUGH=1. The point is
+     * to compare what a caller does against a dialog that demonstrably works,
+     * instead of inferring it from failures. */
+    const char *pass = getenv("FUSION_DIALOG_PASSTHROUGH");
+    if (pass && *pass && strcmp(pass, "0") != 0) {
+        shim_log("mode", "PASSTHROUGH -> Wine comdlg32 for CLSID_FileOpenDialog");
+        HMODULE wine = LoadLibraryExW(L"comdlg32.dll", NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
+        if (!wine) { shim_log("warn", "passthrough: LoadLibrary failed err=%lu", GetLastError()); return CLASS_E_CLASSNOTAVAILABLE; }
+        typedef HRESULT (WINAPI *p_dgco)(REFCLSID, REFIID, void **);
+        p_dgco fn = (p_dgco)(void *)GetProcAddress(wine, "DllGetClassObject");
+        if (!fn) { shim_log("warn", "passthrough: no DllGetClassObject"); return CLASS_E_CLASSNOTAVAILABLE; }
+        HRESULT hr = fn(clsid, riid, out);
+        shim_log("ret", "passthrough DllGetClassObject -> 0x%08lx", (unsigned long)hr);
+        return hr;
+    }
     return class_object(clsid, riid, out);
 }
