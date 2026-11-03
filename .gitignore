@@ -1,2 +1,5 @@
 __pycache__/
 debug-logs/
+
+# Test artifacts created when a Windows path is used verbatim on Linux
+Z:\*
