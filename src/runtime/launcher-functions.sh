@@ -175,6 +175,10 @@ apply_launch_environment() {
   if is_enabled "${FUSION_NATIVE_DIALOGS:-1}"; then
     if [[ -f "$(native_dialog_shim_dir)/comdlg32.dll" ]]; then
       dll_overrides="${dll_overrides:+$dll_overrides;}comdlg32=n"
+    else
+      # Say so. Silently dropping the override is how this shipped broken
+      # once: Fusion just kept its Windows dialogs and looked "fine".
+      echo "launch-fusion.sh warning: native dialog shim missing at $(native_dialog_shim_dir)/comdlg32.dll; using Windows file dialogs" >&2
     fi
   fi
   if [[ -n "$dll_overrides" ]]; then

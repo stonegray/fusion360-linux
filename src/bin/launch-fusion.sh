@@ -107,8 +107,6 @@ elif [[ -z "${FUSION_SKIP_UI:-}" ]]; then
   :
 fi
 
-apply_launch_environment
-
 [[ -f "$RUNTIME_DIR/fusion-session.py" ]] || fail "Fusion session supervisor is missing; reinstall runtime scripts."
 command -v python3 >/dev/null 2>&1 || fail "Python 3 is required for session cleanup."
 
@@ -123,8 +121,14 @@ FUSION_EXE="$(find "$FUSION_ROOT" -maxdepth 2 -name Fusion360.exe -print | sort 
 [[ -n "$FUSION_EXE" ]] || fail "Fusion360.exe was not found under $FUSION_ROOT"
 
 FUSION_DIR="$(dirname "$FUSION_EXE")"
+
+# Both must run before apply_launch_environment: it decides whether to add
+# comdlg32=n / d3dcompiler_47=n by checking that these artifacts exist, and
+# FUSION_DIR is only known now (it encodes Fusion's build hash).
 prepare_native_shader_compiler || fail "Could not prepare the native shader compiler"
 prepare_native_dialog_shim || true
+
+apply_launch_environment
 PRODUCTION_CONFIG="$FUSION_DIR/Applications/Fusion/Fusion360App/ApplicationOptions.production.json"
 SERVER_CONFIG="$FUSION_DIR/Fusion 360.server.config"
 
