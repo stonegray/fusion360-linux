@@ -26,35 +26,17 @@ _this_file="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR="$(cd "$(dirname "$_this_file")" && pwd)"
 if [[ "${1:-}" == "--kill" ]]; then
   echo "Killing all Fusion 360 / Wine / Proton processes..."
-  # Set prefix path for targeted kill
   PFX_DIR="${PFX_DIR:-$HOME/.fusion360-proton2}"
-  # Kill wineserver for our prefix first (cleanest shutdown)
-  if [[ -f "$PFX_DIR/pfx/.wineserver.lock" ]]; then
-    ws_pid=$(head -1 "$PFX_DIR/pfx/.wineserver.lock" 2>/dev/null || true)
-    [[ -n "$ws_pid" ]] && kill -9 "$ws_pid" 2>/dev/null || true
-  fi
-  # Broad kill by process patterns
-  for pattern in fusion360 fusion Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
-    fusion-browser fusion-gray-overlay fusion-toolwindow fusion-callback \
-    wineserver wine-preloader wine64 wine proton steam-runtime xalia streamer steam.exe node.exe; do
-    pkill -9 -u "$(id -u)" -f "$pattern" 2>/dev/null || true
-  done
-  # Nuclear: kill every process with /proc/*/exe matching wine/proton
-  for proc in /proc/[0-9]*/exe; do
-    exe=$(readlink "$proc" 2>/dev/null || true)
-    [[ -z "$exe" ]] && continue
-    if [[ "$exe" == *wine* ]] || [[ "$exe" == *proton* ]]; then
-      pid=${proc%/exe}; pid=${pid#/proc/}
-      kill -9 "$pid" 2>/dev/null || true
-    fi
-  done
-  sleep 1
-  # Verify
-  survivors=$(pgrep -u "$(id -u)" -f 'wine\|proton\|Fusion360\|fusion-' 2>/dev/null | wc -l)
-  if (( survivors > 0 )); then
-    echo "Warning: $survivors process(es) may still be running. Check with: ps aux | grep -i fusion"
-  else
+  # Reuse the tested library implementation: it terminates the prefix's
+  # wineserver first, covers launch-fusion.sh and the shell daemons (so the
+  # launcher watchdog can't respawn the stack), scales TERM -> KILL, and
+  # uses /bin/kill to dodge shell-builtin shadowing.
+  source "$SCRIPT_DIR/share/load.sh"
+  export PFX_DIR
+  if kill_fusion_processes; then
     echo "All Fusion/Wine/Proton processes killed."
+  else
+    echo "Warning: some processes survived. Check with: ps aux | grep -i fusion"
   fi
   exit 0
 fi

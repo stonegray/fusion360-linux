@@ -16,12 +16,18 @@ kill_fusion_processes() {
   local pids=()
   local pid
 
-  # Method 1: pgrep by cmdline patterns
+  # Method 1: pgrep by cmdline patterns.
+  # NOTE: launch-fusion.sh and the browser listener MUST be listed — killing
+  # only the Wine processes lets the launcher's watchdog respawn the whole
+  # stack a few seconds later, silently undoing the kill.
   local pattern
   for pattern in wineserver wine proton steam-runtime xalia streamer \
     Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
-    steam.exe node.exe fusion-gray-overlay; do
+    steam.exe node.exe fusion-gray-overlay \
+    launch-fusion fusion-browser-listener fusion-browser fusion-callback \
+    fusion-toolwindow fusion-gray-overlay-event-killer; do
     while IFS= read -r pid; do
+      [[ "$pid" == "$$" ]] && continue
       pids+=("$pid")
     done < <(pgrep -u "$user" -f "$pattern" 2>/dev/null || true)
   done
@@ -62,7 +68,7 @@ kill_fusion_processes() {
       local ws_pid
       ws_pid=$(head -1 "$ws" 2>/dev/null || true)
       if [[ -n "$ws_pid" ]]; then
-        kill "$ws_pid" 2>/dev/null || true
+        /bin/kill "$ws_pid" 2>/dev/null || command kill "$ws_pid" 2>/dev/null || true
         log_info "   Killed wineserver PID $ws_pid for prefix $PFX_DIR"
         sleep 0.5
       fi
@@ -70,35 +76,50 @@ kill_fusion_processes() {
   fi
   log_info " Killing ${#unique[@]} Wine/Proton process(es)..."
 
+  # NOTE: use /bin/kill explicitly. A shell builtin named `kill` can shadow
+  # the binary and reject numeric signals ("invalid signal name"), leaving
+  # processes alive while this function reports success.
+  _kill() { /bin/kill "$@" 2>/dev/null || command kill "$@" 2>/dev/null; }
+
   # Graceful TERM first
   for pid in "${unique[@]}"; do
-    kill "$pid" 2>/dev/null || true
+    _kill "$pid" || true
   done
 
   sleep "$KILL_ESCALATION_WAIT"
 
   # Hard KILL for survivors
   for pid in "${unique[@]}"; do
-    kill -9 "$pid" 2>/dev/null || true
+    _kill -9 "$pid" || true
   done
+  unset -f _kill
 
-  # Verify — check for actual survivors (skip zombies)
   local survivors=0
-  for proc in /proc/[0-9]*/exe; do
-    exe=$(readlink "$proc" 2>/dev/null || true)
-    [[ -z "$exe" ]] && continue
-    if [[ "$exe" == *wine* ]] || [[ "$exe" == *proton* ]]; then
-      pid=${proc%/exe}
-      pid=${pid#/proc/}
-      local state
-      state=$(cat "/proc/$pid/status" 2>/dev/null | grep '^State:' | awk '{print $2}' || true)
-      if [[ "$state" == "Z" ]]; then
-        log_info "   ZOMBIE: PID $pid ($exe) — already dead, waiting for parent to reap"
-        continue
-      fi
-      log_info "   SURVIVED: PID $pid ($exe) state=$state"
-      survivors=$((survivors + 1))
+  # Verify — scan cmdlines, not just /proc/PID/exe. The launcher and the
+  # shell-script daemons (browser listener, overlay killer) run as `bash`,
+  # so an exe-path scan alone would report a clean kill while the launcher
+  # respawns the stack.
+  for proc in /proc/[0-9]*; do
+    pid=${proc#/proc/}
+    [[ "$pid" == "$$" ]] && continue
+    local cmd
+    cmd=$(tr '\0' ' ' < "$proc/cmdline" 2>/dev/null || true)
+    [[ -z "$cmd" ]] && continue
+    case "$cmd" in
+      *launch-fusion*|*Fusion360*|*fusion-toolwindow*|*fusion-browser*|\
+      *fusion-callback*|*fusion-gray-overlay*|*wineserver*|*winedevice*|\
+      *"proton run"*|*AdskIdentity*|*adexmtsv*|*FusionClientDownloader*)
+        ;;
+      *) continue ;;
+    esac
+    local state
+    state=$(awk '/^State:/{print $2}' "$proc/status" 2>/dev/null || true)
+    if [[ "$state" == "Z" ]]; then
+      log_info "   ZOMBIE: PID $pid — already dead, waiting for parent to reap"
+      continue
     fi
+    log_info "   SURVIVED: PID $pid state=$state — $cmd"
+    survivors=$((survivors + 1))
   done
 
   if (( survivors == 0 )); then
