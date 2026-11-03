@@ -12,7 +12,13 @@
 # Uses /proc/*/exe scanning to match Proton processes.
 # Shutdown order: wineserver first (it reaps its own children, avoiding
 # orphans/zombies), then SIGTERM, then SIGKILL for survivors.
+# Defaults for the tuning constants, so this file is safe whether or not
+# share/constants.fn was sourced first. Without these, a caller that sources
+# process.fn alone dies under `set -u` mid-kill — after SIGTERM has already
+# been sent — leaving Fusion half-stopped.
 : "${WINESERVER_GRACE:=25}"
+: "${KILL_ESCALATION_WAIT:=2}"
+: "${KILL_VERIFY_WAIT:=1}"
 
 kill_fusion_processes() {
   local user; user=$(id -u)

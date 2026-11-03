@@ -6,6 +6,16 @@
 #
 # Safe under set -e.
 
+# Pull in the colour constants this file formats with. The header declares the
+# dependency but nothing enforced it, so a caller that sourced log.fn first
+# died under `set -u` on its first log line.
+if [[ -z "${COLOR_RESET+x}" ]]; then
+  _log_fn_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  # shellcheck source=colors.fn
+  source "$_log_fn_dir/colors.fn"
+  unset _log_fn_dir
+fi
+
 log_set_quiet() { _LOG_QUIET=1; }
 
 # ── Install-style log lines ─────────────────────────────────────

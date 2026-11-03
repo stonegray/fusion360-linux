@@ -24,6 +24,10 @@ if [[ -d "$SCRIPT_DIR/src/native-dialogs" ]]; then
 fi
 cp "$SCRIPT_DIR/src/bin/launch-fusion.sh" "$F360_DATA_DIR/"
 cp "$SCRIPT_DIR/src/doctor/doctor.sh" "$F360_DATA_DIR/"
+# uninstall.sh sources share/*.fn relative to its own directory, so it has to
+# live beside the share/ copy made above. Without this the CLI symlink below
+# points at a file that does not exist and `fusion-uninstall` fails outright.
+cp "$SCRIPT_DIR/uninstall.sh" "$F360_DATA_DIR/"
 cp "$SCRIPT_DIR/Makefile" "$F360_DATA_DIR/" 2>/dev/null || true
 chmod +x "$F360_DATA_DIR/launch-fusion.sh" "$F360_DATA_DIR/doctor.sh" "$F360_DATA_DIR/runtime-scripts/"*.sh "$F360_DATA_DIR/runtime-scripts/"*.py 2>/dev/null || true
 
