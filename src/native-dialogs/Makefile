@@ -7,15 +7,17 @@
 CC      := x86_64-w64-mingw32-gcc
 # -O2 and -s: this sits on every Open dialog call, and the shipped artifact is
 # committed, so keep it small and optimised.
-CFLAGS  ?= -O2 -Wall -Wextra -Wno-cast-function-type
-LDFLAGS ?= -s -shared -Wl,--kill-at
+CFLAGS  := -O2 -Wall -Wextra -Wno-cast-function-type -Wno-unused-parameter
+LDFLAGS := -s -shared -lole32 -luuid
 
-all: comdlg32.dll
+SRCS := comdlg32.c dialog_com.c
 
-comdlg32.dll: comdlg32.c comdlg32.def
-	$(CC) $(CFLAGS) -o $@ $< comdlg32.def $(LDFLAGS)
+all: dlgshim.dll
+
+dlgshim.dll: $(SRCS) dlgshim.def
+	$(CC) $(CFLAGS) -o $@ $(SRCS) dlgshim.def $(LDFLAGS)
 
 clean:
-	rm -f comdlg32.dll
+	rm -f dlgshim.dll
 
 .PHONY: all clean

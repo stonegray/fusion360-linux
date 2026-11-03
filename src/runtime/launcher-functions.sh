@@ -168,19 +168,10 @@ apply_launch_environment() {
   if is_enabled "${FUSION_NATIVE_D3DCOMPILER:-1}"; then
     dll_overrides="${dll_overrides:+$dll_overrides;}d3dcompiler_47=n"
   fi
-  # Native file dialogs: route Fusion's Open dialog to kdialog instead of
-  # Wine's Win32 widget dialog. Requires the shim installed app-local next to
-  # Fusion360.exe (comdlg32 is a KnownDLL, so a plain override cannot reach
-  # it — see install_native_dialog_shim).
-  if is_enabled "${FUSION_NATIVE_DIALOGS:-1}"; then
-    if [[ -f "$(native_dialog_shim_dir)/comdlg32.dll" ]]; then
-      dll_overrides="${dll_overrides:+$dll_overrides;}comdlg32=n"
-    else
-      # Say so. Silently dropping the override is how this shipped broken
-      # once: Fusion just kept its Windows dialogs and looked "fine".
-      echo "launch-fusion.sh warning: native dialog shim missing at $(native_dialog_shim_dir)/comdlg32.dll; using Windows file dialogs" >&2
-    fi
-  fi
+  # Native file dialogs need no WINEDLLOVERRIDES entry: the shim is reached
+  # through COM (CLSID_FileOpenDialog's InprocServer32), not by replacing
+  # comdlg32 by name. Registering it under that name is actively wrong — see
+  # prepare_native_dialog_shim.
   if [[ -n "$dll_overrides" ]]; then
     export WINEDLLOVERRIDES="$dll_overrides"
   else
@@ -270,9 +261,13 @@ native_dialog_shim_dir() {
 prepare_native_dialog_shim() {
   is_enabled "${FUSION_NATIVE_DIALOGS:-1}" || return 0
 
-  local source="$RUNTIME_DIR/../native-dialogs/comdlg32.dll"
+  # NOT comdlg32.dll. Wine loads a module registered as an in-proc COM
+  # server from any path, but if its export name is comdlg32.dll it silently
+  # dispatches CoCreateInstance to its own builtin class table and never calls
+  # ours (verified with a marker file). Any other name works.
+  local source="$RUNTIME_DIR/../native-dialogs/dlgshim.dll"
   local target
-  target="$(native_dialog_shim_dir)/comdlg32.dll"
+  target="$(native_dialog_shim_dir)/dlgshim.dll"
 
   [[ -f "$source" ]] || { echo "launch-fusion.sh warning: native dialog shim not found at $source" >&2; return 0; }
   command -v kdialog >/dev/null 2>&1 || { echo "launch-fusion.sh warning: kdialog not installed; keeping Windows file dialogs" >&2; return 0; }
@@ -289,14 +284,26 @@ prepare_native_dialog_shim() {
     fi
   fi
 
-  # Drop the KnownDLL entry so the app-local copy is consulted.
   local wine_bin
   wine_bin="$(proton_wine_bin "$PROTON")"
-  if [[ -x "$wine_bin" ]]; then
-    WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx" "$wine_bin" reg delete \
-      'HKLM\System\CurrentControlSet\Control\Session Manager\KnownDLLs' \
-      /v comdlg32 /f &>/dev/null || true
-  fi
+  [[ -x "$wine_bin" ]] || return 0
+  local pfx="$STEAM_COMPAT_DATA_PATH/pfx"
+
+  # The shim's Windows path, for the COM registration below. C: is the
+  # prefix's drive_c directory itself, so strip through "/drive_c" and keep
+  # only what follows.
+  local wine_dll="${target#"$STEAM_COMPAT_DATA_PATH/pfx/drive_c"}"
+  wine_dll="C:${wine_dll//\//\\}"
+
+  # Point the COM server at the shim. Wine registers CLSID_FileOpenDialog
+  # with InprocServer32 = C:\windows\system32\comdlg32.dll — an absolute path,
+  # so an app-local DLL is unreachable through it. Fusion's Open button goes
+  # through CoCreateInstance (Qt's QWindowsNativeOpenFileDialog), not
+  # GetOpenFileNameW, so this registration is the one that actually counts.
+  local clsid='{DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7}'
+  WINEPREFIX="$pfx" "$wine_bin" reg add \
+    "HKLM\Software\Classes\CLSID\\$clsid\\InprocServer32" \
+    /ve /t REG_SZ /d "$wine_dll" /f &>/dev/null || true
 }
 
 start_redraw_helper() {

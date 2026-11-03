@@ -38,6 +38,7 @@
 #include <commdlg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 #include <stdio.h>
 
 #define PATH_MAX_W 4096
@@ -257,82 +258,170 @@ static char *win_path_to_unix(const WCHAR *wpath)
  *   "Fusion (*.f3d)\0*.f3d\0All Files (*.*)\0*.*\0\0"
  * kdialog syntax: "Label (*.f3d;*.step)|Label2 (*.*)"
  * Returns malloc'd string, or NULL when no usable filter exists. */
-static char *build_kdialog_filter(const WCHAR *wfilter)
+/* Build a kdialog filter string from parallel label/pattern arrays.
+ *   labels   = {"Fusion Files", "All Files"}
+ *   patterns = {"*.f3d", "*.*"}
+ *   => "Fusion Files (*.f3d);;All Files (*.*)"
+ * Shared by the legacy OPENFILENAMEW path and the COM SetFileTypes path so
+ * both produce identical output. Caller frees. */
+char *shim_filter_from_pairs(const WCHAR **labels, const WCHAR **patterns, UINT count)
 {
-    if (!wfilter) return NULL;
+    if (!labels || !patterns || !count) return NULL;
 
-    /* Measure to the DOUBLE NUL, not the first one. Passing -1 stops at the
-     * first terminator, which yields only the first label and silently drops
-     * every filter after it. */
-    int wlen = 0;
-    for (;;) {
-        while (wfilter[wlen]) wlen++;   /* end of this string */
-        wlen++;                         /* step over its terminator */
-        if (!wfilter[wlen]) { wlen++; break; }  /* empty string => end */
-    }
-
-    int n = WideCharToMultiByte(CP_UTF8, 0, wfilter, wlen, NULL, 0, NULL, NULL);
-    if (n <= 0) return NULL;
-    char *flat = (char *)malloc((size_t)n + 1);
-    if (!flat) return NULL;
-    int got = WideCharToMultiByte(CP_UTF8, 0, wfilter, wlen, flat, n, NULL, NULL);
-    if (got <= 0) { free(flat); return NULL; }
-    flat[got] = 0;
-
-    /* flat is a sequence of NUL-separated pairs, terminated by an empty
-     * string. Walk it: label, pattern, label, pattern, ... */
     size_t cap = 1024, len = 0;
     char *out = (char *)malloc(cap);
-    if (!out) { free(flat); return NULL; }
-    out[0] = '\0';
+    if (!out) return NULL;
+    out[0] = 0;
 
-    const char *p = flat;
-    while (*p) {
-        const char *label = p;
-        p += strlen(p) + 1;
-        if (!*p) break;
-        const char *pattern = p;
-        p += strlen(p) + 1;
+    for (UINT i = 0; i < count; i++) {
+        if (!labels[i] || !patterns[i]) continue;
 
-        /* kdialog wants patterns space-separated inside one quoted group. */
-        char pat[512];
-        size_t po = 0;
-        for (const char *q = pattern; *q && po < sizeof(pat) - 2; q++) {
-            pat[po++] = (*q == ';') ? ' ' : *q;
+        int nlabel = WideCharToMultiByte(CP_UTF8, 0, labels[i], -1, NULL, 0, NULL, NULL);
+        int npat = WideCharToMultiByte(CP_UTF8, 0, patterns[i], -1, NULL, 0, NULL, NULL);
+        if (nlabel <= 0 || npat <= 0) continue;
+
+        char *label = (char *)malloc((size_t)nlabel);
+        char *pat = (char *)malloc((size_t)npat);
+        if (!label || !pat) { free(label); free(pat); free(out); return NULL; }
+        WideCharToMultiByte(CP_UTF8, 0, labels[i], -1, label, nlabel, NULL, NULL);
+        WideCharToMultiByte(CP_UTF8, 0, patterns[i], -1, pat, npat, NULL, NULL);
+
+        /* kdialog separates multiple patterns with spaces, not semicolons. */
+        for (char *q = pat; *q; q++) if (*q == ';') *q = ' ';
+
+        /* Strip a trailing "(...)" from the label: Fusion's labels usually
+         * already contain it, and repeating it reads as "Fusion (*.f3d)
+         * (*.f3d)". */
+        char *paren = strrchr(label, '(');
+        if (paren) {
+            while (paren > label && (paren[-1] == ' ' || paren[-1] == '\t')) paren--;
+            *paren = 0;
         }
-        pat[po] = '\0';
+        if (!label[0]) strcpy(label, "Files");
 
-        /* "--filter" once, then bare "Label (*.ext)" groups. */
         size_t add = strlen(label) + strlen(pat) + 8;
         if (len + add + 2 >= cap) {
             cap = (len + add + 2) * 2;
             char *nb = (char *)realloc(out, cap);
-            if (!nb) { free(out); free(flat); return NULL; }
+            if (!nb) { free(label); free(pat); free(out); return NULL; }
             out = nb;
         }
-        /* kdialog format: "Label (*.a *.b) (*.a *.b)". The left side is the
-         * human label, the right the selectable patterns. Fusion's labels
-         * usually already end in "(*.f3d)", so strip a trailing parenthesised
-         * group before appending the real pattern list — otherwise the entry
-         * reads "Fusion (*.f3d) (*.f3d)". */
-        char clean[512];
-        strncpy(clean, label, sizeof clean - 1);
-        clean[sizeof clean - 1] = 0;
-        char *paren = strrchr(clean, '(');
-        if (paren) {
-            while (paren > clean && (paren[-1] == ' ' || paren[-1] == '\t')) paren--;
-            *paren = 0;
-        }
-        if (!clean[0]) strcpy(clean, "Files");
-
-        /* kdialog: "Label (*.ext *.ext2);;Next (…)". Groups separated by ;;. */
         if (len) { out[len++] = ';'; out[len++] = ';'; }
-        len += (size_t)snprintf(out + len, cap - len, "%s (%s)", clean, pat);
+        len += (size_t)snprintf(out + len, cap - len, "%s (%s)", label, pat);
+        free(label);
+        free(pat);
     }
 
-    free(flat);
     if (!len) { free(out); return NULL; }
     return out;
+}
+
+/* Split a legacy OPENFILENAMEW filter (NUL-separated label/pattern pairs,
+ * double-NUL terminated) and hand it to the pair-based builder. */
+static char *build_kdialog_filter(const WCHAR *wfilter)
+{
+    if (!wfilter) return NULL;
+
+    /* Measure to the DOUBLE NUL, not the first one: passing -1 stops at the
+     * first terminator and silently drops every later filter. */
+    const WCHAR *end = wfilter;
+    for (;;) {
+        while (*end) end++;
+        end++;
+        if (!*end) { end++; break; }
+    }
+
+    /* Count complete label/pattern pairs. */
+    size_t count = 0;
+    for (const WCHAR *p = wfilter; p < end - 1 && *p; ) {
+        p += wcslen(p) + 1;          /* label */
+        if (!*p) break;
+        p += wcslen(p) + 1;          /* pattern */
+        count++;
+    }
+    if (!count) return NULL;
+
+    const WCHAR **labels = (const WCHAR **)calloc(count, sizeof(WCHAR *));
+    const WCHAR **patterns = (const WCHAR **)calloc(count, sizeof(WCHAR *));
+    if (!labels || !patterns) { free(labels); free(patterns); return NULL; }
+
+    UINT n = 0;
+    const WCHAR *p = wfilter;
+    while (p < end - 1 && *p) {
+        labels[n] = p;
+        p += wcslen(p) + 1;
+        if (!*p) break;
+        patterns[n] = p;
+        p += wcslen(p) + 1;
+        n++;
+    }
+
+    char *out = shim_filter_from_pairs(labels, patterns, n);
+    free(labels);
+    free(patterns);
+    return out;
+}
+
+/* Run kdialog and return the picked Unix path (caller frees), or NULL on
+ * cancel/failure. Shared by the legacy OPENFILENAMEW export and the COM
+ * IFileOpenDialog::Show path so both behave identically.
+ *
+ * initial_dir and filter are UTF-8; either may be NULL. */
+char *shim_run_picker_str(const char *initial_dir, const char *filter)
+{
+    const WCHAR *kd = host_kdialog();
+    if (!kd) return NULL;
+
+    WCHAR wdir[PATH_MAX_W];
+    WCHAR wfilter[4096];
+
+    int n = MultiByteToWideChar(CP_UTF8, 0, initial_dir && *initial_dir ? initial_dir : "/",
+                                -1, wdir, PATH_MAX_W);
+    if (n <= 0) return NULL;
+
+    int have_filter = 0;
+    if (filter && *filter) {
+        if (MultiByteToWideChar(CP_UTF8, 0, filter, -1, wfilter, 4096) > 0)
+            have_filter = 1;
+    }
+
+    /* kdialog takes the filter as a POSITIONAL argument after the start dir;
+     * there is no --filter option (verified: "Unknown option 'filter'"). */
+    const WCHAR *argv[6];
+    int ai = 0;
+    argv[ai++] = kd;
+    argv[ai++] = L"--getopenfilename";
+    argv[ai++] = wdir;
+    if (have_filter) argv[ai++] = wfilter;
+    argv[ai] = NULL;
+
+    return run_host_capture(argv);
+}
+
+/* WCHAR wrapper used by the COM path. */
+char *shim_run_picker(const WCHAR *initial_dir, const WCHAR *filter)
+{
+    char *dir_utf8 = NULL, *filter_utf8 = NULL;
+
+    if (initial_dir && *initial_dir) {
+        int n = WideCharToMultiByte(CP_UTF8, 0, initial_dir, -1, NULL, 0, NULL, NULL);
+        if (n > 0) {
+            dir_utf8 = (char *)malloc((size_t)n);
+            if (dir_utf8) WideCharToMultiByte(CP_UTF8, 0, initial_dir, -1, dir_utf8, n, NULL, NULL);
+        }
+    }
+    if (filter && *filter) {
+        int n = WideCharToMultiByte(CP_UTF8, 0, filter, -1, NULL, 0, NULL, NULL);
+        if (n > 0) {
+            filter_utf8 = (char *)malloc((size_t)n);
+            if (filter_utf8) WideCharToMultiByte(CP_UTF8, 0, filter, -1, filter_utf8, n, NULL, NULL);
+        }
+    }
+
+    char *picked = shim_run_picker_str(dir_utf8, filter_utf8);
+    free(dir_utf8);
+    free(filter_utf8);
+    return picked;
 }
 
 /* Exported, not imported: without this the comdlg32 headers mark the
@@ -348,38 +437,13 @@ BOOL WINAPI GetOpenFileNameW(LPOPENFILENAMEW lpofn)
         unix_initial = strdup(getenv("HOME") ? getenv("HOME") : "/");
 
     char *filter = build_kdialog_filter(lpofn->lpstrFilter);
-
-    /* kdialog --getopenfilename <startdir> [--filter <spec>]
-     * Built as argv so CreateProcessW can quote each element correctly. */
-    const WCHAR *kd = host_kdialog();
-    if (!kd) { free(unix_initial); free(filter); goto fail; }
-
-    WCHAR wdir[PATH_MAX_W];
-    WCHAR wfilter[2048];
-    MultiByteToWideChar(CP_UTF8, 0, unix_initial ? unix_initial : "/",
-                        -1, wdir, PATH_MAX_W);
-    if (filter)
-        MultiByteToWideChar(CP_UTF8, 0, filter, -1, wfilter, 2048);
-
-    /* kdialog takes the filter as a POSITIONAL argument after the start dir;
-     * there is no --filter option (verified: "Unknown option 'filter'"). */
-    const WCHAR *argv[6];
-    int ai = 0;
-    argv[ai++] = kd;
-    argv[ai++] = L"--getopenfilename";
-    argv[ai++] = wdir;
-    if (filter) argv[ai++] = wfilter;
-    argv[ai] = NULL;
-
+    char *picked = shim_run_picker_str(unix_initial, filter);
     free(unix_initial);
     free(filter);
 
-    char *picked = run_host_capture(argv);
-
     if (!picked) {
-        /* run_host_capture returns NULL both for cancel (non-zero exit) and
-         * for a launch failure. A missing picker is a configuration error
-         * worth surfacing; a cancel is not. */
+        /* NULL means cancel, or the picker is missing entirely. A missing
+         * picker is a configuration error worth surfacing. */
         if (!host_kdialog())
             goto fail;
         SetLastError(0);
@@ -446,3 +510,15 @@ BOOL WINAPI GetSaveFileNameW(LPOPENFILENAMEW lpofn)
     return FALSE;
 }
 
+
+/* ── COM entry points ─────────────────────────────────────────────── */
+
+HRESULT WINAPI ShimDllGetClassObject(REFCLSID clsid, REFIID riid, void **out);
+
+/* Fusion's Open dialog goes through CoCreateInstance(CLSID_FileOpenDialog),
+ * not GetOpenFileNameW, so the class object is what actually matters.
+ * Unregistered CLSIDs get CLASS_E_CLASSNOTAVAILABLE and fall back. */
+HRESULT WINAPI DllGetClassObject(REFCLSID clsid, REFIID riid, void **out)
+{
+    return ShimDllGetClassObject(clsid, riid, out);
+}

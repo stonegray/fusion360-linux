@@ -15,7 +15,7 @@ cp -r "$SCRIPT_DIR/share" "$F360_DATA_DIR/"
 # Prebuilt PE artifacts used by the launcher (native dialog shim).
 if [[ -d "$SCRIPT_DIR/src/native-dialogs" ]]; then
   mkdir -p "$F360_DATA_DIR/native-dialogs"
-  cp "$SCRIPT_DIR/src/native-dialogs/comdlg32.dll" "$F360_DATA_DIR/native-dialogs/"
+  cp "$SCRIPT_DIR/src/native-dialogs/dlgshim.dll" "$F360_DATA_DIR/native-dialogs/"
 fi
 cp "$SCRIPT_DIR/src/bin/launch-fusion.sh" "$F360_DATA_DIR/"
 cp "$SCRIPT_DIR/src/doctor/doctor.sh" "$F360_DATA_DIR/"

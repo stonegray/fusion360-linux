@@ -1,0 +1,15 @@
+; Export module name MUST NOT be "comdlg32.dll".
+;
+; Wine will happily load a module at an arbitrary path registered as an
+; in-proc COM server, but if that module's export name is comdlg32.dll it
+; silently dispatches CoCreateInstance to its own builtin class table instead
+; of calling ours. Verified with a marker file: identical DLL renamed from
+; comdlg32.dll to anything else starts being called immediately.
+;
+; Separately, the legacy exports are imported BY NAME by qwindows.dll, so
+; those names must be exact.
+LIBRARY dlgshim.dll
+EXPORTS
+    GetOpenFileNameW
+    GetSaveFileNameW
+    DllGetClassObject
