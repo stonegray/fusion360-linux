@@ -1,6 +1,6 @@
 icoutils
 zenity
-python3-tk
+python3-tkinter
 cabextract
 wget
 xdg-utils

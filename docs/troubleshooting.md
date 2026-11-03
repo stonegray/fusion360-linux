@@ -2,6 +2,61 @@
 
 Known issues and their fixes when running Autodesk Fusion 360 on Linux through Proton.
 
+## Computer remains slow after closing Fusion
+
+The launcher supervises the actual `Fusion360.exe` process instead of waiting
+indefinitely for Proton's wrapper. Once Fusion has exited for five seconds,
+it shuts down the dedicated prefix's Wine server and remaining background
+processes, including WebView2 and Linux bridge/overlay helpers. Remaining
+processes receive TERM, then KILL if necessary; the supervisor checks that the
+prefix is empty and reports survivors rather than silently claiming success.
+
+Cleanup matches the current user's processes by their exact `WINEPREFIX` or
+`STEAM_COMPAT_DATA_PATH`. An explicit different `WINEPREFIX` takes precedence,
+so unrelated Wine prefixes are preserved. Process start times are checked before
+sending signals to avoid acting on recycled PIDs. The dedicated Fusion prefix
+must not be shared with unrelated Windows applications.
+
+The live shutdown test removed all observed Fusion prefix processes and allowed
+the launcher and repaint helper to exit normally. Disposable-process tests also
+verify forced cleanup of a stuck helper and preservation of another prefix.
+
+## Sketch midpoint hints or dimension changes appear only after Alt-Tab
+
+On the tested NVIDIA/GE-Proton11-3/Xwayland setup, midpoint hints could remain
+stale even though clicking the midpoint worked. Refocusing Fusion displayed the
+correct hint. A live test sending X11 Expose events restored immediate feedback.
+
+Set `FUSION_ENABLE_REDRAW_HELPER=1` in the launcher configuration to enable the
+repaint workaround. It requests repaints at 10 Hz for Fusion-owned X11 windows
+and their descendants while Fusion is foreground. It never changes focus,
+injects mouse/key input, or changes geometry. Window discovery runs once per
+second. It stops when the tracked Fusion process or launcher exits.
+
+The helper requires Python 3 and libX11. It is disabled by default because the
+workaround has only been verified on the affected setup. Setting
+`FUSION_ENABLE_REDRAW_HELPER=0` disables it on the next launch. This addresses
+stale feedback; the underlying Wine/compositor redraw defect is not yet located.
+
+## Gray canvas and invisible solid bodies while sketches remain visible
+
+On the tested GE-Proton11-3/NVIDIA setup, using Fusion's bundled native
+`d3dcompiler_47.dll` in the prefix's `windows/system32` restored solid-body
+rendering. Previously, Wine's compiler was also loaded and logged incomplete
+shader-reflection calls. The issue was intermittent, so repeated launches and
+longer crash testing are still needed to establish reliability.
+
+The launcher now copies `d3dcompiler_v2/d3dcompiler_47.dll` from the selected
+Fusion installation into system32 and selects native loading. Existing compilers
+are backed up under `shader-compiler-backups` in the compatibility-data directory.
+Identical copies are left alone; the compiler is refreshed when the bundled copy
+changes. Set `FUSION_NATIVE_D3DCOMPILER=0` in the launcher configuration to disable
+this preparation and the native override (this does not restore an earlier DLL).
+
+Run `bash helpers/debug-fusion.sh` from the repository for diagnostic logs under
+`debug-logs/`. Logs can contain document names and account information; review
+them before sharing.
+
 ---
 
 ## "You need Microsoft WebView2 component"
@@ -103,3 +158,88 @@ STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
 **Root cause:** The Wine registry key for the browser bridge already exists or Proton is not fully initialized.
 
 **Fix:** This warning is non-fatal. If sign-in works, ignore it. If not, delete the Proton prefix and re-run Phase 2.
+
+---
+
+## `wine: Call ... to unimplemented function icuuc.dll.??0Locale@icu_77@@QEAA@XZ, aborting`
+
+**Root cause:** Fusion bundles real ICU 77 DLLs next to `Fusion360.exe`, but
+`NODEJS/node.exe` (the Autodesk Assistant / FremontJs runtime) and the embedded
+WebView2 resolve `icuuc.dll` to Wine's 32 KB stub, which has no `icu_77`
+symbols.  The process aborts; `node.exe` dies silently at startup and the
+WebView2 renderer crash later shows up as a hang → native crash in the Neutron
+core (`nsplatform10` / `cer` stack on the main thread).
+
+**Fix:** See "ICU 77 Native DLL Override" in the README — copy the real
+`icuuc.dll` / `third_party_icu_icui18n.dll` from the Fusion production
+directory into the prefix `system32/`, and keep `FUSION_FIX_ICU77=1` (default)
+so the launcher forces `icuuc,icuin,icudt=n,b`.
+
+---
+
+## Fusion freezes ~1 min after launch, then UI appears after ~50 min (assistant)
+
+**Root cause:** The saved window layout
+(`.../Neutron Platform/Options/<user-hash>/NULastDisplayedLayout.xml`) contains
+the Autodesk Assistant dock panels (`AAPalette`/`AAHostWindow` and
+`ChatPalette`/`ChatSupport`).  Fusion recreates them at startup and the
+embedded assistant host blocks the UI thread until it times out (~50 min) —
+the log goes silent after `[ADP] PanelCreateAssistant` while LaunchDarkly
+stream retries fail.
+
+**Fix:** Strip the two assistant `<Area>` blocks from
+`NULastDisplayedLayout.xml` (it is UTF-16 LE — convert to UTF-8, edit, convert
+back, or regenerate by deleting the file).  Back the file up first.  Fusion
+still logs `PanelCreateAssistant` but no longer hangs on it.
+
+---
+
+## `fusion-toolwindow-fixer.exe` processes accumulate (hundreds), then Fusion hangs
+
+**Root cause:** `start_toolwindow_fixer()` spawns two Wine instances per call
+but only records one PID; the health monitor (`daemon_health_check`, every 30 s)
+restarts the daemon whenever the pidfile PID is dead, and each stale
+`launch-fusion.sh` instance runs its own monitor.  Multiple launches or a
+dying fixer turns into a respawn loop — hundreds of Wine processes, CPU
+saturation, then Hang Detection → crash.
+
+**Fix (workaround):** Set `FUSION_ENABLE_TOOLWINDOW_FIXER=0` in
+`~/.config/fusion360-linux/config` to disable the z-order daemon.  The
+"always on top" panel bug returns, but no process leak.  Also ensure only one
+`launch-fusion.sh` is running before launching.
+
+---
+
+## Assistant scripts fail: `RuntimeError: 2 : InternalValidationError` on `SketchLines.addByTwoPoints`
+
+**Root cause:** The script used the **legacy, undocumented Point2D overload**.
+`SketchLines.addByTwoPoints(start, end)` (see the docstring in the bundled
+`adsk/fusion.py`) documents **SketchPoint or Point3D** as the only input
+types.  The Point2D form comes from old tutorials; the C++ binding still
+*attempts* the Point2D → AcGePoint3D coercion, and that conversion path is
+broken, so it fails on the first call with
+
+```
+RuntimeError: 2 : InternalValidationError :
+Xl::Fusion::SketchCurves::getAcGePoint3D(startPoint, acStartPoint, &pStartPoint)
+```
+
+This is not a regression of the documented API — the **Point3D** (and
+`SketchPoint`) inputs work fine.  (The error type is misleading: an
+unsupported type should raise `TypeError`, not an internal validation
+error — minor API hygiene issue.)
+
+**Fix (workaround):** Use the documented input types.  Convert `Point2D` →
+`Point3D` before calling `addByTwoPoints`:
+
+```python
+def p2d(x, y):
+    return adsk.core.Point3D.create(x, y, 0.0)
+
+lines.addByTwoPoints(p2d(0.0, 0.0), p2d(2.54, 0.0))
+```
+
+The unhandled script error can also destabilize the MCP/scripting thread
+(crash stack `nsmcp10`/`nafusion10`/`v8`) — see the ICU 77 entry above; keep
+`FUSION_FIX_ICU77=1` so the script-execution helpers don't abort on top of
+the API error.

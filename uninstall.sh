@@ -3,7 +3,7 @@
 # Removes Proton prefix, config, desktop files, icons, and bridge temp files.
 # Does NOT remove GE-Proton from compatibilitytools.d (other apps may use it).
 
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -euo
 
 # ── Root guard ─────────────────────────────────────────────────────────
 if [[ $EUID -eq 0 ]]; then
@@ -17,12 +17,17 @@ fi
 
 : "${HOME:?HOME must be set to run uninstall}"
 
-RED='\033[0;31m'
-NC='\033[0m'
+# Resolve script directory and source color/path constants
+_this_file="${BASH_SOURCE[0]:-$0}"
+SCRIPT_DIR="$(cd "$(dirname "$_this_file")" && pwd)"
+source "$SCRIPT_DIR/share/colors.fn"
+source "$SCRIPT_DIR/share/paths.fn"
+source "$SCRIPT_DIR/share/desktop.fn"
+
 
 echo "=== Fusion360 Linux — Uninstall ==="
 echo ""
-printf '%b' "${RED}WARNING: This will remove all Fusion360 local data.${NC}\n"
+printf '%b' "${COLOR_RED}WARNING: This will remove all Fusion360 local data.${COLOR_RESET}\n"
 echo "  - Proton prefix (~/.fusion360-proton2) — contains Fusion360 itself"
 echo "  - Config files (~/.config/fusion360-linux)"
 echo "  - Desktop entries and protocol handlers"
@@ -44,24 +49,11 @@ esac
 
 
 # Kill any running Fusion/Wine processes before removing files.
-# Use the nuclear kill from launcher-functions.sh if available.
 echo "  Stopping Fusion 360 processes..."
-if [[ -f "$HOME/.local/share/fusion360-linux/runtime-scripts/launcher-functions.sh" ]]; then
-  source "$HOME/.local/share/fusion360-linux/runtime-scripts/launcher-functions.sh"
-  kill_fusion_processes
-else
-  # Fallback: broad process kill
-  patterns=( wineserver wine proton Fusion360 FusionClientDownloader \
-    AdskIdentity adexmtsv steam.exe fusion-gray-overlay )
-  for pattern in "${patterns[@]}"; do
-    pkill -u "$(id -u)" -f "$pattern" 2>/dev/null || true
-  done
-  sleep 2
-  for pattern in "${patterns[@]}"; do
-    pkill -9 -u "$(id -u)" -f "$pattern" 2>/dev/null || true
-  done
-  echo "    Fusion/Wine processes killed."
-fi
+source "$SCRIPT_DIR/share/log.fn"
+source "$SCRIPT_DIR/share/process.fn"
+kill_fusion_processes || true
+echo "    Fusion/Wine processes killed."
 echo ""
 echo "Removing..."
 
@@ -140,11 +132,19 @@ if [[ -L "$HOME/.local/bin/fusion-doctor" ]]; then
   rm -f "$HOME/.local/bin/fusion-doctor"
   echo "    Removed: ~/.local/bin/fusion-doctor"
 fi
+if [[ -L "$HOME/.local/bin/fusion360" ]]; then
+  rm -f "$HOME/.local/bin/fusion360"
+  echo "    Removed: ~/.local/bin/fusion360"
+fi
+if [[ -L "$HOME/.local/bin/fusion-uninstall" ]]; then
+  rm -f "$HOME/.local/bin/fusion-uninstall"
+  echo "    Removed: ~/.local/bin/fusion-uninstall"
+fi
 
 # 9. DPI log
-if [[ -f "/tmp/fusion360-dpi.log" ]]; then
-  rm -f "/tmp/fusion360-dpi.log"
-  echo "    Removed: DPI log"
+if [[ -f "$FUSION_DPI_LOG_FILE" ]]; then
+  rm -f "$FUSION_DPI_LOG_FILE"
+  echo "    Removed: DPI log ($FUSION_DPI_LOG_FILE)"
 fi
 
 # 10. MIME type definitions
@@ -160,12 +160,7 @@ else
   echo "  [SKIP] MIME types not found."
 fi
 
-# 11. Refresh KDE menu if available
-if command -v kbuildsycoca6 &>/dev/null; then
-  kbuildsycoca6 2>/dev/null || true
-elif command -v kbuildsycoca5 &>/dev/null; then
-  kbuildsycoca5 2>/dev/null || true
-fi
+refresh_desktop_database
 
 echo ""
 echo "============================================================"

@@ -1,6 +1,6 @@
 # src/install/99-uninstall.sh — Interactive selective uninstall
 # Sourced by install.sh --uninstall
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -euo
 : "${HOME:?HOME must be set to run selective uninstall}"
 
 echo "╔══════════════════════════════════════════════════════════════╗"
@@ -40,11 +40,11 @@ add_comp() {
   fi
 }
 
-add_comp "Proton prefix (Fusion install)" "$HOME/.fusion360-proton2"
+add_comp "Proton prefix (Fusion install)" "$PFX_DIR"
 
 for g in "$HOME/.local/share/Steam/compatibilitytools.d"/GE-Proton*; do
   [[ -d "$g" ]] || continue
-  add_comp "GE-Proton ($name)" "$g"
+  add_comp "GE-Proton ($(basename "$g"))" "$g"
 done
 add_comp "Config files" "$HOME/.config/fusion360-linux"
 add_comp "Callback handler desktop entry" \
@@ -128,12 +128,7 @@ for idx in "${selected[@]}"; do
   fi
 done
 
-# Refresh KDE menu if available
-if command -v kbuildsycoca6 &>/dev/null; then
-  kbuildsycoca6 2>/dev/null || true
-elif command -v kbuildsycoca5 &>/dev/null; then
-  kbuildsycoca5 2>/dev/null || true
-fi
+refresh_desktop_database
 
 echo ""
 echo "  Done."

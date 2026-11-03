@@ -1,0 +1,171 @@
+# share/process.fn — Process management for Fusion 360
+#
+# Sources: share/log.fn
+# Exports: kill_fusion_processes(), kill_installer(), installer_is_running(),
+#          list_fusion_processes()
+#
+# PFX_DIR should be set (e.g. by share/paths.fn) for lock-file cleanup.
+#
+# Safe under set -e.
+
+# ── Kill all Fusion/Wine/Proton processes ───────────────────────────────
+# Uses /proc/*/exe scanning to match Proton processes.
+# SIGTERM -> sleep 2 -> SIGKILL escalation.
+kill_fusion_processes() {
+  local user; user=$(id -u)
+  local pids=()
+  local pid
+
+  # Method 1: pgrep by cmdline patterns.
+  # NOTE: launch-fusion.sh and the browser listener MUST be listed — killing
+  # only the Wine processes lets the launcher's watchdog respawn the whole
+  # stack a few seconds later, silently undoing the kill.
+  local pattern
+  for pattern in wineserver wine proton steam-runtime xalia streamer \
+    Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
+    steam.exe node.exe fusion-gray-overlay \
+    launch-fusion fusion-browser-listener fusion-browser fusion-callback \
+    fusion-toolwindow fusion-gray-overlay-event-killer; do
+    while IFS= read -r pid; do
+      [[ "$pid" == "$$" ]] && continue
+      pids+=("$pid")
+    done < <(pgrep -u "$user" -f "$pattern" 2>/dev/null || true)
+  done
+
+  # Method 2: scan /proc/PID/exe for wine/proton binaries (same user only)
+  local exe proc pid uid
+  for proc in /proc/[0-9]*/exe; do
+    exe=$(readlink "$proc" 2>/dev/null || true)
+    [[ -z "$exe" ]] && continue
+    if [[ "$exe" == *wine* ]] || [[ "$exe" == *proton* ]]; then
+      pid=${proc%/exe}
+      pid=${pid#/proc/}
+      # Verify the process belongs to the same user (skip root/other users' processes)
+      uid=$(stat -c '%u' "/proc/$pid" 2>/dev/null || true)
+      [[ "$uid" == "$user" ]] || continue
+      pids+=("$pid")
+    fi
+  done
+
+  # Deduplicate
+  local unique=()
+  for pid in "${pids[@]}"; do
+    [[ -z "$pid" ]] && continue
+    case " ${unique[*]} " in *" $pid "*) continue ;; esac
+    unique+=("$pid")
+  done
+
+  if (( ${#unique[@]} == 0 )); then
+    return 0
+  fi
+
+
+  # Method 3: kill the Wine server for our prefix — cleanly terminates all
+  # Wine processes in that prefix (most thorough single-action shutdown).
+  if [[ -n "${PFX_DIR:-}" ]]; then
+    local ws="$PFX_DIR/pfx/.wineserver.lock"
+    if [[ -f "$ws" ]]; then
+      local ws_pid
+      ws_pid=$(head -1 "$ws" 2>/dev/null || true)
+      if [[ -n "$ws_pid" ]]; then
+        /bin/kill "$ws_pid" 2>/dev/null || command kill "$ws_pid" 2>/dev/null || true
+        log_info "   Killed wineserver PID $ws_pid for prefix $PFX_DIR"
+        sleep 0.5
+      fi
+    fi
+  fi
+  log_info " Killing ${#unique[@]} Wine/Proton process(es)..."
+
+  # NOTE: use /bin/kill explicitly. A shell builtin named `kill` can shadow
+  # the binary and reject numeric signals ("invalid signal name"), leaving
+  # processes alive while this function reports success.
+  _kill() { /bin/kill "$@" 2>/dev/null || command kill "$@" 2>/dev/null; }
+
+  # Graceful TERM first
+  for pid in "${unique[@]}"; do
+    _kill "$pid" || true
+  done
+
+  sleep "$KILL_ESCALATION_WAIT"
+
+  # Hard KILL for survivors
+  for pid in "${unique[@]}"; do
+    _kill -9 "$pid" || true
+  done
+  unset -f _kill
+
+  local survivors=0
+  # Verify — scan cmdlines, not just /proc/PID/exe. The launcher and the
+  # shell-script daemons (browser listener, overlay killer) run as `bash`,
+  # so an exe-path scan alone would report a clean kill while the launcher
+  # respawns the stack.
+  for proc in /proc/[0-9]*; do
+    pid=${proc#/proc/}
+    [[ "$pid" == "$$" ]] && continue
+    local cmd
+    cmd=$(tr '\0' ' ' < "$proc/cmdline" 2>/dev/null || true)
+    [[ -z "$cmd" ]] && continue
+    case "$cmd" in
+      *launch-fusion*|*Fusion360*|*fusion-toolwindow*|*fusion-browser*|\
+      *fusion-callback*|*fusion-gray-overlay*|*wineserver*|*winedevice*|\
+      *"proton run"*|*AdskIdentity*|*adexmtsv*|*FusionClientDownloader*)
+        ;;
+      *) continue ;;
+    esac
+    local state
+    state=$(awk '/^State:/{print $2}' "$proc/status" 2>/dev/null || true)
+    if [[ "$state" == "Z" ]]; then
+      log_info "   ZOMBIE: PID $pid — already dead, waiting for parent to reap"
+      continue
+    fi
+    log_info "   SURVIVED: PID $pid state=$state — $cmd"
+    survivors=$((survivors + 1))
+  done
+
+  if (( survivors == 0 )); then
+    return 0
+  else
+    return 1
+  fi
+}
+
+# ── Installer-specific kill ────────────────────────────────────────────
+# Kill a specific installer PID with tracking + escalation, then
+# clean up all Fusion processes and remove the wineserver lock.
+INSTALLER_PID=""
+
+kill_installer() {
+  # Kill tracked installer PID
+  if [[ -n "${INSTALLER_PID:-}" ]] && kill -0 "$INSTALLER_PID" 2>/dev/null; then
+    kill "$INSTALLER_PID" 2>/dev/null || true
+    sleep "$KILL_INSTALLER_WAIT"
+    kill -9 "$INSTALLER_PID" 2>/dev/null || true
+  fi
+
+  # Kill all Fusion/Wine/Proton processes
+  kill_fusion_processes || true
+
+  # Remove wineserver lock so next start is clean
+  [[ -n "${PFX_DIR:-}" ]] && rm -f "$PFX_DIR/pfx/.wineserver.lock" 2>/dev/null || true
+}
+
+# ── Check if installer is running ──────────────────────────────────────
+installer_is_running() {
+  # Check if a Fusion installer is already running through Proton
+  pgrep -f "FusionClientDownloader" 2>/dev/null | grep -q . && return 0
+  # Check if wineserver is running for our prefix
+  [[ -f "${PFX_DIR:-}/pfx/.wineserver.lock" ]] && return 0
+  return 1
+}
+
+# ── List running Fusion-related processes ──────────────────────────────
+# Outputs PID+command lines for all matching processes, deduplicated.
+list_fusion_processes() {
+  local user; user=$(id -u)
+  local pattern
+  for pattern in wineserver wine proton steam-runtime xalia streamer \
+    Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
+    steam.exe node.exe fusion-gray-overlay; do
+    pgrep -u "$user" -af "$pattern" 2>/dev/null || true
+  done | sort -u
+}

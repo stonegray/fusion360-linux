@@ -2,8 +2,6 @@
 
 header "3. Proton & Prefix"
 
-COMPAT_DIR="$HOME/.local/share/Steam/compatibilitytools.d"
-PFX_DIR="$HOME/.fusion360-proton2"
 
 proton_bins=()
 while IFS= read -r -d '' p; do

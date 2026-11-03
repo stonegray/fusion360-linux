@@ -1,0 +1,25 @@
+# share/check-dep.fn — Binary dependency checker
+#
+# Sources: share/log.fn, share/report.fn (for pass/fail)
+# Exports: check_dep()
+#
+# Safe under set -e.
+
+# Check if a binary is available.  Uses command -v and reports status
+# through pass()/fail() (from report.fn).
+# Usage: check_dep <binary_name> [friendly_name] [package_hint]
+# Returns: 0 if found, 1 if not
+check_dep() {
+  local bin="${1:?check_dep: missing binary name}"
+  local friendly="${2:-$bin}"
+  local pkg_hint="${3:-}"
+  if command -v "$bin" &>/dev/null; then
+    pass "$friendly ($bin found)"
+    return 0
+  else
+    local msg="$friendly ($bin not found)"
+    [[ -n "$pkg_hint" ]] && msg="$msg --- install: $pkg_hint"
+    fail "$msg"
+    return 1
+  fi
+}

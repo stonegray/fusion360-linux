@@ -2,9 +2,9 @@
 CONFIG_DIR="$F360_CONFIG_DIR"
 CONFIG_FILE="$F360_CONFIG_FILE"
 
-GE_PROTON=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
+GE_PROTON=$(find_proton "$COMPAT_DIR")
 FUSION_EXE=$(find "$PFX_DIR" -name Fusion360.exe -type f 2>/dev/null | head -1 || true)
-local fusion_root=""
+fusion_root=""
 if [[ -n "$FUSION_EXE" ]]; then
   fusion_root="$(dirname "$(dirname "$FUSION_EXE")")"
 else
@@ -26,7 +26,7 @@ declare -a CONFIG_KEYS=(
 )
 
 declare -a CONFIG_VALS=(
-  "$GE_PROTON" "$HOME/.fusion360-proton2" "$HOME/.local/share/Steam"
+  "$GE_PROTON" "$PFX_DIR" "$HOME/.local/share/Steam"
   "$fusion_root" "$F360_DATA_DIR/runtime-scripts/fusion-browser.sh"
   "$F360_DATA_DIR/runtime-scripts/fusion-browser-listener.sh"
   "$F360_DATA_DIR/runtime-scripts/fusion-callback-handler.sh"
@@ -38,23 +38,12 @@ declare -a CONFIG_VALS=(
   "0" "0" "1" "1" "1" "1" "0" "1" "1" "1" "1" "1" "1" "25"
 )
 
-quote_val() {
-  local raw="$1"
-  local q
-  q=$(printf '%q' "$raw" 2>/dev/null || printf '%s' "$raw")
-  if [[ "$q" == $\'* ]]; then
-    local escaped
-    escaped=$(printf '%s' "$raw" | sed "s/'/'\\\\''/g")
-    q="'$escaped'"
-  fi
-  printf '%s' "$q"
-}
 
 if [[ -f "$CONFIG_FILE" ]]; then
   local wrote=0
-  for i in "${!CONFIG_KEYS[@]}"; do
+  for ((i = 0; i < ${#CONFIG_KEYS[@]}; i++)); do
     if ! grep -q "^${CONFIG_KEYS[$i]}=" "$CONFIG_FILE" 2>/dev/null; then
-      printf '%s=%s\n' "${CONFIG_KEYS[$i]}" "$(quote_val "${CONFIG_VALS[$i]}")" >> "$CONFIG_FILE"
+      printf '%s=%s\n' "${CONFIG_KEYS[$i]}" "$(config_quote "${CONFIG_VALS[$i]}")" >> "$CONFIG_FILE"
       log_info "  added missing ${CONFIG_KEYS[$i]}"
       wrote=1
     fi
@@ -62,11 +51,13 @@ if [[ -f "$CONFIG_FILE" ]]; then
   if [[ $wrote -eq 0 ]]; then
     log_info "  already present, nothing to add"
   fi
+  chmod 600 "$CONFIG_FILE"
   return 0
 fi
 
 mkdir -p "$CONFIG_DIR"
-for i in "${!CONFIG_KEYS[@]}"; do
-  printf '%s=%s\n' "${CONFIG_KEYS[$i]}" "$(quote_val "${CONFIG_VALS[$i]}")"
+for ((i = 0; i < ${#CONFIG_KEYS[@]}; i++)); do
+  printf '%s=%s\n' "${CONFIG_KEYS[$i]}" "$(config_quote "${CONFIG_VALS[$i]}")"
 done > "$CONFIG_FILE"
+chmod 600 "$CONFIG_FILE"
 log_info "  written"

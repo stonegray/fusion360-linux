@@ -1,0 +1,52 @@
+# share/cleanup.fn — Cleanup and temp file management for Fusion 360
+#
+# Sources: share/log.fn, share/paths.fn
+# Exports: clear_bridge_temp_files(), cleanup()
+#
+# cleanup() also stops daemon processes.  For best results, source
+# share/daemon.fn before this file so stop_all_daemons() is available.
+#
+# Safe under set -e.
+
+# ── Bridge temp file cleanup ──────────────────────────────────────────
+# Remove stale .request and .partial files from all bridge directories.
+clear_bridge_temp_files() {
+  [[ -n "${BRIDGE_BROWSER_REQUEST_DIR:-}" ]] || return 0
+
+  mkdir -p "$BRIDGE_BROWSER_REQUEST_DIR" \
+           "$BRIDGE_BROWSER_PROCESSED_DIR" \
+           "$BRIDGE_CALLBACK_REQUEST_DIR" \
+           "$BRIDGE_CALLBACK_PROCESSED_DIR"
+
+  find "$BRIDGE_BROWSER_REQUEST_DIR"   -type f \( -name "*.request" -o -name "*.partial" \) -delete 2>/dev/null || true
+  find "$BRIDGE_BROWSER_PROCESSED_DIR" -type f \( -name "*.request" -o -name "*.partial" \) -delete 2>/dev/null || true
+  find "$BRIDGE_CALLBACK_REQUEST_DIR"  -type f \( -name "*.request" -o -name "*.partial" \) -delete 2>/dev/null || true
+  find "$BRIDGE_CALLBACK_PROCESSED_DIR" -type f \( -name "*.request" -o -name "*.partial" \) -delete 2>/dev/null || true
+}
+
+# ── Main cleanup orchestrator ────────────────────────────────────────
+# Called on exit — kills tracked daemons, clears PID files and bridge temp files.
+cleanup() {
+  local pid
+  for pid in "${HEALTH_MONITOR_PID:-}" "${REDRAW_HELPER_PID:-}"; do
+    [[ -n "$pid" ]] || continue
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+  done
+
+  # Kill daemons (if daemon module is loaded)
+  if declare -F stop_all_daemons &>/dev/null; then
+    stop_all_daemons
+  fi
+
+  # Prefix cleanup is handled by fusion-session.py after Fusion exits.
+  # Never call the user-wide nuclear kill routine during normal shutdown.
+
+  # Remove PID file directory
+  if declare -F daemon_cleanup_all_pids &>/dev/null; then
+    daemon_cleanup_all_pids
+  fi
+
+  # Clear bridge temp files
+  clear_bridge_temp_files
+}

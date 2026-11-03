@@ -1,151 +1,23 @@
-is_enabled() {
-  case "${1:-}" in
-    1|yes|true|on|enabled|y|Y|TRUE|True|ON|On)
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
-load_config() {
-  [[ -f "$CONFIG_FILE" ]] || return 0
-  source "$CONFIG_FILE"
-
-  local _run_dir
-  _run_dir=$(cd "${SCRIPT_DIR:+$SCRIPT_DIR/../runtime}" 2>/dev/null && pwd) || true
-  BROWSER_LISTENER="${BROWSER_LISTENER:-${_run_dir:+$_run_dir/fusion-browser-listener.sh}}"
-  CALLBACK_HANDLER="${CALLBACK_HANDLER:-${_run_dir:+$_run_dir/fusion-callback-handler.sh}}"
-  FUSION_OVERLAY_KILLER="${FUSION_OVERLAY_KILLER:-${_run_dir:+$_run_dir/fusion-gray-overlay-event-killer.sh}}"
-  FUSION_WINE_RESTART_SCRIPT="${FUSION_WINE_RESTART_SCRIPT:-${_run_dir:+$_run_dir/kill-wine-proton-fusion-nuclear.sh}}"
-  FUSION_TOOLWINDOW_FIXER="${FUSION_TOOLWINDOW_FIXER:-${STEAM_COMPAT_DATA_PATH:-$HOME/.fusion360-proton2}/pfx/drive_c/fusion-toolwindow-fixer.exe}"
-
-  FUSION_WINE_DPI="${FUSION_WINE_DPI:-auto}"
-  FUSION_WINE_SCALE_PERCENT="${FUSION_WINE_SCALE_PERCENT:-auto}"
-  FUSION_WINE_DPI_FALLBACK="${FUSION_WINE_DPI_FALLBACK:-144}"
-  FUSION_WINE_SCALE_FALLBACK_PERCENT="${FUSION_WINE_SCALE_FALLBACK_PERCENT:-150}"
-
-  FUSION_PROTON_USE_WINED3D="${FUSION_PROTON_USE_WINED3D:-0}"
-  FUSION_PROTON_USE_XALIA="${FUSION_PROTON_USE_XALIA:-0}"
-  FUSION_DXVK_ASYNC="${FUSION_DXVK_ASYNC:-1}"
-  FUSION_NO_AT_BRIDGE="${FUSION_NO_AT_BRIDGE:-1}"
-  FUSION_FIX_BCP47LANGS="${FUSION_FIX_BCP47LANGS:-1}"
-  FUSION_FIX_WINHTTP_PROXY="${FUSION_FIX_WINHTTP_PROXY:-1}"
-  FUSION_WEBVIEW_NO_SANDBOX="${FUSION_WEBVIEW_NO_SANDBOX:-1}"
-  FUSION_WEBVIEW_DISABLE_GPU="${FUSION_WEBVIEW_DISABLE_GPU:-0}"
-  FUSION_USE_INTEL_VK_ICD="${FUSION_USE_INTEL_VK_ICD:-1}"
-  FUSION_STAGING_WRITECOPY="${FUSION_STAGING_WRITECOPY:-0}"
-  FUSION_HEAP_DELAY_FREE="${FUSION_HEAP_DELAY_FREE:-0}"
-  FUSION_ENABLE_OVERLAY_KILLER="${FUSION_ENABLE_OVERLAY_KILLER:-1}"
-  FUSION_ENABLE_TOOLWINDOW_FIXER="${FUSION_ENABLE_TOOLWINDOW_FIXER:-1}"
-  FUSION_DARK_MODE="${FUSION_DARK_MODE:-auto}"
-}
-
-save_config() {
-  mkdir -p "$CONFIG_DIR"
-
-  {
-    local keys=(
-      PROTON STEAM_COMPAT_DATA_PATH STEAM_COMPAT_CLIENT_INSTALL_PATH
-      FUSION_ROOT BROWSER BROWSER_LISTENER CALLBACK_HANDLER CHROME
-      FUSION_TOOLWINDOW_FIXER
-      FUSION_ENABLE_TOOLWINDOW_FIXER
-      FUSION_OVERLAY_KILLER FUSION_WINE_RESTART_SCRIPT
-      FUSION_WINE_DPI FUSION_WINE_SCALE_PERCENT FUSION_WINE_DPI_FALLBACK
-      FUSION_WINE_SCALE_FALLBACK_PERCENT FUSION_PROTON_USE_WINED3D
-      FUSION_PROTON_USE_XALIA FUSION_DXVK_ASYNC FUSION_NO_AT_BRIDGE
-      FUSION_FIX_BCP47LANGS FUSION_WEBVIEW_NO_SANDBOX FUSION_WEBVIEW_DISABLE_GPU
-      FUSION_USE_INTEL_VK_ICD FUSION_STAGING_WRITECOPY FUSION_HEAP_DELAY_FREE
-      FUSION_ENABLE_OVERLAY_KILLER FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT
-    )
-    for key in "${keys[@]}"; do
-      local val
-      val=$(printf "%q" "${!key}")
-      # bash 5.0+ printf %q outputs $'...' which older bash can't parse
-      if [[ "$val" == \$* ]]; then
-        # Fall back to single-quote wrapping
-        val="'${!key}'"
-      fi
-      printf '%s=%s\n' "$key" "$val"
-    done
-  } > "$CONFIG_FILE"
-}
-
-# ── Process killing ──────────────────────────────────────────
-kill_fusion_processes() {
-  local user; user=$(id -u)
-  local pids=()
-  local pid
-
-  # Method 1: pgrep by cmdline patterns
-  for pattern in wineserver wine proton xalia streamer \
-    Fusion360 FusionClientDownloader AdskIdentity adexmtsv \
-    steam.exe node.exe fusion-gray-overlay; do
-    while IFS= read -r pid; do
-      pids+=("$pid")
-    done < <(pgrep -u "$user" -f "$pattern" 2>/dev/null || true)
-  done
-
-  # Method 2: scan /proc/PID/exe for wine/proton binaries
-  local exe
-  for proc in /proc/[0-9]*/exe; do
-    exe=$(readlink "$proc" 2>/dev/null || true)
-    [[ -z "$exe" ]] && continue
-    if [[ "$exe" == *wine* ]] || [[ "$exe" == *proton* ]]; then
-      pid=${proc%/exe}
-      pid=${pid#/proc/}
-      pids+=("$pid")
-    fi
-  done
-
-  # Deduplicate
-  local unique=()
-  for pid in "${pids[@]}"; do
-    [[ -z "$pid" ]] && continue
-    case " ${unique[*]} " in *" $pid "*) continue ;; esac
-    unique+=("$pid")
-  done
-
-  if (( ${#unique[@]} == 0 )); then
-    return 0
-  fi
-
-  log_info " Killing ${#unique[@]} Wine/Proton process(es)..."
-
-  # Graceful TERM first
-  for pid in "${unique[@]}"; do
-    kill "$pid" 2>/dev/null || true
-  done
-
-  sleep 2
-
-  # Hard KILL for survivors
-  for pid in "${unique[@]}"; do
-    kill -9 "$pid" 2>/dev/null || true
-  done
-
-  sleep 1
-
-  # Verify
-  local survivors=0
-  for proc in /proc/[0-9]*/exe; do
-    exe=$(readlink "$proc" 2>/dev/null || true)
-    [[ -z "$exe" ]] && continue
-    if [[ "$exe" == *wine* ]] || [[ "$exe" == *proton* ]]; then
-      pid=${proc%/exe}
-      pid=${pid#/proc/}
-      log_info "   SURVIVED: PID $pid ($exe)"
-      survivors=$((survivors + 1))
-    fi
-  done
-
-  if (( survivors == 0 )); then
-    return 0
-  else
-    return 1
-  fi
-}
+# ── Load share/ modules ──────────────────────────────────────
+# Resolve share/ directory relative to this file's location
+_share_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../share" 2>/dev/null && pwd)" || true
+if [[ -z "$_share_dir" ]]; then
+  _share_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../../share" 2>/dev/null && pwd)" || true
+fi
+if [[ -d "$_share_dir" ]]; then
+  source "$_share_dir/load.sh"
+fi
+unset _share_dir
+#
+# This file now contains only 3 launcher-context-specific functions that
+# don't belong in the general-purpose share/ library:
+#
+#   configure_with_file_browsers()  — runs the Python config UI
+#   show_selection_summary()        — displays launch config summary
+#   apply_launch_environment()      — exports env vars for Fusion launch
+#
+# All reusable logic has been moved to share/*.fn modules loaded above.
+#
 
 configure_with_file_browsers() {
   local user_interface_mode="${1:-hold}"
@@ -175,8 +47,10 @@ configure_with_file_browsers() {
   FUSION_WEBVIEW_DISABLE_GPU="$FUSION_WEBVIEW_DISABLE_GPU" \
   FUSION_USE_INTEL_VK_ICD="$FUSION_USE_INTEL_VK_ICD" \
   FUSION_ENABLE_OVERLAY_KILLER="$FUSION_ENABLE_OVERLAY_KILLER" \
+  FUSION_NATIVE_D3DCOMPILER="${FUSION_NATIVE_D3DCOMPILER:-1}" \
+  FUSION_ENABLE_REDRAW_HELPER="${FUSION_ENABLE_REDRAW_HELPER:-0}" \
   FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="$FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT" \
-  python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/launcher-config-user-interface.py" "$CONFIG_FILE" "$user_interface_mode"
+  python3 "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/launcher-config-user-interface.py" "$CONFIG_FILE" "$user_interface_mode"
 
   local config_user_interface_status=$?
   [[ $config_user_interface_status -eq 0 ]] || return "$config_user_interface_status"
@@ -203,387 +77,6 @@ Fusion 360 launch selections:
   Grey overlay killer enabled: $FUSION_ENABLE_OVERLAY_KILLER
   Wine restart script: $FUSION_WINE_RESTART_SCRIPT
 EOF_SUMMARY
-}
-
-clear_bridge_temp_files() {
-  mkdir -p "$BRIDGE_BROWSER_REQUEST_DIR"
-  mkdir -p "$BRIDGE_BROWSER_PROCESSED_DIR"
-  mkdir -p "$BRIDGE_CALLBACK_REQUEST_DIR"
-  mkdir -p "$BRIDGE_CALLBACK_PROCESSED_DIR"
-
-  find "$BRIDGE_BROWSER_REQUEST_DIR" -type f \( -name "*.request" -o -name "*.partial" \) -delete 2>/dev/null || true
-  find "$BRIDGE_BROWSER_PROCESSED_DIR" -type f \( -name "*.request" -o -name "*.partial" \) -delete 2>/dev/null || true
-  find "$BRIDGE_CALLBACK_REQUEST_DIR" -type f \( -name "*.request" -o -name "*.partial" \) -delete 2>/dev/null || true
-  find "$BRIDGE_CALLBACK_PROCESSED_DIR" -type f \( -name "*.request" -o -name "*.partial" \) -delete 2>/dev/null || true
-}
-
-read_gsettings_number() {
-  local schema_name="$1"
-  local key_name="$2"
-  local raw_value
-
-  command -v gsettings >/dev/null 2>&1 || return 1
-
-  raw_value="$(gsettings get "$schema_name" "$key_name" 2>/dev/null)" || return 1
-  printf "%s\n" "$raw_value" | grep -Eo '[0-9]+([.][0-9]+)?' | tail -n 1
-}
-
-read_kde_forced_dpi() {
-  # KDE Plasma stores forced font DPI in kdeglobals
-  command -v kreadconfig5 >/dev/null 2>&1 || return 1
-  local dpi
-  dpi="$(kreadconfig5 --file "$HOME/.config/kdeglobals" --group "General" --key "forceFontDPI" 2>/dev/null)" || return 1
-  [[ "$dpi" =~ ^[0-9]+$ ]] && [[ "$dpi" -gt 0 ]] || return 1
-  printf "%s" "$dpi"
-}
-
-# Check all KDE outputs via kscreen-doctor and return the highest scale factor as DPI
-read_kde_primary_scale() {
-  command -v kscreen-doctor &>/dev/null || return 1
-  local scale
-  scale=$(kscreen-doctor -o 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -i 'Scale:' | awk '{print $NF}' | sort -r | head -1)
-  [[ -n "$scale" ]] || return 1
-  # Only return if actual scaling is active (> 1.0)
-  awk -v value="$scale" 'BEGIN { exit !(value > 1.0) }' || return 1
-  scale_to_dpi "$scale"
-}
-
-# Detect GNOME text scaling factor via gsettings
-read_gnome_text_scaling() {
-  command -v gsettings &>/dev/null || return 1
-  local scale
-  scale=$(gsettings get org.gnome.desktop.interface text-scaling-factor 2>/dev/null || true)
-  [[ -n "$scale" ]] || return 1
-  # GNOME default is 1.0 (no scaling)
-  awk -v value="$scale" 'BEGIN { exit !(value > 0 && value != 1) }' || return 1
-  scale_to_dpi "$scale"
-}
-
-scale_to_dpi() {
-  local scale_value="$1"
-
-  awk -v scale_value="$scale_value" 'BEGIN { printf "%d", (96 * scale_value) + 0.5 }'
-}
-
-percent_to_dpi() {
-  local percent_value="$1"
-
-  awk -v percent_value="$percent_value" 'BEGIN { printf "%d", (96 * percent_value / 100) + 0.5 }'
-}
-
-resolve_fusion_wine_dpi() {
-  local kde_forced_dpi
-  local cinnamon_scaling_factor
-  local cinnamon_text_scaling_factor
-
-  if printf "%s\n" "$FUSION_WINE_SCALE_PERCENT" | grep -Eq '^[0-9]+$'; then
-    percent_to_dpi "$FUSION_WINE_SCALE_PERCENT"
-    return 0
-  fi
-
-  if printf "%s\n" "$FUSION_WINE_DPI" | grep -Eq '^[0-9]+$'; then
-    printf "%s" "$FUSION_WINE_DPI"
-    return 0
-  fi
-
-  # KDE Plasma: check forced font DPI
-  kde_forced_dpi="$(read_kde_forced_dpi || true)"
-  if [[ -n "$kde_forced_dpi" ]]; then
-    printf "%s" "$kde_forced_dpi"
-    return 0
-  fi
-
-  # KDE Plasma: primary monitor scale factor
-  local kde_primary_dpi
-  kde_primary_dpi="$(read_kde_primary_scale || true)"
-  if [[ -n "$kde_primary_dpi" ]] && [[ "$kde_primary_dpi" =~ ^[0-9]+$ ]]; then
-    printf "%s" "$kde_primary_dpi"
-    return 0
-  fi
-
-  # GNOME: text scaling factor
-  local gnome_text_dpi
-  gnome_text_dpi="$(read_gnome_text_scaling || true)"
-  if [[ -n "$gnome_text_dpi" ]] && [[ "$gnome_text_dpi" =~ ^[0-9]+$ ]]; then
-    printf "%s" "$gnome_text_dpi"
-    return 0
-  fi
-
-  # Cinnamon: check text scaling factor
-  cinnamon_text_scaling_factor="$(read_gsettings_number org.cinnamon.desktop.interface text-scaling-factor || true)"
-  cinnamon_scaling_factor="$(read_gsettings_number org.cinnamon.desktop.interface scaling-factor || true)"
-
-  if [[ -n "$cinnamon_text_scaling_factor" ]]; then
-    if awk -v value="$cinnamon_text_scaling_factor" 'BEGIN { exit !(value > 0 && value != 1) }'; then
-      scale_to_dpi "$cinnamon_text_scaling_factor"
-      return 0
-    fi
-  fi
-
-  if [[ -n "$cinnamon_scaling_factor" ]]; then
-    if awk -v value="$cinnamon_scaling_factor" 'BEGIN { exit !(value > 1) }'; then
-      scale_to_dpi "$cinnamon_scaling_factor"
-      return 0
-    fi
-  fi
-
-  # Xft.dpi from xrdb (set by KDE font DPI, GNOME, or .Xresources)
-  if command -v xrdb &>/dev/null; then
-    local xft_dpi
-    xft_dpi=$(xrdb -query 2>/dev/null | grep '^Xft\.dpi:' | awk '{print $2}' || true)
-    if [[ -n "$xft_dpi" ]] && [[ "$xft_dpi" =~ ^[0-9]+$ ]] && [[ "$xft_dpi" -gt 0 ]]; then
-      printf "%s" "$xft_dpi"
-      return 0
-    fi
-  fi
-
-  if printf "%s\n" "$FUSION_WINE_SCALE_FALLBACK_PERCENT" | grep -Eq '^[0-9]+$'; then
-    percent_to_dpi "$FUSION_WINE_SCALE_FALLBACK_PERCENT"
-    return 0
-  fi
-
-  printf "%s" "$FUSION_WINE_DPI_FALLBACK"
-}
-
-apply_fusion_wine_dpi() {
-  local dpi_value
-  local win8_dpi_scaling
-
-  dpi_value="$(resolve_fusion_wine_dpi)"
-  [[ "$dpi_value" =~ ^[0-9]+$ ]] || { echo "warning: invalid DPI value '$dpi_value'" >&2; return 1; }
-  [[ "$dpi_value" -eq 96 ]] && win8_dpi_scaling=0 || win8_dpi_scaling=1
-
-  {
-    echo "timestamp=$(date -Is)"
-    echo "FUSION_WINE_DPI=$FUSION_WINE_DPI"
-    echo "FUSION_WINE_SCALE_PERCENT=$FUSION_WINE_SCALE_PERCENT"
-    echo "FUSION_WINE_DPI_FALLBACK=$FUSION_WINE_DPI_FALLBACK"
-    echo "FUSION_WINE_SCALE_FALLBACK_PERCENT=$FUSION_WINE_SCALE_FALLBACK_PERCENT"
-    echo "resolved_dpi=$dpi_value"
-    echo "win8_dpi_scaling=$win8_dpi_scaling"
-    echo "cinnamon_scaling_factor=$(read_gsettings_number org.cinnamon.desktop.interface scaling-factor || true)"
-    echo "cinnamon_text_scaling_factor=$(read_gsettings_number org.cinnamon.desktop.interface text-scaling-factor || true)"
-    echo "kde_forced_dpi=$(read_kde_forced_dpi || true)"
-  } > "$FUSION_DPI_LOG_FILE"
-
-  local wine_bin
-  wine_bin="$(dirname "$PROTON")/files/bin/wine"
-  [[ -x "$wine_bin" ]] || { echo "launch-fusion.sh warning: wine binary not found at $wine_bin" >&2; return 1; }
-
-  local pfx="$STEAM_COMPAT_DATA_PATH/pfx"
-
-  WINEPREFIX="$pfx" "$wine_bin" reg add 'HKCU\Software\Wine\Fonts' /v LogPixels /t REG_DWORD /d "$dpi_value" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
-    echo "launch-fusion.sh warning: failed to set Wine Fonts LogPixels. See $FUSION_DPI_LOG_FILE" >&2
-  }
-
-  WINEPREFIX="$pfx" "$wine_bin" reg add 'HKCU\Control Panel\Desktop' /v LogPixels /t REG_DWORD /d "$dpi_value" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
-    echo "launch-fusion.sh warning: failed to set Desktop LogPixels. See $FUSION_DPI_LOG_FILE" >&2
-  }
-
-  WINEPREFIX="$pfx" "$wine_bin" reg add 'HKCU\Control Panel\Desktop' /v Win8DpiScaling /t REG_DWORD /d "$win8_dpi_scaling" /f >> "$FUSION_DPI_LOG_FILE" 2>&1 || {
-    echo "launch-fusion.sh warning: failed to set Win8DpiScaling. See $FUSION_DPI_LOG_FILE" >&2
-  }
-
-  {
-    echo
-    echo "---- registry check after write ----"
-    WINEPREFIX="$pfx" "$wine_bin" reg query 'HKCU\Software\Wine\Fonts' /v LogPixels 2>&1 || true
-    WINEPREFIX="$pfx" "$wine_bin" reg query 'HKCU\Control Panel\Desktop' /v LogPixels 2>&1 || true
-    WINEPREFIX="$pfx" "$wine_bin" reg query 'HKCU\Control Panel\Desktop' /v Win8DpiScaling 2>&1 || true
-  } >> "$FUSION_DPI_LOG_FILE"
-}
-
-# ── Dark mode ────────────────────────────────────────────────
-
-# Detect current system dark/light color scheme.  Returns 0 (dark) or 1
-# (light) by exit code, echoes the scheme name on stdout.  Supports:
-#   - KDE Plasma 5/6  (kreadconfig5 / kdeglobals)
-#   - GNOME 42+       (gsettings color-scheme)
-#   - GTK 3           (settings.ini gtk-application-prefer-dark-theme)
-detect_system_dark_mode() {
-  local scheme=""
-
-  # 1. KDE Plasma
-  if command -v kreadconfig5 &>/dev/null; then
-    scheme=$(kreadconfig5 --file ~/.config/kdeglobals --group General --key ColorScheme 2>/dev/null || true)
-    if [[ -n "$scheme" ]]; then
-      case "$scheme" in
-        *Dark*)  return 0 ;;
-        *Light*) return 1 ;;
-      esac
-    fi
-  fi
-
-  # 2. GNOME 42+ (prefer-dark = dark, default = light)
-  if command -v gsettings &>/dev/null; then
-    scheme=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null || true)
-    if [[ "$scheme" == "'prefer-dark'" ]]; then
-      return 0
-    elif [[ -n "$scheme" ]]; then
-      return 1
-    fi
-  fi
-
-  # 3. GTK 3 settings.ini
-  local gtk_ini="${XDG_CONFIG_HOME:-$HOME/.config}/gtk-3.0/settings.ini"
-  if [[ -f "$gtk_ini" ]]; then
-    if grep -iqs "gtk-application-prefer-dark-theme\s*=\s*1" "$gtk_ini" 2>/dev/null; then
-      return 0
-    fi
-    if grep -iqs "gtk-theme-name.*[Dd]ark" "$gtk_ini" 2>/dev/null; then
-      return 0
-    fi
-    return 1
-  fi
-
-  # No detection method available — return undetermined
-  return 2
-}
-
-# Write Windows dark mode registry keys matching the host system theme.
-# Fusion 360 respects AppsUseLightTheme when rendering its UI panels.
-apply_fusion_wine_dark_mode() {
-  local theme_val=1  # default: light
-
-  case "${FUSION_DARK_MODE:-auto}" in
-    0)   theme_val=1 ;;   # force light
-    1)   theme_val=0 ;;   # force dark
-    auto|*)
-      if detect_system_dark_mode 2>/dev/null; then
-        theme_val=0  # dark
-      else
-        theme_val=1  # light or undetected
-      fi
-      ;;
-  esac
-
-  local wine_bin
-  wine_bin="$(dirname "$PROTON")/files/bin/wine"
-  [[ -x "$wine_bin" ]] || { echo "launch-fusion.sh warning: wine binary not found at $wine_bin" >&2; return 1; }
-
-  local pfx="${STEAM_COMPAT_DATA_PATH:-$HOME/.fusion360-proton2}/pfx"
-  local reg_key="HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"
-
-  WINEPREFIX="$pfx" "$wine_bin" reg add "$reg_key" /v AppsUseLightTheme /t REG_DWORD /d "$theme_val" /f &>/dev/null || {
-    echo "launch-fusion.sh warning: failed to set AppsUseLightTheme" >&2
-  }
-  WINEPREFIX="$pfx" "$wine_bin" reg add "$reg_key" /v SystemUsesLightTheme /t REG_DWORD /d "$theme_val" /f &>/dev/null || {
-    echo "launch-fusion.sh warning: failed to set SystemUsesLightTheme" >&2
-  }
-}
-
-install_callback_protocol_handlers() {
-  local applications_dir
-  local desktop_file
-
-  applications_dir="${F360_APPS_DIR:-$HOME/.local/share/applications/fusion360-linux}"
-  desktop_file="$applications_dir/fusion360-callback-handler.desktop"
-
-  if [[ -f "$desktop_file" ]] && grep -q "$CALLBACK_HANDLER" "$desktop_file" 2>/dev/null; then
-    return 0
-  fi
-
-  mkdir -p "$applications_dir"
-  cat > "$desktop_file" <<EOF_DESKTOP
-[Desktop Entry]
-Name=Fusion 360 Autodesk Callback Handler
-Exec=$CALLBACK_HANDLER %u
-Type=Application
-NoDisplay=true
-MimeType=x-scheme-handler/adsk;x-scheme-handler/adskidmgr;
-EOF_DESKTOP
-
-  xdg-mime default fusion360-callback-handler.desktop x-scheme-handler/adsk 2>/dev/null || true
-  xdg-mime default fusion360-callback-handler.desktop x-scheme-handler/adskidmgr 2>/dev/null || true
-  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$applications_dir" >/dev/null 2>&1 || true
-}
-
-register_wine_browser_bridge() {
-  local wine_bin
-  wine_bin="$(dirname "$PROTON")/files/bin/wine"
-  [[ -x "$wine_bin" ]] || { echo "launch-fusion.sh warning: wine binary not found at $wine_bin" >&2; return 1; }
-  local pfx="$STEAM_COMPAT_DATA_PATH/pfx"
-  WINEPREFIX="$pfx" "$wine_bin" reg add 'HKCU\Software\Wine\WineBrowser' /v Browsers /t REG_SZ /d "$BROWSER" /f >/tmp/fusion360-winebrowser-register.log 2>&1 || {
-    echo "launch-fusion.sh warning: failed to register WineBrowser. See /tmp/fusion360-winebrowser-register.log" >&2
-  }
-}
-
-start_browser_listener() {
-  [[ -x "$BROWSER_LISTENER" ]] || fail "Browser listener was not found or is not executable: $BROWSER_LISTENER"
-
-  clear_bridge_temp_files
-
-  "$BROWSER_LISTENER" &
-  BRIDGE_LISTENER_PID="$!"
-
-  echo "launch-fusion.sh: browser listener started with PID $BRIDGE_LISTENER_PID"
-}
-
-start_overlay_killer() {
-  is_enabled "$FUSION_ENABLE_OVERLAY_KILLER" || return 0
-
-  if [[ ! -x "$FUSION_OVERLAY_KILLER" ]]; then
-    echo "launch-fusion.sh warning: overlay killer is enabled but not executable: $FUSION_OVERLAY_KILLER" >&2
-    return 0
-  fi
-
-  FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="$FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT" "$FUSION_OVERLAY_KILLER" &
-  OVERLAY_KILLER_PID="$!"
-  echo "launch-fusion.sh: overlay killer started with PID $OVERLAY_KILLER_PID"
-}
-
-TOOLWINDOW_FIXER_PID=""
-
-# ── Toolwindow fixer ─────────────────────────────────────────────────
-# Background daemon that adds WS_EX_APPWINDOW to Fusion's docked
-# toolwindow popups so Wine's X11 driver makes them "managed" instead
-# of override-redirect.  Fixes the "always on top" z-order bug.
-start_toolwindow_fixer() {
-  is_enabled "$FUSION_ENABLE_TOOLWINDOW_FIXER" || return 0
-
-  if [[ ! -x "$FUSION_TOOLWINDOW_FIXER" ]]; then
-    echo "launch-fusion.sh warning: toolwindow fixer is enabled but not executable: $FUSION_TOOLWINDOW_FIXER" >&2
-    return 0
-  fi
-
-  # Find the Wine binary from the GE-Proton installation
-  local wine_bin
-  wine_bin="$(dirname "$PROTON")/files/bin/wine"
-  if [[ ! -x "$wine_bin" ]]; then
-    echo "launch-fusion.sh warning: wine binary not found at $wine_bin" >&2
-    return 0
-  fi
-
-  WINEPREFIX="${STEAM_COMPAT_DATA_PATH:-${PFX_DIR:-$HOME/.fusion360-proton2}}/pfx" \
-  "$wine_bin" "$FUSION_TOOLWINDOW_FIXER" &
-  TOOLWINDOW_FIXER_PID="$!"
-
-  echo "launch-fusion.sh: toolwindow fixer started with PID $TOOLWINDOW_FIXER_PID"
-}
-
-cleanup() {
-  if [[ -n "$OVERLAY_KILLER_PID" ]]; then
-    if kill -0 "$OVERLAY_KILLER_PID" 2>/dev/null; then
-      kill "$OVERLAY_KILLER_PID" 2>/dev/null || true
-      wait "$OVERLAY_KILLER_PID" 2>/dev/null || true
-    fi
-  fi
-
-  if [[ -n "$BRIDGE_LISTENER_PID" ]]; then
-    if kill -0 "$BRIDGE_LISTENER_PID" 2>/dev/null; then
-      kill "$BRIDGE_LISTENER_PID" 2>/dev/null || true
-      wait "$BRIDGE_LISTENER_PID" 2>/dev/null || true
-    fi
-  fi
-
-
-  if [[ -n "$TOOLWINDOW_FIXER_PID" ]]; then
-    if kill -0 "$TOOLWINDOW_FIXER_PID" 2>/dev/null; then
-      kill "$TOOLWINDOW_FIXER_PID" 2>/dev/null || true
-      wait "$TOOLWINDOW_FIXER_PID" 2>/dev/null || true
-    fi
-  fi
-  clear_bridge_temp_files
 }
 
 apply_launch_environment() {
@@ -621,14 +114,25 @@ apply_launch_environment() {
     # causing slow UI panel rendering.  --use-angle=d3d11 forces the
     # D3D11 backend through ANGLE, which DXVK then translates to
     # Vulkan (same fast path as the 3D viewport).
+    #
+    # Wine compatibility flags:
+    # --disable-accelerated-2d-canvas  — 2D canvas on CPU, reduces D3D11 calls
+    # --disable-direct-composition    — avoid Wine's broken DirectComposition path
+    # --disable-features=VizDisplayCompositor — older compositor, fewer D3D11 draws
+    # --disable-gpu-vsync             — remove D3D11 VSync sync overhead
+    # --renderer-process-limit=2      — fewer D3D11 devices under DXVK
     webview_arguments+=("--ignore-gpu-blocklist")
     webview_arguments+=("--enable-gpu-rasterization")
     webview_arguments+=("--enable-zero-copy")
     webview_arguments+=("--use-angle=d3d11")
+    webview_arguments+=("--disable-accelerated-2d-canvas")
+    webview_arguments+=("--disable-direct-composition")
+    webview_arguments+=("--disable-features=VizDisplayCompositor")
+    webview_arguments+=("--disable-gpu-vsync")
+    webview_arguments+=("--renderer-process-limit=2")
   fi
   if is_enabled "$FUSION_WEBVIEW_DISABLE_GPU"; then
     webview_arguments+=("--disable-gpu")
-    webview_arguments+=("--disable-features=VizDisplayCompositor")
   fi
 
   if [[ ${#webview_arguments[@]} -gt 0 ]]; then
@@ -640,9 +144,9 @@ apply_launch_environment() {
   # DXVK tuning for UI rendering — reduces swapchain latency and
   # sets optimal shader compiler threads (half of logical cores)
   local dxvk_cfg="dxgi.syncInterval=0"
-  dxvk_cfg="${dxvk_cfg},dxvk.tearFree=1"
-  dxvk_cfg="${dxvk_cfg},dxgi.numBackBuffers=3"
-  dxvk_cfg="${dxvk_cfg},dxvk.numCompilerThreads=$(( $(nproc 2>/dev/null || echo 4) / 2 ))"
+  dxvk_cfg="${dxvk_cfg};dxvk.tearFree=1"
+  dxvk_cfg="${dxvk_cfg};dxgi.numBackBuffers=3"
+  dxvk_cfg="${dxvk_cfg};dxvk.numCompilerThreads=$(( $(nproc 2>/dev/null || echo 4) / 2 ))"
   export DXVK_CONFIG="$dxvk_cfg"
 
 
@@ -653,7 +157,16 @@ apply_launch_environment() {
     dll_overrides=""
   fi
   if is_enabled "${FUSION_FIX_WINHTTP_PROXY:-1}"; then
-    dll_overrides="${dll_overrides:+$dll_overrides,}winhttp=b"
+    dll_overrides="${dll_overrides:+$dll_overrides;}winhttp=b"
+  fi
+  # ICU 77: Fusion bundles a real icuuc.dll/icuin.dll (ICU 77, needed by the
+  # embedded webview/node.exe); Wine's 32KB stub aborts on icu_77 symbols.
+  # Prefer the native copies installed in the prefix system32.
+  if is_enabled "${FUSION_FIX_ICU77:-1}"; then
+    dll_overrides="${dll_overrides:+$dll_overrides;}icuuc,icuin,icudt=n,b"
+  fi
+  if is_enabled "${FUSION_NATIVE_D3DCOMPILER:-1}"; then
+    dll_overrides="${dll_overrides:+$dll_overrides;}d3dcompiler_47=n"
   fi
   if [[ -n "$dll_overrides" ]]; then
     export WINEDLLOVERRIDES="$dll_overrides"
@@ -672,7 +185,6 @@ apply_launch_environment() {
       echo "launch-fusion.sh warning: Intel Vulkan ICD flag is enabled, but no Intel ICD file was found." >&2
     fi
   fi
-
   export BROWSER
   export BROWSER_LISTENER
   export CALLBACK_HANDLER
@@ -681,6 +193,64 @@ apply_launch_environment() {
   export FUSION_WINE_SCALE_PERCENT
   export FUSION_WINE_DPI_FALLBACK
   export FUSION_WINE_SCALE_FALLBACK_PERCENT
+  export FUSION_PROTON_USE_WINED3D
+  export FUSION_PROTON_USE_XALIA
+  export FUSION_DXVK_ASYNC
+  export FUSION_NO_AT_BRIDGE
+  export FUSION_FIX_BCP47LANGS
+  export FUSION_WEBVIEW_NO_SANDBOX
+  export FUSION_WEBVIEW_DISABLE_GPU
+  export FUSION_USE_INTEL_VK_ICD
+  export FUSION_ENABLE_OVERLAY_KILLER
+  export FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT
+  export FUSION_ENABLE_TOOLWINDOW_FIXER
+  export FUSION_DARK_MODE
+  export PROTON_NO_SECCOMP
+  export PROTON_USE_WINED3D
+  export PROTON_USE_XALIA
+  export DXVK_ASYNC
+  export STAGING_WRITECOPY
+  export PROTON_HEAP_DELAY_FREE
+  export WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
   export STEAM_COMPAT_DATA_PATH
   export STEAM_COMPAT_CLIENT_INSTALL_PATH
+  export PROTON
+}
+
+REDRAW_HELPER_PID=""
+
+prepare_native_shader_compiler() {
+  is_enabled "${FUSION_NATIVE_D3DCOMPILER:-1}" || return 0
+  local compiler="$FUSION_DIR/d3dcompiler_v2/d3dcompiler_47.dll"
+  local target="$STEAM_COMPAT_DATA_PATH/pfx/drive_c/windows/system32/d3dcompiler_47.dll"
+  [[ -f "$compiler" ]] || { echo "Native shader compiler missing: $compiler" >&2; return 1; }
+  cmp -s "$compiler" "$target" && return 0
+
+  local backup_dir="$STEAM_COMPAT_DATA_PATH/shader-compiler-backups"
+  local backup temporary
+  mkdir -p "$backup_dir"
+  if [[ -e "$target" ]]; then
+    backup="$(mktemp "$backup_dir/d3dcompiler_47-XXXXXX.dll")" || return 1
+    cp -pL "$target" "$backup" || return 1
+    echo "launch-fusion.sh: previous shader compiler backed up to $backup"
+  fi
+  temporary="$(mktemp "${target}.XXXXXX")" || return 1
+  if ! cp "$compiler" "$temporary" || ! mv -f "$temporary" "$target"; then
+    unlink "$temporary" 2>/dev/null || true
+    return 1
+  fi
+  echo "launch-fusion.sh: installed Fusion's native shader compiler"
+}
+
+start_redraw_helper() {
+  is_enabled "${FUSION_ENABLE_REDRAW_HELPER:-0}" || return 0
+  [[ -n "${DISPLAY:-}" ]] || return 0
+  if ! command -v python3 >/dev/null 2>&1 || [[ ! -f "$RUNTIME_DIR/fusion-redraw-helper.py" ]]; then
+    echo "launch-fusion.sh warning: redraw helper requires Python 3 and fusion-redraw-helper.py" >&2
+    return 0
+  fi
+  python3 "$RUNTIME_DIR/fusion-redraw-helper.py" \
+    --prefix "$STEAM_COMPAT_DATA_PATH/pfx" --parent-pid "$$" &
+  REDRAW_HELPER_PID=$!
+  echo "launch-fusion.sh: redraw helper started with PID $REDRAW_HELPER_PID"
 }

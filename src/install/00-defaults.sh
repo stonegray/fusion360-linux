@@ -19,11 +19,7 @@ F360_BIN_DIR="$XDG_BIN_HOME"                         # CLI symlinks
 F360_APPS_DIR="$XDG_DATA_HOME/applications/fusion360-linux"
 F360_ICONS_DIR="$XDG_DATA_HOME/icons/hicolor"
 
-# Proton / Wine
-COMPAT_DIR="$HOME/.local/share/Steam/compatibilitytools.d"
-PFX_DIR="$HOME/.fusion360-proton2"
-GE_PROTON_VERSION="GE-Proton11-3"
-GE_PROTON_URL="https://github.com/GloriousEggroll/proton-ge-custom/releases/download/${GE_PROTON_VERSION}/${GE_PROTON_VERSION}.tar.gz"
+# Proton / Wine (resolved from share/paths.fn + share/constants.fn)
 
 # Installer paths
 INSTALLER_PATH=""

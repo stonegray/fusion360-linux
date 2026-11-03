@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # launch-fusion.sh: Launch Fusion 360 through Proton with browser bridge support.
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -euo
 # ── Root guard ─────────────────────────────────────────────────────────
 if [[ $EUID -eq 0 ]]; then
   echo "ERROR: Do not run launch-fusion.sh as root. Run as a normal user." >&2
@@ -8,7 +8,7 @@ if [[ $EUID -eq 0 ]]; then
 fi
 
 # ── Quick health check ────────────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]:-$0}")")" && pwd)"
 
 # Detect runtime directory — supports both installed ($SCRIPT_DIR/runtime-scripts/)
 # and dev repo ($SCRIPT_DIR/../runtime/) layouts
@@ -24,15 +24,11 @@ if [[ -x "$RUNTIME_DIR/health-check.sh" ]]; then
   fi
 fi
 
-fail() {
-  echo "launch-fusion.sh failed: $*" >&2
-  exit 1
-}
 
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux"
 CONFIG_FILE="$CONFIG_DIR/config"
 
-PROTON="${PROTON:-$HOME/.local/share/Steam/compatibilitytools.d/GE-Proton11-3/proton}"
+PROTON="${PROTON:-$HOME/.local/share/Steam/compatibilitytools.d/${GE_PROTON_VERSION:-GE-Proton11-3}/proton}"
 STEAM_COMPAT_DATA_PATH="${STEAM_COMPAT_DATA_PATH:-$HOME/.fusion360-proton2}"
 STEAM_COMPAT_CLIENT_INSTALL_PATH="${STEAM_COMPAT_CLIENT_INSTALL_PATH:-$HOME/.local/share/Steam}"
 FUSION_ROOT="${FUSION_ROOT:-$STEAM_COMPAT_DATA_PATH/pfx/drive_c/users/steamuser/AppData/Local/Autodesk/webdeploy/production}"
@@ -54,13 +50,16 @@ FUSION_WINE_DPI="${FUSION_WINE_DPI:-auto}"
 FUSION_WINE_SCALE_PERCENT="${FUSION_WINE_SCALE_PERCENT:-auto}"
 FUSION_WINE_DPI_FALLBACK="${FUSION_WINE_DPI_FALLBACK:-144}"
 FUSION_WINE_SCALE_FALLBACK_PERCENT="${FUSION_WINE_SCALE_FALLBACK_PERCENT:-150}"
-FUSION_DPI_LOG_FILE="/tmp/fusion360-dpi.log"
+: "${FUSION_DPI_LOG_FILE:=/tmp/fusion360-dpi.log}"
 
 FUSION_PROTON_USE_WINED3D="${FUSION_PROTON_USE_WINED3D:-0}"
 FUSION_PROTON_USE_XALIA="${FUSION_PROTON_USE_XALIA:-0}"
 FUSION_DXVK_ASYNC="${FUSION_DXVK_ASYNC:-1}"
 FUSION_NO_AT_BRIDGE="${FUSION_NO_AT_BRIDGE:-1}"
 FUSION_FIX_BCP47LANGS="${FUSION_FIX_BCP47LANGS:-1}"
+FUSION_FIX_WINHTTP_PROXY="${FUSION_FIX_WINHTTP_PROXY:-1}"
+FUSION_STAGING_WRITECOPY="${FUSION_STAGING_WRITECOPY:-0}"
+FUSION_HEAP_DELAY_FREE="${FUSION_HEAP_DELAY_FREE:-0}"
 FUSION_WEBVIEW_NO_SANDBOX="${FUSION_WEBVIEW_NO_SANDBOX:-1}"
 FUSION_WEBVIEW_DISABLE_GPU="${FUSION_WEBVIEW_DISABLE_GPU:-0}"
 FUSION_USE_INTEL_VK_ICD="${FUSION_USE_INTEL_VK_ICD:-1}"
@@ -68,14 +67,18 @@ FUSION_ENABLE_OVERLAY_KILLER="${FUSION_ENABLE_OVERLAY_KILLER:-1}"
 FUSION_ENABLE_TOOLWINDOW_FIXER="${FUSION_ENABLE_TOOLWINDOW_FIXER:-1}"
 FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="${FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT:-25}"
 
-BRIDGE_BROWSER_REQUEST_DIR="/tmp/fusion360-browser-requests"
-BRIDGE_BROWSER_PROCESSED_DIR="/tmp/fusion360-browser-processed"
-BRIDGE_CALLBACK_REQUEST_DIR="/tmp/fusion360-callback-requests"
-BRIDGE_CALLBACK_PROCESSED_DIR="/tmp/fusion360-callback-processed"
+: "${BRIDGE_BROWSER_REQUEST_DIR:=/tmp/fusion360-browser-requests}"
+: "${BRIDGE_BROWSER_PROCESSED_DIR:=/tmp/fusion360-browser-processed}"
+: "${BRIDGE_CALLBACK_REQUEST_DIR:=/tmp/fusion360-callback-requests}"
+: "${BRIDGE_CALLBACK_PROCESSED_DIR:=/tmp/fusion360-callback-processed}"
 BRIDGE_LISTENER_PID=""
 OVERLAY_KILLER_PID=""
 
 source "$RUNTIME_DIR/launcher-functions.sh"
+fail() {
+  echo "launch-fusion.sh failed: $*" >&2
+  exit 1
+}
 load_config
 
 if [[ "${1:-}" == "--config" || "${1:-}" == "--configure" ]]; then
@@ -106,8 +109,11 @@ fi
 
 apply_launch_environment
 
+[[ -f "$RUNTIME_DIR/fusion-session.py" ]] || fail "Fusion session supervisor is missing; reinstall runtime scripts."
+command -v python3 >/dev/null 2>&1 || fail "Python 3 is required for session cleanup."
+
 [[ -x "$PROTON" ]] || fail "Proton was not found or is not executable: $PROTON. Run $0 --configure to select it."
-[[ -x "$BROWSER" ]] || fail "Browser bridge was not found or is not executable: $BROWSER. Run $0 --configure to select it."
+[[ -x "$BROWSER" ]] || fail "Browser bridge was not found or is not executable: $BROWSER"
 [[ -x "$BROWSER_LISTENER" ]] || fail "Browser listener was not found or is not executable: $BROWSER_LISTENER"
 [[ -x "$CALLBACK_HANDLER" ]] || fail "Callback handler was not found or is not executable: $CALLBACK_HANDLER"
 [[ -x "$CHROME" ]] || fail "Chrome was not found or is not executable: $CHROME. Run $0 --configure to select it."
@@ -117,6 +123,7 @@ FUSION_EXE="$(find "$FUSION_ROOT" -maxdepth 2 -name Fusion360.exe -print | sort 
 [[ -n "$FUSION_EXE" ]] || fail "Fusion360.exe was not found under $FUSION_ROOT"
 
 FUSION_DIR="$(dirname "$FUSION_EXE")"
+prepare_native_shader_compiler || fail "Could not prepare the native shader compiler"
 PRODUCTION_CONFIG="$FUSION_DIR/Applications/Fusion/Fusion360App/ApplicationOptions.production.json"
 SERVER_CONFIG="$FUSION_DIR/Fusion 360.server.config"
 
@@ -144,21 +151,51 @@ apply_fusion_wine_dpi
 apply_fusion_wine_dark_mode
 install_callback_protocol_handlers
 register_wine_browser_bridge
+register_wine_dll_overrides
 start_browser_listener
 start_overlay_killer
 
 # ── Service Utility mode ──────────────────────────────────────
 if [[ "${1:-}" == "--service-util" ]]; then
-  exec "$PROTON" run "$FUSION_EXE" -serviceUtil
+  "$PROTON" run "$FUSION_EXE" -serviceUtil
+  exit $?
 fi
 start_toolwindow_fixer
+start_redraw_helper
 
-if (( ${#FUSION_ARGS[@]} > 0 )); then
-  "$PROTON" run "$FUSION_EXE" "${FUSION_ARGS[@]}"
-else
-  "$PROTON" run "$FUSION_EXE" "$@"
+# ── Background health monitor ─────────────────────────────────
+# Checks daemons every 30s and restarts any that died.
+# Redirected to /dev/null so it never prints to terminal after exit.
+while true; do
+  sleep 30
+  daemon_health_check || true
+done &>/dev/null &
+HEALTH_MONITOR_PID=$!
+
+# ── Check if Fusion is already running ──────────────────────────
+if pgrep -u "$(id -u)" -f Fusion360.exe &>/dev/null; then
+  echo "launch-fusion.sh: Fusion 360 is already running. Running two instances is unsupported." >&2
+  # Stop the health monitor we just started — this path exits before cleanup().
+  /bin/kill "$HEALTH_MONITOR_PID" 2>/dev/null || true
+  wait "$HEALTH_MONITOR_PID" 2>/dev/null || true
+  exit 0
 fi
-fusion_status=$?
-
-[[ $fusion_status -eq 0 ]] || fail "Fusion exited or crashed with status $fusion_status"
+fusion_status=0
+SESSION_COMMAND=(python3 "$RUNTIME_DIR/fusion-session.py"
+  --prefix "$STEAM_COMPAT_DATA_PATH/pfx"
+  --wineserver "$(dirname "$PROTON")/files/bin/wineserver"
+  -- "$PROTON" run "$FUSION_EXE")
+if (( ${#FUSION_ARGS[@]} > 0 )); then
+  "${SESSION_COMMAND[@]}" "${FUSION_ARGS[@]}" || fusion_status=$?
+else
+  "${SESSION_COMMAND[@]}" "$@" || fusion_status=$?
+fi
+if [[ $fusion_status -ne 0 ]]; then
+  # Distinguish a real crash from a second instance exiting early.
+  if pgrep -u "$(id -u)" -f Fusion360.exe &>/dev/null; then
+    echo "launch-fusion.sh: Fusion 360 is already running (another instance detected after launch)." >&2
+    exit 0
+  fi
+  fail "Fusion exited or crashed with status $fusion_status"
+fi
 exit 0

@@ -1,5 +1,5 @@
 # src/install/40-fusion-installer.sh — Download and run Fusion installer
-proton=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
+proton=$(find_proton "$COMPAT_DIR")
 if [[ -z "$proton" ]]; then
   log_info " GE-Proton not found. Run install.sh first."
 return 1
@@ -54,6 +54,7 @@ if [[ -z "${INSTALLER_PATH:-}" ]]; then
   wget --timeout=30 -O "$HOME/Downloads/fusion360-linux-install/FusionClientDownloader.exe" \
     "https://dl.appstreaming.autodesk.com/production/installers/Fusion%20Client%20Downloader.exe" || {
 
+cat <<EOF
   ┌─ Manual download ────────────────────────────────────────────┐
   │                                                                │
   │  Download FusionClientDownloader.exe manually from:             │
@@ -94,7 +95,7 @@ PROTON_NO_SECCOMP=1 \
 "$proton" run "$INSTALLER_PATH" 2>/dev/null &
 INSTALLER_PID=$!
 
-sleep 3
+sleep "$INSTALLER_STARTUP_WAIT"
 if ! kill -0 "$INSTALLER_PID" 2>/dev/null; then
   log_fail " Fusion installer exited immediately."
   log_info " Possible causes:"
@@ -108,7 +109,7 @@ log_info " Attaching to installer PID $INSTALLER_PID..."
 
 MAX_WAIT=$((2 * 3600))
 while (( SECONDS < MAX_WAIT )); do
-  sleep 10
+  sleep "$INSTALLER_TIMEOUT"
   ELAPSED=$SECONDS
   if ! kill -0 "$INSTALLER_PID" 2>/dev/null; then
     if (( ELAPSED < 240 )); then
@@ -126,7 +127,6 @@ if (( SECONDS >= MAX_WAIT )); then
   log_warn " Installer did not complete within 2 hours — continuing anyway."
 fi
 log_info " Killing Fusion installer processes..."
-source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
 kill_fusion_processes || true
 log_info " Done. Auth will complete on next launch."
 # ── Check result ──────────────────────────────────────────────────────
@@ -160,9 +160,7 @@ Name=Service Utility
 Icon=fusion360
 Exec=$F360_DATA_DIR/launch-fusion.sh --service-util
 EOF
-  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$F360_APPS_DIR" 2>/dev/null || true
-  command -v kbuildsycoca6 &>/dev/null && kbuildsycoca6 2>/dev/null || true
-  command -v kbuildsycoca5 &>/dev/null && kbuildsycoca5 2>/dev/null || true
+  refresh_desktop_database "$F360_APPS_DIR"
   log_info " Desktop entry installed."
 else
   log_info " Fusion360.exe not found yet. Install may still be in progress."

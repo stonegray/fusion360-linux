@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -euo
+
+# Load share/ modules for interval constants
+_share_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../share" 2>/dev/null && pwd)" || true
+if [[ -z "$_share_dir" ]]; then
+  _share_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../../share" 2>/dev/null && pwd)" || true
+fi
+if [[ -d "$_share_dir" ]]; then
+  source "$_share_dir/load.sh"
+fi
+unset _share_dir
 # fusion-gray-overlay-event-killer-parent-exit.sh:
 # Event-driven closer for Fusion 360's broken Wine grey modal overlay.
 #
@@ -26,6 +36,13 @@ SIZE_TOLERANCE_PERCENT="${FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT:-25}"
 PARENT_WINDOW_ID="${FUSION_OVERLAY_PARENT_WINDOW_ID:-}"
 
 echo "fusion-gray-overlay-event-killer-parent-exit started at $(date -Is)" >> "$LOG_FILE"
+# This daemon uses X11-specific tools (xdotool, xprop, xwininfo) to
+# detect and close Fusion 360's grey modal overlay windows.  On Wayland
+# these tools are not available; exit gracefully with a log message.
+if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+  echo "$(date -Is) Wayland detected — overlay killer requires X11, exiting." >> "$LOG_FILE"
+  exit 0
+fi
 
 window_exists() {
   xprop -id "$1" WM_NAME >/dev/null 2>&1
@@ -170,6 +187,6 @@ else
 fi
 
 "${XPROP_COMMAND[@]}" 2>/dev/null | while IFS= read -r _event_line; do
-  sleep 0.05
+  sleep "$OVERLAY_KILLER_POLL_INTERVAL"
   close_gray_overlays
 done

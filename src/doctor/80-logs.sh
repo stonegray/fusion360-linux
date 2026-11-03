@@ -19,7 +19,7 @@ if [[ -d "$PFX_DIR" ]]; then
   fi
 fi
 
-bridge_log="/tmp/fusion-browser-bridge.log"
+bridge_log="$BRIDGE_BROWSER_LOG"
 if [[ -f "$bridge_log" ]]; then
   bridge_size=$(stat -c%s "$bridge_log" 2>/dev/null || echo "?")
   pass "Browser bridge log exists ($bridge_size bytes)"
@@ -32,7 +32,7 @@ else
   info "Browser bridge log not found (created when Fusion is launched)"
 fi
 
-winebrowser_log="/tmp/fusion360-winebrowser-register.log"
+winebrowser_log="$WINE_BROWSER_REGISTER_LOG"
 if [[ -f "$winebrowser_log" ]]; then
   if grep -qi 'error\|fail' "$winebrowser_log" 2>/dev/null; then
     warn "WineBrowser registration had errors:"
@@ -42,7 +42,7 @@ if [[ -f "$winebrowser_log" ]]; then
   fi
 fi
 
-dpi_log="/tmp/fusion360-dpi.log"
+dpi_log="$FUSION_DPI_LOG_FILE"
 if [[ -f "$dpi_log" ]]; then
   info "DPI log exists (contents below)"
   tail -5 "$dpi_log" | sed 's/^/  /'

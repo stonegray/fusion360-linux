@@ -3,10 +3,10 @@
 header "6. Bridge Infrastructure"
 
 BRIDGE_DIRS=(
-  "/tmp/fusion360-browser-requests"
-  "/tmp/fusion360-browser-processed"
-  "/tmp/fusion360-callback-requests"
-  "/tmp/fusion360-callback-processed"
+  "$BRIDGE_BROWSER_REQUEST_DIR"
+  "$BRIDGE_BROWSER_PROCESSED_DIR"
+  "$BRIDGE_CALLBACK_REQUEST_DIR"
+  "$BRIDGE_CALLBACK_PROCESSED_DIR"
 )
 
 for d in "${BRIDGE_DIRS[@]}"; do

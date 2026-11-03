@@ -1,8 +1,16 @@
 # src/install/00-common.sh — Shared functions and vars for install steps
 # Sourced by install.sh, not executed directly.
 
+
+# Load share/ modules (path resolution: this file is at src/install/,
+# share/ is at the repo root)
+_share_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../../share" 2>/dev/null && pwd)" || true
+if [[ -d "$_share_dir" ]]; then
+  source "$_share_dir/load.sh"
+fi
+unset _share_dir
 # Path defaults (XDG-compliant, single source of truth)
-SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../.." && pwd)}"
 source "$SCRIPT_DIR/src/install/00-defaults.sh"
 
 find_installer() {
@@ -20,56 +28,7 @@ find_installer() {
   return 1
 }
 
-detect_distro() {
-  if [[ ! -f /etc/os-release ]]; then
-    echo "ERROR: /etc/os-release not found. Cannot detect distro." >&2
-    exit 1
-  fi
-  source /etc/os-release
-  case "$ID" in
-    ubuntu|neon|debian|pop|elementary|linuxmint)
-      INSTALL_CMD="sudo apt-get install -y"
-      ;;
-    fedora)
-      INSTALL_CMD="sudo dnf install -y"
-      ;;
-    arch|manjaro|endeavour)
-      INSTALL_CMD="sudo pacman -S --needed --noconfirm"
-      ;;
-    opensuse*|suse)
-      INSTALL_CMD="sudo zypper install -y"
-      ;;
-    void)
-      INSTALL_CMD="sudo xbps-install -S"
-      ;;
-    solus)
-      INSTALL_CMD="sudo eopkg install -y"
-      ;;
-    *)
-      INSTALL_CMD=""
-      echo "WARNING: Unknown distro '$ID'. Installing generic packages — you may need to adapt."
-      ;;
-  esac
 
-  # Normalize distro ID for package file lookup (aliases map to canonical files)
-  local distro_id="$ID"
-  case "$distro_id" in
-    ubuntu|neon|pop|elementary|linuxmint) distro_id="debian" ;;
-    manjaro|endeavour) distro_id="arch" ;;
-    opensuse*|suse) distro_id="opensuse" ;;
-  esac
-  local distro_file="$SCRIPT_DIR/src/install/distro/${distro_id}.txt"
-  if [[ ! -f "$distro_file" ]]; then
-    distro_file="$SCRIPT_DIR/src/install/distro/generic.txt"
-  fi
-
-  if [[ -f "$distro_file" ]]; then
-    PKGS=$(tr '\n' ' ' < "$distro_file" | sed 's/ *$//')
-  else
-    echo "ERROR: Package list not found for distro '$distro_id' and no generic.txt fallback." >&2
-    exit 1
-  fi
-}
 
 pre_flight() {
   if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
@@ -87,76 +46,10 @@ pre_flight() {
   if [[ $avail_gb -lt 15 ]]; then
     echo "WARNING: Only ${avail_gb}GB free on $HOME. Fusion needs ~10GB."
     echo "  Press Ctrl+C to abort, or wait 5s to continue..."
-    sleep 5
+    sleep "$PREFLIGHT_WARN_WAIT"
   fi
 }
 
-# ── Install lifecycle management ──────────────────────────────────────
-INSTALLER_PID=""
 
-kill_installer() {
-  # Kill tracked installer PID
-  if [[ -n "${INSTALLER_PID:-}" ]] && kill -0 "$INSTALLER_PID" 2>/dev/null; then
-    kill "$INSTALLER_PID" 2>/dev/null || true
-    sleep 0.3
-    kill -9 "$INSTALLER_PID" 2>/dev/null || true
-  fi
 
-  # Use the shared kill function from launcher-functions.sh
-  if [[ -f "$SCRIPT_DIR/src/runtime/launcher-functions.sh" ]]; then
-    source "$SCRIPT_DIR/src/runtime/launcher-functions.sh"
-    kill_fusion_processes
-  else
-    # Fallback: simple pgrep kill
-    local user; user=$(id -u)
-    for pattern in wineserver wine proton; do
-      pkill -u "$user" -f "$pattern" 2>/dev/null || true
-    done
-  fi
 
-  # Remove wineserver lock so next start is clean
-  [[ -n "${PFX_DIR:-}" ]] && rm -f "$PFX_DIR/pfx/.wineserver.lock" 2>/dev/null || true
-}
-
-installer_is_running() {
-  # Check if a Fusion installer is already running through Proton
-  pgrep -f "FusionClientDownloader" 2>/dev/null | grep -q . && return 0
-  # Check if wineserver is running for our prefix
-  [[ -f "${PFX_DIR:-}/pfx/.wineserver.lock" ]] && return 0
-  return 1
-}
-
-setup_traps() {
-  trap_cleanup() {
-    echo ""
-    log_info " Interrupted. Cleaning up..."
-    kill_installer
-    exit 1
-  }
-  trap trap_cleanup INT TERM
-}
-
-clear_traps() {
-  trap - INT TERM
-}
-
-# ── Unified output formatting ─────────────────────────────────────
-# Colors (auto-disabled if NO_COLOR is set or stdout not a terminal)
-if [[ -z "${NO_COLOR:-}" ]] && [[ -t 1 ]]; then
-  _C_RESET="\e[0m"; _C_BOLD="\e[1m"; _C_DIM="\e[2m"
-  _C_RED="\e[31m"; _C_GREEN="\e[32m"; _C_YELLOW="\e[33m"
-  _C_BLUE="\e[34m"; _C_CYAN="\e[36m"
-else
-  _C_RESET=""; _C_BOLD=""; _C_DIM=""; _C_RED=""; _C_GREEN=""
-  _C_YELLOW=""; _C_BLUE=""; _C_CYAN=""
-fi
-
-# Print a step header: "── Step N/M: Title ──"
-log_step()   { printf "${_C_BOLD}${_C_CYAN}── %s${_C_RESET}\n" "$*"; }
-
-# Print a status line
-log_info()   { printf "  ${_C_BLUE}●${_C_RESET} %s\n" "$*"; }
-log_pass()   { printf "  ${_C_GREEN}✓${_C_RESET} %s\n" "$*"; }
-log_warn()   { printf "  ${_C_YELLOW}⚠${_C_RESET} %s\n" "$*"; }
-log_fail()   { printf "  ${_C_RED}✗${_C_RESET} %s\n" "$*"; }
-log_detail() { printf "  ${_C_DIM}%s${_C_RESET}\n" "$*"; }

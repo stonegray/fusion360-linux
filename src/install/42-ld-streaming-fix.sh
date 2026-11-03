@@ -8,7 +8,7 @@
 # 0.0.0.0 so the connection fails instantly (ECONNREFUSED from loopback)
 # instead of timing out or hitting real DNS.
 
-proton=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
+proton=$(find_proton "$COMPAT_DIR")
 if [[ -z "$proton" ]]; then
   log_info " GE-Proton not found — skipping LD streaming fix."
   return 1

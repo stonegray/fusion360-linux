@@ -1,10 +1,15 @@
 # src/doctor/00-common.sh — Shared state and output helpers
 # Sourced by doctor.sh, not executed directly.
 
-SECTION_PASS=0
-SECTION_FAIL=0
-SECTION_WARN=0
-RECOMMENDATIONS=()
+# Load share/ modules (path resolution: this file is at src/doctor/,
+# share/ is at the repo root)
+_share_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../../share" 2>/dev/null && pwd)" || true
+if [[ -d "$_share_dir" ]]; then
+  source "$_share_dir/load.sh"
+fi
+unset _share_dir
+
+
 
 SAVE=""
 QUICK=false
@@ -14,7 +19,7 @@ parse_args() {
   SAVE="${1:-}"
   case "$SAVE" in
     --save)
-      REPORT_FILE="/tmp/fusion360-doctor-$(date +%Y%m%d-%H%M%S).txt"
+      REPORT_FILE="$FUSION_DOCTOR_REPORT_TEMPLATE"
       exec > >(tee "$REPORT_FILE") 2>&1 || exec > "$REPORT_FILE" 2>&1
       ;;
     --quick)
@@ -31,25 +36,10 @@ parse_args() {
   esac
 }
 
-# ── Unified output formatting (mirrors src/install/00-common.sh) ──
-if [[ -z "${NO_COLOR:-}" ]] && [[ -t 1 ]]; then
-  _C_RESET="\e[0m"; _C_BOLD="\e[1m"; _C_DIM="\e[2m"
-  _C_RED="\e[31m"; _C_GREEN="\e[32m"; _C_YELLOW="\e[33m"
-  _C_BLUE="\e[34m"; _C_CYAN="\e[36m"
-else
-  _C_RESET=""; _C_BOLD=""; _C_DIM=""; _C_RED=""; _C_GREEN=""
-  _C_YELLOW=""; _C_BLUE=""; _C_CYAN=""
-fi
 
-header()   { printf "\n${_C_BOLD}${_C_CYAN}━━━ %s ━━━${_C_RESET}\n" "$*"; }
-pass()     { printf "  ${_C_GREEN}✓${_C_RESET} %s\n" "$*"; ((SECTION_PASS++)); }
-fail()     { printf "  ${_C_RED}✗${_C_RESET} %s\n" "$*"; ((SECTION_FAIL++)); RECOMMENDATIONS+=("$*"); }
-warn()     { printf "  ${_C_YELLOW}⚠${_C_RESET} %s\n" "$*"; ((SECTION_WARN++)); }
-info()     { printf "  ${_C_BLUE}●${_C_RESET} %s\n" "$*"; }
-detail()   { printf "  ${_C_DIM}%s${_C_RESET}\n" "$*"; }
 
 print_summary() {
-  header "Summary"
+  section_header "Summary"
   echo "  Passed checks:  $SECTION_PASS"
   echo "  Failed checks:  $SECTION_FAIL"
   echo "  Warnings:       $SECTION_WARN"
@@ -77,7 +67,7 @@ print_summary() {
 }
 
 print_banner() {
-  header "Fusion360 on Linux — Doctor Report"
+  section_header "Fusion360 on Linux — Doctor Report"
   echo ""
 }
 

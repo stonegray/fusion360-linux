@@ -1,0 +1,77 @@
+# share/desktop.fn — Desktop entry creation and registration
+#
+# Sources: (none)
+# Exports: install_desktop_entry(), install_desktop_entry_user(),
+#          refresh_desktop_database(), xdg_mime_set_default()
+#
+# Safe under set -e.
+
+# install_desktop_entry <file> <name> <exec> <icon> <mime_types>
+#   Write a visible .desktop file at <file>.  Creates parent directories.
+#   Fields: Name, Exec, Icon, Type=Application, MimeType.
+install_desktop_entry() {
+  local file="$1" name="$2" exec="$3" icon="$4" mime="$5"
+  mkdir -p "$(dirname "$file")"
+  cat > "$file" <<EOF
+[Desktop Entry]
+Name=$name
+Exec=$exec
+Icon=$icon
+Type=Application
+MimeType=$mime
+EOF
+}
+
+# install_desktop_entry_user <name> <exec> <mime> [icon]
+#   Create a handler .desktop entry in the user applications directory
+#   (FUSION_APPS_DIR or ~/.local/share/applications/fusion360-linux).
+#   Uses NoDisplay=true for protocol/handler entries.  If <icon> is
+#   non-empty, writes Icon=<icon> and omits NoDisplay.
+install_desktop_entry_user() {
+  local name="$1" exec="$2" mime="$3" icon="${4:-}"
+  local apps_dir="${FUSION_APPS_DIR:-$HOME/.local/share/applications/fusion360-linux}"
+  local file="$apps_dir/$(echo "$name" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9_.-').desktop"
+  mkdir -p "$apps_dir"
+  {
+    echo "[Desktop Entry]"
+    echo "Name=$name"
+    echo "Exec=$exec"
+    [[ -n "$icon" ]] && echo "Icon=$icon"
+    echo "Type=Application"
+    [[ -z "$icon" ]] && echo "NoDisplay=true"
+    echo "MimeType=$mime"
+  } > "$file"
+}
+
+# refresh_desktop_database [dir1 dir2 ...]
+#   Regenerate the desktop-file cache for each listed directory
+#   (defaults to ~/.local/share/applications).  Followed by
+#   kbuildsycoca6 / kbuildsycoca5 for KDE sessions.
+refresh_desktop_database() {
+  if [[ $# -eq 0 ]]; then
+    set -- "$HOME/.local/share/applications"
+  fi
+  local d
+  for d; do
+    if [[ -d "$d" ]]; then
+      command -v update-desktop-database >/dev/null 2>&1 && \
+        update-desktop-database "$d" 2>/dev/null || true
+    fi
+  done
+  command -v kbuildsycoca6 &>/dev/null && kbuildsycoca6 2>/dev/null || true
+  command -v kbuildsycoca5 &>/dev/null && kbuildsycoca5 2>/dev/null || true
+}
+
+# xdg_mime_set_default <desktop_file> <mime_type> [mime_type ...]
+#   Register <desktop_file> as the default handler for every listed
+#   MIME type or URI scheme via xdg-mime(1).  Silently no-ops when
+#   xdg-mime is unavailable.
+xdg_mime_set_default() {
+  local desktop="$1"
+  shift
+  command -v xdg-mime >/dev/null 2>&1 || return 0
+  local t
+  for t; do
+    xdg-mime default "$desktop" "$t" 2>/dev/null || true
+  done
+}

@@ -21,19 +21,9 @@ fi
 # Extracts Fusion's icon from the Wine prefix and installs it at
 # standard sizes in the hicolor theme so file managers show a
 # Fusion icon for .f3d files instead of a generic one.
-_resize_icon() {
-  local src="$1" dst="$2" size="$3"
-  if command -v convert &>/dev/null; then
-    convert "$src" -resize "${size}x${size}" "$dst" 2>/dev/null && return 0
-  fi
-  if command -v ffmpeg &>/dev/null; then
-    ffmpeg -y -i "$src" -vf "scale=${size}:${size}:flags=lanczos" "$dst" 2>/dev/null && return 0
-  fi
-  return 1
-}
 
 _install_fusion_mime_icon() {
-  local sizes="16 22 24 32 48 64 128 256"
+  local sizes=(16 22 24 32 48 64 128 256)
   local hicolor="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"
   local icondir="${F360_DATA_DIR:-$HOME/.local/share/fusion360-linux}/icons"
   local master="$icondir/fusion360.png"
@@ -70,10 +60,10 @@ _install_fusion_mime_icon() {
   fi
 
   # Install resized PNGs into the hicolor MIME theme
-  for s in $sizes; do
+  for s in "${sizes[@]}"; do
     d="$hicolor/${s}x${s}/mimetypes"
     mkdir -p "$d"
-    _resize_icon "$master" "$d/application-vnd.autodesk.fusion360.png" "$s" || true
+    resize_icon "$master" "$d/application-vnd.autodesk.fusion360.png" "$s" || true
   done
 
   # Clean up any stale icon-theme.cache left from a previous broken
@@ -85,7 +75,7 @@ _install_fusion_mime_icon() {
   rm -f "$hicolor/icon-theme.cache"
 
   # Also install App icon so the desktop entry (`Icon=fusion360`) resolves
-  for s in $sizes; do
+  for s in "${sizes[@]}"; do
     local src_icon="$hicolor/${s}x${s}/mimetypes/application-vnd.autodesk.fusion360.png"
     local dst_icon="$hicolor/${s}x${s}/apps/fusion360.png"
     if [[ -f "$src_icon" ]] && [[ ! -f "$dst_icon" ]]; then
@@ -94,12 +84,7 @@ _install_fusion_mime_icon() {
     fi
   done
 
-  # Refresh KDE icon cache so the running session picks up new icons
-  if command -v kbuildsycoca6 &>/dev/null; then
-    kbuildsycoca6 --noincremental 2>/dev/null || true
-  elif command -v kbuildsycoca5 &>/dev/null; then
-    kbuildsycoca5 --noincremental 2>/dev/null || true
-  fi
+  refresh_desktop_database
 
   rm -f "$icondir"/*.ico 2>/dev/null || true
   log_info " Fusion 360 MIME icons installed."
@@ -111,6 +96,18 @@ if command -v xdg-mime &>/dev/null; then
   xdg-mime default autodesk-fusion360.desktop application/vnd.autodesk.fusion360 2>/dev/null || true
   log_info " Fusion 360 set as default for .f3d/.f3z files."
   fi
+
+# Check for conflicting protocol handlers — other apps may have registered adsk://
+if command -v xdg-mime &>/dev/null; then
+  for scheme in adsk adskidmgr; do
+    handler=$(xdg-mime query default "x-scheme-handler/$scheme" 2>/dev/null || true)
+    if [[ -n "$handler" ]] && ! echo "$handler" | grep -qi "fusion360-callback"; then
+      log_warn " Found existing handler for $scheme://: $handler"
+      log_warn " This may conflict with Fusion 360's callback handler."
+      log_info " Will register fusion360-callback-handler.desktop for $scheme://"
+    fi
+  done
+fi
 
 # Re-assert protocol handlers — Wine/Fusion installer may have registered its own
 if command -v xdg-mime &>/dev/null; then
@@ -133,12 +130,7 @@ if command -v update-desktop-database &>/dev/null; then
   fi
 fi
 
-# Refresh KDE menu if running
-if command -v kbuildsycoca6 &>/dev/null; then
-  kbuildsycoca6 2>/dev/null || true
-elif command -v kbuildsycoca5 &>/dev/null; then
-  kbuildsycoca5 2>/dev/null || true
-fi
+refresh_desktop_database
 
 # ── Register NLauncher.exe in Wine prefix ─────────────────────────
 # This lets Windows ShellExecute (inside the Wine prefix) open .f3d
@@ -175,9 +167,9 @@ _shell_folder() {
 }
 
 local proton_bin
-proton_bin=$(find "$COMPAT_DIR" -name proton -type f 2>/dev/null | head -1 || true)
+proton_bin=$(find_proton "$COMPAT_DIR")
 local wine_bin
-wine_bin="$(dirname "$proton_bin")/files/bin/wine"
+wine_bin="$(proton_wine_bin "$proton_bin")"
 if [[ -x "$wine_bin" ]]; then
   _shell_folder "Personal"  "$HOME/Documents"
   _shell_folder "Desktop"   "$HOME/Desktop"
