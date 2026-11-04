@@ -35,13 +35,14 @@ FUSION_ROOT="${FUSION_ROOT:-$STEAM_COMPAT_DATA_PATH/pfx/drive_c/users/steamuser/
 BROWSER="${BROWSER:-$RUNTIME_DIR/fusion-browser.sh}"
 BROWSER_LISTENER="${BROWSER_LISTENER:-$RUNTIME_DIR/fusion-browser-listener.sh}"
 CALLBACK_HANDLER="${CALLBACK_HANDLER:-$RUNTIME_DIR/fusion-callback-handler.sh}"
-# Auto-detect browser: google-chrome > chromium-browser > chromium > firefox
-_detected_chrome=""
-for _c in /usr/bin/google-chrome /usr/bin/chromium-browser /usr/bin/chromium /usr/sbin/firefox; do
-  [[ -x "$_c" ]] && { _detected_chrome="$_c"; break; }
-done
-CHROME="${CHROME:-$_detected_chrome}"
-unset _detected_chrome _c
+# Browser used to open Autodesk's OAuth pages.
+#
+# Leave CHROME empty by default so the listener tries the desktop's own
+# handler (xdg-open) first. Hardcoding a browser here overrides the user's
+# default and, worse, the direct-launch path is the fragile one: a browser
+# started with a scrubbed environment can fail to reach the running instance
+# while still exiting 0. Set CHROME explicitly to force a specific binary.
+CHROME="${CHROME:-}"
 FUSION_OVERLAY_KILLER="${FUSION_OVERLAY_KILLER:-$RUNTIME_DIR/fusion-gray-overlay-event-killer.sh}"
 FUSION_TOOLWINDOW_FIXER="${FUSION_TOOLWINDOW_FIXER:-${STEAM_COMPAT_DATA_PATH:-$HOME/.fusion360-proton2}/pfx/drive_c/fusion-toolwindow-fixer.exe}"
 FUSION_WINE_RESTART_SCRIPT="${FUSION_WINE_RESTART_SCRIPT:-$RUNTIME_DIR/kill-wine-proton-fusion-nuclear.sh}"

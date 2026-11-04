@@ -47,39 +47,74 @@ find_identity_manager_executable() {
   printf "%s" "$identity_manager_executable"
 }
 
-# Build a clean environment for browser launches — preserves only what
-# browsers actually need under Wayland/X11, strips the rest.
+# Environment for browser launches.
+#
+# This used to run browsers under `env -i` with a hand-picked list of
+# variables. That breaks the normal hand-off to an already-running browser:
+# the new process cannot find the running instance's profile (fastlane /
+# D-Bus / MOZ_* state are all stripped), so it exits 0 without opening
+# anything, and the listener records it as success.
+#
+# The desktop-default handler is invoked with the caller's environment as-is.
+# Only proven-missing values are filled in, never blanked. Set
+# FUSION_BROWSER_STRICT_ENV=1 to get the old scrubbed behaviour back.
 _browser_env() {
+  local uid; uid="$(id -u)"
+  local xauth="${XAUTHORITY:-}"
+  if [[ -z "$xauth" || ! -f "$xauth" ]]; then
+    local cand
+    for cand in "$XDG_RUNTIME_DIR"/xauth_* "/run/user/$uid"/xauth_* "$HOME/.Xauthority"; do
+      [[ -f "$cand" ]] && { xauth="$cand"; break; }
+    done
+  fi
+  local dbus="${DBUS_SESSION_BUS_ADDRESS:-unix:path=/run/user/$uid/bus}"
+
   printf "HOME=%s\n" "$HOME"
   printf "USER=%s\n" "${USER:-$(id -un)}"
   printf "DISPLAY=%s\n" "${DISPLAY:-:0}"
   printf "WAYLAND_DISPLAY=%s\n" "${WAYLAND_DISPLAY:-}"
-  printf "XAUTHORITY=%s\n" "${XAUTHORITY:-$HOME/.Xauthority}"
-  printf "DBUS_SESSION_BUS_ADDRESS=%s\n" "${DBUS_SESSION_BUS_ADDRESS:-}"
+  printf "XAUTHORITY=%s\n" "$xauth"
+  printf "DBUS_SESSION_BUS_ADDRESS=%s\n" "$dbus"
   printf "XDG_CURRENT_DESKTOP=%s\n" "${XDG_CURRENT_DESKTOP:-}"
   printf "XDG_SESSION_TYPE=%s\n" "${XDG_SESSION_TYPE:-}"
-  printf "XDG_RUNTIME_DIR=%s\n" "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+  printf "XDG_RUNTIME_DIR=%s\n" "${XDG_RUNTIME_DIR:-/run/user/$uid}"
   printf "LANG=%s\n" "${LANG:-en_US.UTF-8}"
-  printf "PATH=%s\n" "/usr/local/bin:/usr/bin:/bin"
-  printf "LIBGL_ALWAYS_SOFTWARE=%s\n" "${LIBGL_ALWAYS_SOFTWARE:-}"
+  printf "PATH=%s\n" "${PATH:-/usr/local/bin:/usr/bin:/bin}"
 }
 
+# Launch one candidate. Returns 0 only when the attempt plausibly worked.
 _try_open() {
   local label="$1" bin="$2" url="$3"
   {
     echo "--- attempt: $label ---"
     echo "bin=$bin"
   } >> "$LOG_FILE" 2>&1
-  env -i $(_browser_env) "$bin" "$url" >> "$LOG_FILE" 2>&1 &
+
+  local rc=0
+  if [[ -n "${FUSION_BROWSER_STRICT_ENV:-}" ]]; then
+    env -i $(_browser_env) "$bin" "$url" >> "$LOG_FILE" 2>&1 &
+  else
+    "$bin" "$url" >> "$LOG_FILE" 2>&1 &
+  fi
   local pid=$!
-  disown 2>/dev/null || true
-  sleep 0.5
+
+  # A browser handing the URL to an already-running instance exits quickly.
+  # Give it time to do so; a fresh launch stays up and is equally fine.
+  local waited=0
+  while (( waited < 16 )) && kill -0 "$pid" 2>/dev/null; do
+    sleep 0.5
+    waited=$((waited + 1))
+  done
   if kill -0 "$pid" 2>/dev/null; then
-    log_message "  $label OK (pid=$pid)"
+    log_message "  $label OK (pid=$pid, still running)"
     return 0
   fi
-  wait "$pid" 2>/dev/null || true
-  log_message "  $label FAILED"
+  wait "$pid" 2>/dev/null; rc=$?
+  if [[ $rc -eq 0 ]]; then
+    log_message "  $label OK (exit 0)"
+    return 0
+  fi
+  log_message "  $label FAILED (exit $rc)"
   return 1
 }
 
@@ -104,25 +139,30 @@ open_browser_url() {
 
   cd "$HOME" || { log_message "ERROR: cd $HOME failed"; mv "$request_file" "$processed_file"; return 1; }
 
-  # Stratified fallback chain — each attempt must stay alive >0.5s
-  # 1 — Configured CHROME (fastest path)
-  if [[ -n "${CHROME:-}" ]] && [[ -x "$CHROME" ]]; then
-    _try_open "CHROME" "$CHROME" "$url" && { mv "$request_file" "$processed_file"; return 0; }
+  # Fallback chain, most-preferred first.
+  #
+  # xdg-open leads deliberately: it asks the desktop which browser is
+  # registered for http(s), so the URL lands in the user's *default* browser
+  # with its real environment, D-Bus session and profile. Launching a
+  # browser binary directly is the fragile path — a scrubbed environment can
+  # make it fail to reach a running instance (or fail outright) and still
+  # exit 0.
+  # 1 — Desktop default handler
+  if command -v xdg-open &>/dev/null; then
+    _try_open "xdg-open" "xdg-open" "$url" && { mv "$request_file" "$processed_file"; return 0; }
   fi
 
-  # 2 — KDE Plasma native openers (most reliable on KDE)
-  # 2a — kde-open6 (KDE Plasma 6)
+  # 2 — KDE Plasma native openers
   if command -v kde-open6 &>/dev/null; then
     _try_open "kde-open6" "kde-open6" "$url" && { mv "$request_file" "$processed_file"; return 0; }
   fi
-  # 2b — kde-open5 (KDE Plasma 5, or compat shim)
   if command -v kde-open5 &>/dev/null; then
     _try_open "kde-open5" "kde-open5" "$url" && { mv "$request_file" "$processed_file"; return 0; }
   fi
 
-  # 3 — xdg-open (last resort on KDE, broken under Wayland; universal elsewhere)
-  if command -v xdg-open &>/dev/null; then
-    _try_open "xdg-open" "xdg-open" "$url" && { mv "$request_file" "$processed_file"; return 0; }
+  # 3 — Explicitly configured browser, if the user set CHROME / FUSION_CHROME
+  if [[ -n "${CHROME:-}" ]] && [[ -x "$CHROME" ]]; then
+    _try_open "CHROME" "$CHROME" "$url" && { mv "$request_file" "$processed_file"; return 0; }
   fi
 
   # 4 — Known browser binaries (last resort)
