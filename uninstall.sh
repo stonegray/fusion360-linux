@@ -17,8 +17,11 @@ fi
 
 : "${HOME:?HOME must be set to run uninstall}"
 
-# Resolve script directory and source color/path constants
-_this_file="${BASH_SOURCE[0]:-$0}"
+# Resolve script directory and source color/path constants.
+# readlink -f matters: this script is reached through the ~/.local/bin symlink,
+# and plain dirname would resolve SCRIPT_DIR to the symlink's directory, making
+# every ../../share/*.fn source below fail.
+_this_file="$(readlink -f "${BASH_SOURCE[0]:-$0}")"
 SCRIPT_DIR="$(cd "$(dirname "$_this_file")" && pwd)"
 source "$SCRIPT_DIR/share/colors.fn"
 source "$SCRIPT_DIR/share/paths.fn"

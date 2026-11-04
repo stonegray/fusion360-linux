@@ -1,13 +1,20 @@
 # src/doctor/00-common.sh — Shared state and output helpers
 # Sourced by doctor.sh, not executed directly.
 
-# Load share/ modules (path resolution: this file is at src/doctor/,
-# share/ is at the repo root)
-_share_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../../share" 2>/dev/null && pwd)" || true
-if [[ -d "$_share_dir" ]]; then
-  source "$_share_dir/load.sh"
-fi
-unset _share_dir
+# Load share/ modules. Two layouts to support:
+#   repo:      <root>/src/doctor/00-common.sh  -> <root>/share/
+#   installed: <data>/00-common.sh             -> <data>/share/
+# Only the repo layout used to be probed, so an installed doctor looked for
+# <data>/../share and carried on with no share functions loaded at all.
+_doctor_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+for _candidate in "$_doctor_dir/../../share" "$_doctor_dir/share" "$_doctor_dir/../share"; do
+  if [[ -f "$_candidate/load.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$_candidate/load.sh"
+    break
+  fi
+done
+unset _doctor_dir _candidate
 
 
 

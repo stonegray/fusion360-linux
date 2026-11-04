@@ -23,7 +23,10 @@ if [[ -d "$SCRIPT_DIR/src/native-dialogs" ]]; then
      "$F360_DATA_DIR/native-dialogs/"
 fi
 cp "$SCRIPT_DIR/src/bin/launch-fusion.sh" "$F360_DATA_DIR/"
-cp "$SCRIPT_DIR/src/doctor/doctor.sh" "$F360_DATA_DIR/"
+# doctor.sh sources NN-*.sh modules from its own directory, so the whole
+# directory has to come along — copying only doctor.sh leaves `fusion-doctor`
+# failing to load 00-common.sh and every check silently missing.
+cp "$SCRIPT_DIR/src/doctor/"*.sh "$F360_DATA_DIR/"
 # uninstall.sh sources share/*.fn relative to its own directory, so it has to
 # live beside the share/ copy made above. Without this the CLI symlink below
 # points at a file that does not exist and `fusion-uninstall` fails outright.
