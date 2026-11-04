@@ -199,31 +199,19 @@ else
   log_info " Wine binary not found — skipping shell folders."
 fi
 mkdir -p "$PFX_DIR/pfx/drive_c"
-local twf_src="$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.c"
-local twf_prebuilt="$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.exe"
+# Built by 26-runtime-patches.sh; nothing is shipped prebuilt. If that step
+# skipped the build (no cross-compiler), the fixer is simply absent and
+# Fusion falls back to Wine's default stacking.
+local twf_built="$F360_DATA_DIR/toolwindow-fixer/fusion-toolwindow-fixer.exe"
 local twf_target="$PFX_DIR/pfx/drive_c/fusion-toolwindow-fixer.exe"
-local built_ok=false
 
-# Try compiling from source if the cross-compiler is available
-if command -v x86_64-w64-mingw32-gcc &>/dev/null && [[ -f "$twf_src" ]]; then
-  log_info " Building toolwindow fixer from source..."
-  if x86_64-w64-mingw32-gcc -Os -s -o "$twf_target" "$twf_src" -luser32 2>&1; then
-    log_info " Toolwindow fixer built from source."
-    built_ok=true
-  else
-    log_info " Warning: source build failed, falling back to pre-built binary."
-  fi
+if [[ -f "$twf_built" ]]; then
+  cp "$twf_built" "$twf_target"
+  log_info " Toolwindow fixer installed."
+else
+  log_warn " Toolwindow fixer not built — the z-order fix will be unavailable."
+  log_warn " Install mingw-w64 and re-run install.sh to enable it."
 fi
 
-# Fall back to pre-built binary
-if [[ "$built_ok" != true ]] && [[ -f "$twf_prebuilt" ]]; then
-  cp "$twf_prebuilt" "$twf_target"
-  log_info " Toolwindow fixer installed (pre-built binary)."
-  built_ok=true
-fi
-
-if [[ "$built_ok" != true ]]; then
-  log_info " Warning: toolwindow fixer not found — skipping."
-fi
 
 log_info " Done."

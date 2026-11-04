@@ -11,8 +11,25 @@
 
 log_info " Building runtime helpers..."
 
-F360_ND_SRC="$SCRIPT_DIR/src/native-dialogs"
+# Build from the sources 25-install-to-location.sh staged into the data
+# directory, not from this repo: the installed tree is then self-contained and
+# this step works even when run on its own.
 F360_ND_OUT="$F360_DATA_DIR/native-dialogs"
+F360_ND_SRC="$F360_ND_OUT"
+
+# 25 creates this while staging; make it here too so the step does not depend
+# on running order. Falling back to the repo keeps `make test`-style use
+# working from a checkout that was never installed.
+if [[ ! -d "$F360_ND_SRC" ]]; then
+  F360_ND_SRC="$SCRIPT_DIR/src/native-dialogs"
+fi
+mkdir -p "$F360_ND_OUT" "$F360_DATA_DIR/toolwindow-fixer"
+
+if [[ ! -f "$F360_ND_SRC/comdlg32.c" ]]; then
+  log_error " Dialog shim sources not found in $F360_ND_SRC."
+  log_error " Run 25-install-to-location.sh first, or re-run install.sh."
+  return 1
+fi
 
 # The shim is an optional convenience: without it Fusion still opens files
 # through Wine's own dialog. So a missing toolchain degrades rather than
@@ -69,4 +86,26 @@ if ! x86_64-w64-mingw32-objdump -f "$F360_ND_OUT/dlgshim.dll" 2>/dev/null | grep
   return 1
 fi
 
-log_info " Runtime helpers built: dlgshim.dll, hostrunner"
+# toolwindow-fixer: a Win32 daemon that marks Fusion's WS_POPUP panels as
+# WS_EX_APPWINDOW so the compositor can stack them (the "always on top"
+# z-order bug). 45-filetypes.sh installs it into the prefix; it is built here
+# because this is the step that verifies the cross-compiler exists.
+# Prefer the staged copy (25 installs it) so the data tree is self-contained.
+F360_TWF_SRC="$F360_DATA_DIR/toolwindow-fixer"
+[[ -f "$F360_TWF_SRC/fusion-toolwindow-fixer.c" ]] || F360_TWF_SRC="$SCRIPT_DIR/src/toolwindow-fixer"
+F360_TWF_OUT="$F360_DATA_DIR/toolwindow-fixer"
+
+log_info " Building toolwindow fixer..."
+if ! x86_64-w64-mingw32-gcc -Os -s \
+      -o "$F360_TWF_OUT/fusion-toolwindow-fixer.exe" \
+      "$F360_TWF_SRC/fusion-toolwindow-fixer.c" -luser32; then
+  log_error " fusion-toolwindow-fixer.exe build failed."
+  return 1
+fi
+if ! x86_64-w64-mingw32-objdump -f "$F360_TWF_OUT/fusion-toolwindow-fixer.exe" \
+      2>/dev/null | grep -q 'pei-x86-64'; then
+  log_error " fusion-toolwindow-fixer.exe is not a 64-bit PE."
+  return 1
+fi
+
+log_info " Runtime helpers built: dlgshim.dll, hostrunner, fusion-toolwindow-fixer.exe"

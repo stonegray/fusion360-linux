@@ -22,6 +22,12 @@ if [[ -d "$SCRIPT_DIR/src/native-dialogs" ]]; then
      "$SCRIPT_DIR/src/native-dialogs/dlgshim.def" \
      "$F360_DATA_DIR/native-dialogs/"
 fi
+# Toolwindow fixer source, staged alongside and built by 26-runtime-patches.sh.
+if [[ -d "$SCRIPT_DIR/src/toolwindow-fixer" ]]; then
+  mkdir -p "$F360_DATA_DIR/toolwindow-fixer"
+  cp "$SCRIPT_DIR/src/toolwindow-fixer/fusion-toolwindow-fixer.c" \
+     "$F360_DATA_DIR/toolwindow-fixer/"
+fi
 cp "$SCRIPT_DIR/src/bin/launch-fusion.sh" "$F360_DATA_DIR/"
 # doctor.sh sources NN-*.sh modules from its own directory, so the whole
 # directory has to come along — copying only doctor.sh leaves `fusion-doctor`

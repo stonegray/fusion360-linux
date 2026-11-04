@@ -61,24 +61,49 @@ if [[ $stuck_found -eq 0 ]]; then
   pass "No stuck-install indicators detected"
 fi
 
-# Native dialog shim: built at install time by 26-runtime-patches.sh. A missing
-# or stale pair means Fusion silently falls back to Wine's Windows-style dialog
-# (or, worse, loads a shim built from different sources).
-nd_dir="$F360_DATA_DIR/native-dialogs"
+# Runtime helpers built at install time by 26-runtime-patches.sh. Nothing is
+# shipped prebuilt, so a missing or source-newer-than-binary artifact means
+# the last install did not finish that step — Fusion then silently falls back
+# to stock Wine behaviour.
 shim_cfg="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux/config"
+
+# helper: stale_or_missing <artifact> <newest source> <label> <remedy-hint>
+check_helper() {
+  local artifact="$1" src="$2" label="$3" hint="$4"
+  if [[ ! -f "$artifact" ]]; then
+    warn "$label is missing — run ./install.sh"
+    ((stuck_found++)) || true
+  elif [[ -f "$src" && "$src" -nt "$artifact" ]]; then
+    warn "$label is older than its source — rebuild with ./install.sh"
+    ((stuck_found++)) || true
+  else
+    pass "$label present and up to date"
+  fi
+}
+
+nd_dir="$F360_DATA_DIR/native-dialogs"
 shim_wanted=0
 [[ -f "$shim_cfg" ]] && grep -qE '^FUSION_NATIVE_DIALOGS=1' "$shim_cfg" && shim_wanted=1
 
 if [[ $shim_wanted -eq 1 ]]; then
-  if [[ ! -f "$nd_dir/dlgshim.dll" || ! -x "$nd_dir/hostrunner" ]]; then
-    warn "Native dialogs enabled but shim is missing from $nd_dir — run ./install.sh"
+  # dlgshim.dll depends on all three sources, so compare against the newest.
+  newest_src=""
+  for f in "$nd_dir"/comdlg32.c "$nd_dir"/dialog_com.c "$nd_dir"/shim_log.c; do
+    if [[ -f "$f" && ( -z "$newest_src" || "$f" -nt "$newest_src" ) ]]; then newest_src="$f"; fi
+  done
+  check_helper "$nd_dir/dlgshim.dll" "$newest_src" "Native dialog shim" ""
+  if [[ ! -x "$nd_dir/hostrunner" ]]; then
+    warn "hostrunner is missing — native dialogs will fail to pick files"
     ((stuck_found++)) || true
-  elif [[ -f "$nd_dir/dlgshim.dll" && -f "$nd_dir/comdlg32.c" ]] &&
-       [[ "$nd_dir/comdlg32.c" -nt "$nd_dir/dlgshim.dll" ]]; then
-    warn "dlgshim.dll is older than its source — rebuild with ./install.sh"
-    ((stuck_found++)) || true
-  else
-    pass "Native dialog shim present and up to date"
   fi
   command -v kdialog &>/dev/null || warn "kdialog not installed — native dialogs will not appear"
+fi
+
+twf_cfg="${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux/config"
+twf_wanted=0
+[[ -f "$twf_cfg" ]] && grep -qE '^FUSION_ENABLE_TOOLWINDOW_FIXER=1' "$twf_cfg" && twf_wanted=1
+if [[ $twf_wanted -eq 1 ]]; then
+  check_helper "$F360_DATA_DIR/toolwindow-fixer/fusion-toolwindow-fixer.exe" \
+               "$SCRIPT_DIR/../toolwindow-fixer/fusion-toolwindow-fixer.c" \
+               "Toolwindow fixer" ""
 fi

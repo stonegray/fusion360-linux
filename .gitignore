@@ -7,3 +7,4 @@ Z:\*
 # Build artifacts — built at install time by src/install/26-runtime-patches.sh
 src/native-dialogs/dlgshim.dll
 src/native-dialogs/hostrunner
+src/toolwindow-fixer/fusion-toolwindow-fixer.exe
