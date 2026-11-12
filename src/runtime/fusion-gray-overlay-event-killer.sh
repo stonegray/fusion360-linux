@@ -188,27 +188,20 @@ close_gray_overlays() {
 # Fusion's modal dialogs (e.g. "Move to") are mapped as top-level NORMAL windows
 # with skip-taskbar and no WM_TRANSIENT_FOR, so the WM can stack them *below* the
 # main Fusion window. The main window is disabled while the modal is open, which
-# looks like a hang. Raise any such dialog that sits below a main window.
+# looks like a hang. Raise any such dialog that sits below *its own* main window.
+#
+# Every Proton app shares the steam_proton class, so ownership is established
+# with _NET_WM_PID (Wine sets it to the owning process): a dialog is only
+# considered if a main Fusion window from the same process exists, and it is
+# only compared with that process's main windows. Windows without the property
+# are ignored.
 raise_buried_dialogs() {
-  local stacking window_id props main_pos=-1 pos i
-  local -a stack mains=() dialogs=()
+  local stacking window_id props pid pos main_pos i
+  local -a stack dialogs=()
+  local -A main_top=() dialog_pid=()
 
   stacking="$(xprop -root _NET_CLIENT_LIST_STACKING 2>/dev/null)" || return 0
   read -r -a stack <<< "$(grep -o '0x[0-9a-fA-F]\+' <<< "$stacking" | tr '\n' ' ')"
-
-  while read -r window_id; do
-    [[ -n "$window_id" ]] || continue
-    props="$(xprop -id "$window_id" WM_NAME _NET_WM_WINDOW_TYPE _NET_WM_STATE WM_TRANSIENT_FOR 2>/dev/null)" || continue
-    grep -q '_NET_WM_WINDOW_TYPE_NORMAL' <<< "$props" || continue
-    if grep -q 'Autodesk Fusion' <<< "$props"; then
-      mains+=("$window_id")
-    elif grep -q '_NET_WM_STATE_SKIP_TASKBAR' <<< "$props" \
-         && grep -q 'WM_TRANSIENT_FOR:  not found' <<< "$props"; then
-      dialogs+=("$window_id")
-    fi
-  done < <(xdotool search --onlyvisible --class steam_proton 2>/dev/null || true)
-
-  (( ${#mains[@]} && ${#dialogs[@]} )) || return 0
 
   # Position in stacking order (bottom -> top); xdotool gives decimal ids.
   stack_pos() {
@@ -219,18 +212,35 @@ raise_buried_dialogs() {
     echo -1
   }
 
-  for window_id in "${mains[@]}"; do
-    pos="$(stack_pos "$window_id")"
-    (( pos > main_pos )) && main_pos=$pos
-  done
+  while read -r window_id; do
+    [[ -n "$window_id" ]] || continue
+    props="$(xprop -id "$window_id" WM_NAME _NET_WM_WINDOW_TYPE _NET_WM_STATE WM_TRANSIENT_FOR _NET_WM_PID 2>/dev/null)" || continue
+    grep -q '_NET_WM_WINDOW_TYPE_NORMAL' <<< "$props" || continue
+    pid="$(sed -n 's/^_NET_WM_PID(CARDINAL) = \([0-9][0-9]*\)$/\1/p' <<< "$props")"
+    [[ -n "$pid" ]] || continue
+    if grep -q '^WM_NAME([^)]*) = ".* - Autodesk Fusion' <<< "$props"; then
+      pos="$(stack_pos "$window_id")"
+      if (( pos > ${main_top[$pid]:--1} )); then main_top[$pid]=$pos; fi
+    elif grep -q '_NET_WM_STATE_SKIP_TASKBAR' <<< "$props" \
+         && grep -q 'WM_TRANSIENT_FOR:  not found' <<< "$props"; then
+      dialogs+=("$window_id")
+      dialog_pid[$window_id]=$pid
+    fi
+  done < <(xdotool search --onlyvisible --class steam_proton 2>/dev/null || true)
+
+  (( ${#main_top[@]} && ${#dialogs[@]} )) || return 0
 
   for window_id in "${dialogs[@]}"; do
+    pid="${dialog_pid[$window_id]}"
+    main_pos="${main_top[$pid]:-}"
+    [[ -n "$main_pos" ]] || continue          # not a Fusion process's dialog
     pos="$(stack_pos "$window_id")"
     (( pos >= 0 && pos < main_pos )) || continue
-    echo "$(date -Is) raising buried dialog window_id=$window_id name=$(xdotool getwindowname "$window_id" 2>/dev/null)" >> "$LOG_FILE"
+    echo "$(date -Is) raising buried dialog window_id=$window_id pid=$pid name=$(xdotool getwindowname "$window_id" 2>/dev/null)" >> "$LOG_FILE"
     xdotool windowraise "$window_id" 2>/dev/null || true
     xdotool windowactivate "$window_id" 2>/dev/null || true
   done
+  return 0
 }
 
 close_gray_overlays
