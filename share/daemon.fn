@@ -137,7 +137,7 @@ _find_toolwindow_fixer_pid() {
   local exe_name
   exe_name="$(basename "$FUSION_TOOLWINDOW_FIXER")"
   exe_name="${exe_name//./\\.}"
-  pgrep -u "$(id -u)" -f "^[A-Za-z]:\\\\.*\\\\${exe_name}" 2>/dev/null | head -n 1 || true
+  pgrep -u "$(id -u)" -f "^[A-Za-z]:\\\\(.*\\\\)?${exe_name}" 2>/dev/null | head -n 1 || true
 }
 
 start_toolwindow_fixer() {
