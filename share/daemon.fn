@@ -130,14 +130,30 @@ start_overlay_killer() {
 # Background daemon that adds WS_EX_APPWINDOW to Fusion's docked
 # toolwindow popups so Wine's X11 driver makes them "managed" instead
 # of override-redirect.  Fixes the "always on top" z-order bug.
+# The Wine prefix the fixer runs in (the one Fusion uses).
+_toolwindow_fixer_prefix() {
+  printf '%s\n' "${STEAM_COMPAT_DATA_PATH:-${PFX_DIR:-$HOME/.fusion360-proton2}}/pfx"
+}
+
 # Wine starts the .exe via start.exe in a reparented process, so $! of the
 # launch command exits at once. Find the real fixer process by its Windows
-# command line (e.g. "C:\fusion-toolwindow-fixer.exe") instead.
+# command line (e.g. "C:\fusion-toolwindow-fixer.exe") instead, and only
+# accept one running in Fusion's prefix: a fixer in another prefix cannot see
+# Fusion's windows. Prefixes are compared after resolving symlinks.
 _find_toolwindow_fixer_pid() {
-  local exe_name
+  local exe_name want pid pfx
   exe_name="$(basename "$FUSION_TOOLWINDOW_FIXER")"
   exe_name="${exe_name//./\\.}"
-  pgrep -u "$(id -u)" -f "^[A-Za-z]:\\\\(.*\\\\)?${exe_name}" 2>/dev/null | head -n 1 || true
+  want="$(realpath -m "$(_toolwindow_fixer_prefix)")"
+  for pid in $(pgrep -u "$(id -u)" -f "^[A-Za-z]:\\\\(.*\\\\)?${exe_name}" 2>/dev/null || true); do
+    pfx="$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | sed -n 's/^WINEPREFIX=//p' | head -n 1 || true)"
+    [[ -n "$pfx" ]] || pfx="$HOME/.wine"
+    if [[ "$(realpath -m "$pfx")" == "$want" ]]; then
+      printf '%s\n' "$pid"
+      return 0
+    fi
+  done
+  return 0
 }
 
 start_toolwindow_fixer() {
@@ -172,7 +188,7 @@ start_toolwindow_fixer() {
     return 0
   fi
 
-  nohup setsid env WINEPREFIX="${STEAM_COMPAT_DATA_PATH:-${PFX_DIR:-$HOME/.fusion360-proton2}}/pfx" \
+  nohup setsid env WINEPREFIX="$(_toolwindow_fixer_prefix)" \
     "$wine_bin" "$FUSION_TOOLWINDOW_FIXER" &>/dev/null &
   disown 2>/dev/null || true
 
