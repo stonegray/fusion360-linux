@@ -243,3 +243,38 @@ The unhandled script error can also destabilize the MCP/scripting thread
 (crash stack `nsmcp10`/`nafusion10`/`v8`) — see the ICU 77 entry above; keep
 `FUSION_FIX_ICU77=1` so the script-execution helpers don't abort on top of
 the API error.
+
+## Cloud saves upload very slowly (~100 KB/s)
+
+Saving a design spends minutes in "uploading". In the Fusion log
+(`AppLogFile*.log`), every 5 MiB `[OS3] UPLOAD` part takes about 53 s
+(`dt=53.4`). Fusion often drops to one part at a time (`parts=1`), so a
+100 MB design can take 10-25 minutes. This doesn't depend on your
+connection, the S3 acceleration setting or the number of upload threads.
+
+Cause: a Wine bug that affects any Windows app uploading with libcurl.
+Wine reports the "ideal send backlog" as a fixed 64 KiB, so curl shrinks
+the socket send buffer. curl's sends then succeed but fill that buffer.
+curl checks writability, sees "not writable", and waits for FD_WRITE. Wine
+only re-arms FD_WRITE after a send that fails, so the event never arrives
+and each wait runs to curl's 1 s timeout. Reported upstream as
+[WineHQ bug 59893](https://bugs.winehq.org/show_bug.cgi?id=59893);
+[MR !11272](https://gitlab.winehq.org/wine/wine/-/merge_requests/11272)
+fixes the related select() writability mismatch but not this re-arm.
+
+Fix (opt-in): `./install.sh --upload-fix`. It rebuilds wineserver from the
+installed GE-Proton release's own sources plus a small patch
+(`src/upload-fix/`), tests it with a curl-style upload loop, backs up the
+original and installs it. Close Fusion first. It needs git, gcc, make,
+python3, perl, bison, flex, autoconf and the MinGW-w64 x86_64 compiler; the
+step lists the exact packages if any are missing. Expect about 10 minutes.
+
+Measured with a 54.8 MB design: 298 s (179 KB/s) before, 50.7 s
+(1069 KB/s, a full 10 Mbit/s uplink) after, with Fusion keeping 4 parts in
+flight. A 1 MiB upload with the official Windows curl.exe went from
+4.5-8.5 s to 0.96 s.
+
+Updating or reinstalling GE-Proton replaces wineserver. Once you have
+applied the fix, the launch health check reports `[!!] Upload fix` when that
+happens; run `./install.sh --upload-fix` again. To undo:
+`./install.sh --upload-fix-revert`.

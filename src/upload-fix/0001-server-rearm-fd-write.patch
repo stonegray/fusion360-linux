@@ -1,0 +1,45 @@
+From 2a1f1770b60fbb933b63583b8696a380d2db017d Mon Sep 17 00:00:00 2001
+From: Wine user <noreply@localhost>
+Date: Thu, 12 Nov 2026 10:11:24 +1030
+Subject: [PATCH] server: Re-enable FD_WRITE when a successful send leaves the
+ socket unwritable.
+
+On Windows a nonblocking send() either queues all of the data or fails with
+WSAEWOULDBLOCK, which re-enables FD_WRITE. On Unix a successful send() can fill
+the socket buffer, and ntdll hides short writes by queueing the remainder in
+the background. In both cases the application then sees the socket as not
+writable without ever having got WSAEWOULDBLOCK, and since AFD_POLL_WRITE is
+still in reported_events, FD_WRITE is never signalled again.
+
+This makes curl's Windows multi_wait() (select() precheck, then wait for
+FD_WRITE with a 1 second cap) stall for a full second every few 64 KiB blocks
+during uploads, e.g. Autodesk Fusion cloud saves run at ~100 KB/s.
+---
+ server/sock.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/server/sock.c b/server/sock.c
+index 93505d5..2afa463 100644
+--- a/server/sock.c
++++ b/server/sock.c
+@@ -3998,9 +3998,15 @@ static void send_socket_completion_callback( void *private )
+     struct iosb *iosb = send_req->iosb;
+     struct sock *sock = send_req->sock;
+ 
+-    if (iosb->status != STATUS_SUCCESS)
++    /* send() calls only clear and reselect events if unsuccessful.
++     *
++     * However, unlike on Windows, a successful send() may leave the Unix
++     * socket buffer full (or have its remainder queued in the background
++     * after a short write), so that the application subsequently sees the
++     * socket as not writable without ever having got WSAEWOULDBLOCK. Treat
++     * that the same way, or FD_WRITE would never be signalled again. */
++    if (iosb->status != STATUS_SUCCESS || !check_fd_events( sock->fd, POLLOUT ))
+     {
+-        /* send() calls only clear and reselect events if unsuccessful. */
+         sock->pending_events &= ~AFD_POLL_WRITE;
+         sock->reported_events &= ~AFD_POLL_WRITE;
+         sock_reselect( sock );
+-- 
+2.47.3
+
