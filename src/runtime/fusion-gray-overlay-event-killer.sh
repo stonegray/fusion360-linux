@@ -44,13 +44,6 @@ if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
   exit 0
 fi
 
-for _tool in xdotool xprop xwininfo; do
-  if ! command -v "$_tool" >/dev/null 2>&1; then
-    echo "$(date -Is) WARNING: $_tool not found - grey overlays will not be closed and dialogs will not accept mouse clicks. Install it (e.g. sudo apt install xdotool x11-utils)." >> "$LOG_FILE"
-  fi
-done
-unset _tool
-
 window_exists() {
   xprop -id "$1" WM_NAME >/dev/null 2>&1
 }
@@ -180,61 +173,12 @@ close_gray_overlays() {
       echo "$(date -Is) closing grey overlay window_id=$window_id parent_window_id=$PARENT_WINDOW_ID" >> "$LOG_FILE"
       xdotool windowclose "$window_id" 2>/dev/null || true
     fi
-  done < <(xdotool search --onlyvisible --class steam_proton 2>/dev/null || true)
+  done < <(xdotool search --class steam_proton 2>/dev/null || true)
 
   check_parent_still_exists
 }
 
-# Fusion's modal dialogs (e.g. "Move to") are mapped as top-level NORMAL windows
-# with skip-taskbar and no WM_TRANSIENT_FOR, so the WM can stack them *below* the
-# main Fusion window. The main window is disabled while the modal is open, which
-# looks like a hang. Raise any such dialog that sits below a main window.
-raise_buried_dialogs() {
-  local stacking window_id props main_pos=-1 pos i
-  local -a stack mains=() dialogs=()
-
-  stacking="$(xprop -root _NET_CLIENT_LIST_STACKING 2>/dev/null)" || return 0
-  read -r -a stack <<< "$(grep -o '0x[0-9a-fA-F]\+' <<< "$stacking" | tr '\n' ' ')"
-
-  while read -r window_id; do
-    [[ -n "$window_id" ]] || continue
-    props="$(xprop -id "$window_id" WM_NAME _NET_WM_WINDOW_TYPE _NET_WM_STATE WM_TRANSIENT_FOR 2>/dev/null)" || continue
-    grep -q '_NET_WM_WINDOW_TYPE_NORMAL' <<< "$props" || continue
-    if grep -q 'Autodesk Fusion' <<< "$props"; then
-      mains+=("$window_id")
-    elif grep -q '_NET_WM_STATE_SKIP_TASKBAR' <<< "$props" \
-         && grep -q 'WM_TRANSIENT_FOR:  not found' <<< "$props"; then
-      dialogs+=("$window_id")
-    fi
-  done < <(xdotool search --onlyvisible --class steam_proton 2>/dev/null || true)
-
-  (( ${#mains[@]} && ${#dialogs[@]} )) || return 0
-
-  # Position in stacking order (bottom -> top); xdotool gives decimal ids.
-  stack_pos() {
-    local want; want="$(printf '0x%x' "$1")"
-    for i in "${!stack[@]}"; do
-      [[ "$(printf '0x%x' "${stack[$i]}")" == "$want" ]] && { echo "$i"; return; }
-    done
-    echo -1
-  }
-
-  for window_id in "${mains[@]}"; do
-    pos="$(stack_pos "$window_id")"
-    (( pos > main_pos )) && main_pos=$pos
-  done
-
-  for window_id in "${dialogs[@]}"; do
-    pos="$(stack_pos "$window_id")"
-    (( pos >= 0 && pos < main_pos )) || continue
-    echo "$(date -Is) raising buried dialog window_id=$window_id name=$(xdotool getwindowname "$window_id" 2>/dev/null)" >> "$LOG_FILE"
-    xdotool windowraise "$window_id" 2>/dev/null || true
-    xdotool windowactivate "$window_id" 2>/dev/null || true
-  done
-}
-
 close_gray_overlays
-raise_buried_dialogs
 
 if command -v stdbuf >/dev/null 2>&1; then
   XPROP_COMMAND=(stdbuf -oL xprop -root -spy _NET_CLIENT_LIST)
@@ -242,13 +186,7 @@ else
   XPROP_COMMAND=(xprop -root -spy _NET_CLIENT_LIST)
 fi
 
-# React to client-list changes, but also re-check every second: Wine can map the
-# overlay before it sets opacity/size, so the single event-triggered check races.
-"${XPROP_COMMAND[@]}" 2>/dev/null | while true; do
-  _rc=0
-  IFS= read -r -t 1 _event_line || _rc=$?
-  (( _rc == 0 || _rc > 128 )) || break   # 1 = EOF (xprop died)
-  (( _rc == 0 )) && sleep "$OVERLAY_KILLER_POLL_INTERVAL"
+"${XPROP_COMMAND[@]}" 2>/dev/null | while IFS= read -r _event_line; do
+  sleep "$OVERLAY_KILLER_POLL_INTERVAL"
   close_gray_overlays
-  raise_buried_dialogs
 done

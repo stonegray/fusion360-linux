@@ -21,8 +21,6 @@ check_dep cabextract "cabextract"
 check_dep wget    "wget"
 check_dep xdg-open "xdg-utils"
 check_dep desktop-file-validate "desktop-file-utils"
-check_dep xdotool "xdotool (grey dialog overlay fix)" "xdotool"
-check_dep xprop   "xprop" "x11-utils / xorg-x11-utils / xorg-xprop"
 
 if python3 -c "import tkinter" &>/dev/null 2>&1; then
   pass "python3-tk (tkinter import OK)"
