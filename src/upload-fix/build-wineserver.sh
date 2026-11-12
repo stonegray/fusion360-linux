@@ -95,15 +95,20 @@ if [[ -n $PROTON_DIR && -x $PROTON_DIR/files/bin/wine ]]; then
   x86_64-w64-mingw32-gcc -O2 -o "$WORK/shortwrite.exe" "$HERE/shortwrite.c" -lws2_32
   export WINEPREFIX="$WORK/testpfx" WINEDEBUG=-all
   mkdir -p "$WINEPREFIX"
-  "$NEW" -p 120
+  "$NEW" -p120   # the timeout must be attached: "-p 120" means persist forever
   timeout 300 "$PROTON_DIR/files/bin/wine" wineboot -u >/dev/null 2>&1 || true
   fails=0
   for port in 47101 47102 47103; do
     timeout 60 python3 -I "$HERE/slowsink.py" "$port" 6 & sleep 0.5
-    out=$(timeout 60 "$PROTON_DIR/files/bin/wine" "$WORK/shortwrite.exe" "$port" 8 2>/dev/null | grep sent || true)
+    # Pass only if the run exits 0 (no stalls, no send error) and moved all 8 MiB.
+    rc=0
+    out=$(timeout 60 "$PROTON_DIR/files/bin/wine" "$WORK/shortwrite.exe" "$port" 8 2>/dev/null) || rc=$?
     wait || true
-    say "  ${out:-no output}"
-    [[ $out == *" 0 stalls"* ]] || fails=$((fails + 1))
+    out=$(grep -E '^(sent|send err)' <<<"$out" || true)
+    say "  ${out:-no output} (exit $rc)"
+    if (( rc != 0 )) || [[ $out != "sent 8 MiB "*" 0 stalls"* ]]; then
+      fails=$((fails + 1))
+    fi
   done
   "$NEW" -k 2>/dev/null || true
   if (( fails )); then

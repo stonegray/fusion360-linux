@@ -39,7 +39,13 @@ check "Callback handler"        test -f "$HOME/.local/share/applications/fusion3
 # or update has replaced the patched wineserver.
 upload_fix_intact() {
   local proton ws
-  proton="$(find_proton "$COMPAT_DIR")" || return 1
+  # Check the Proton the launcher uses, not just the first one installed.
+  if declare -F configured_proton >/dev/null; then
+    proton="$(configured_proton "$CONFIG_FILE")" || return 1
+  else
+    proton="$(find_proton "$COMPAT_DIR")" || return 1
+  fi
+  [[ -n "$proton" ]] || return 1
   ws="$(dirname "$proton")/files/bin/wineserver"
   grep -qs "^$(sha256sum "$ws" 2>/dev/null | awk '{print $1}')  " "$FUSION_DATA_DIR/upload-fix/patched.sha256"
 }

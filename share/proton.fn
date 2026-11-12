@@ -13,6 +13,23 @@ find_proton() {
   find "$compat_dir" -name proton -type f 2>/dev/null | head -1 || true
 }
 
+# The Proton the launcher actually runs: PROTON from the user config (parsed
+# the same way load_config does), else $PROTON, else the launcher's default
+# path. Unlike find_proton it never picks an arbitrary other release.
+# Usage: proton=$(configured_proton [config_file]) || ...
+configured_proton() {
+  local cfg="${1:-${XDG_CONFIG_HOME:-$HOME/.config}/fusion360-linux/config}"
+  local p
+  p="$(
+    if [[ -f "$cfg" ]] && declare -F parse_config >/dev/null; then
+      parse_config "$cfg" >/dev/null 2>&1 || true
+    fi
+    printf '%s' "${PROTON:-$HOME/.local/share/Steam/compatibilitytools.d/${GE_PROTON_VERSION:-GE-Proton11-3}/proton}"
+  )"
+  [[ -f "$p" ]] || return 1
+  printf '%s\n' "$p"
+}
+
 # Given a proton binary path, derive the Wine binary location.
 # Proton ships its own Wine inside the bundle under files/bin/.
 # Usage: wine_bin=$(proton_wine_bin "$proton")

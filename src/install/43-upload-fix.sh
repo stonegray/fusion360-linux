@@ -15,10 +15,15 @@
 # State: $FUSION_DATA_DIR/upload-fix/ (original backups + patched.sha256, used by
 # the health check to notice when a Proton reinstall/update removed the fix).
 
+# NOTE: install.sh runs this step as `run_step ... || exit 1`, which turns off
+# errexit inside it. Every step that changes files is checked explicitly.
+
 local fix_dir="$FUSION_DATA_DIR/upload-fix"
-local proton; proton=$(find_proton "$COMPAT_DIR")
+# Patch the Proton the launcher actually uses (config PROTON / launcher default).
+local proton; proton="$(configured_proton "$F360_CONFIG_FILE" || true)"
 if [[ -z "$proton" ]]; then
-  log_error " GE-Proton not found. Run ./install.sh first."
+  log_error " The Proton configured for Fusion was not found (PROTON in $F360_CONFIG_FILE)."
+  log_detail "   Run ./install.sh first, or fix PROTON with: fusion360 --config"
   return 1
 fi
 local proton_dir; proton_dir="$(dirname "$proton")"
@@ -26,14 +31,35 @@ local tag; tag="$(basename "$proton_dir")"
 local target="$proton_dir/files/bin/wineserver"
 local backup="$fix_dir/wineserver.$tag.orig"
 
-if [[ -n "$(list_fusion_processes | grep -i -E 'Fusion360|wineserver' || true)" ]]; then
+# Capture the list first: piping it straight into grep lets pgrep match that
+# grep's own command line (it contains "wineserver") and block every run.
+local procs; procs="$(list_fusion_processes)"
+if grep -q -i -E 'Fusion360|wineserver' <<<"$procs"; then
   log_error " Fusion / Wine is running. Close Fusion (or ./install.sh --kill) and retry."
   return 1
 fi
 
+# Refresh the installed health check so an existing install can detect a
+# Proton update that replaces the patched wineserver (normally installed by
+# 25-install-to-location.sh, which this standalone step does not run).
+_upload_fix_refresh_health_check() {
+  local rt="$FUSION_DATA_DIR/runtime-scripts" sh="$FUSION_DATA_DIR/share"
+  [[ -d "$rt" ]] || return 0
+  cp "$SCRIPT_DIR/src/runtime/health-check.sh" "$rt/health-check.sh" \
+    && chmod 755 "$rt/health-check.sh" \
+    || { log_warn " Could not update $rt/health-check.sh"; return 0; }
+  [[ -d "$sh" ]] && { cp "$SCRIPT_DIR/share/proton.fn" "$sh/proton.fn" \
+    || log_warn " Could not update $sh/proton.fn"; }
+  return 0
+}
+
 if [[ "${UPLOAD_FIX_ACTION:-apply}" == "revert" ]]; then
   if [[ -f "$backup" ]]; then
-    cp "$backup" "$target.new" && chmod 755 "$target.new" && mv "$target.new" "$target"
+    if ! { cp "$backup" "$target.new" && chmod 755 "$target.new" && mv "$target.new" "$target"; }; then
+      rm -f "$target.new"
+      log_error " Could not restore $target from $backup; nothing changed."
+      return 1
+    fi
     rm -f "$fix_dir/patched.sha256"
     log_pass " Restored original wineserver for $tag."
   else
@@ -42,7 +68,10 @@ if [[ "${UPLOAD_FIX_ACTION:-apply}" == "revert" ]]; then
   return 0
 fi
 
-mkdir -p "$fix_dir"
+if ! mkdir -p "$fix_dir"; then
+  log_error " Could not create $fix_dir"
+  return 1
+fi
 local current; current="$(sha256sum "$target" | awk '{print $1}')"
 if grep -qs "^$current  $tag\$" "$fix_dir/patched.sha256"; then
   log_pass " Upload fix already installed for $tag."
@@ -73,10 +102,33 @@ if ! built="$("$SCRIPT_DIR/src/upload-fix/build-wineserver.sh" "$tag" "$work" "$
   return 1
 fi
 built="$(tail -n1 <<<"$built")"
+if [[ ! -x "$built" ]]; then
+  log_error " Build did not produce a wineserver; the installed one was not changed."
+  return 1
+fi
 
-[[ -f "$backup" ]] || cp -a "$target" "$backup"
-cp "$built" "$target.new" && chmod 755 "$target.new" && mv "$target.new" "$target"
-echo "$(sha256sum "$target" | awk '{print $1}')  $tag" > "$fix_dir/patched.sha256"
+if [[ ! -f "$backup" ]]; then
+  if ! cp -a "$target" "$backup" || ! cmp -s "$target" "$backup"; then
+    rm -f "$backup"
+    log_error " Could not back up $target; the installed wineserver was not changed."
+    return 1
+  fi
+fi
+if ! { cp "$built" "$target.new" && chmod 755 "$target.new" && mv "$target.new" "$target"; }; then
+  rm -f "$target.new"
+  log_error " Could not install the patched wineserver; $target was not changed."
+  return 1
+fi
+local new_sum; new_sum="$(sha256sum "$target" | awk '{print $1}')"
+if [[ "$new_sum" != "$(sha256sum "$built" | awk '{print $1}')" ]]; then
+  log_error " Installed wineserver does not match the build. Restore with: ./install.sh --upload-fix-revert"
+  return 1
+fi
+if ! echo "$new_sum  $tag" > "$fix_dir/patched.sha256"; then
+  log_error " Could not write $fix_dir/patched.sha256 (the health check will not track the fix)."
+  return 1
+fi
+_upload_fix_refresh_health_check
 rm -rf "$work"
 log_pass " Upload fix installed for $tag (original saved as $backup)."
 log_detail "   Undo with: ./install.sh --upload-fix-revert"
