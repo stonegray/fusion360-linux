@@ -146,6 +146,22 @@ static void fix_window(HWND hwnd)
     RECT pos;
     GetWindowRect(hwnd, &pos);
 
+    /* Command dialogs (Extrude etc.) are frameless WS_POPUPs that Fusion
+     * lets the user resize.  Once managed, Wine hands edge-drags to the WM
+     * via _NET_WM_MOVERESIZE, and without WS_THICKFRAME it advertises a
+     * fixed size (min == max), so KWin refuses: the panel stays cut off at
+     * whatever height Fusion first gave it.  KWin decides resizability when
+     * it starts managing the window, so WS_THICKFRAME must be set *before*
+     * WS_EX_APPWINDOW.  Thin strips (status bars) and layered windows
+     * (docked panels such as the Browser) are left fixed-size.          */
+    {
+        LONG_PTR style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+        if (!(style & (WS_CAPTION | WS_THICKFRAME)) &&
+            !(ex & WS_EX_LAYERED) &&
+            pos.right - pos.left >= 100 && pos.bottom - pos.top >= 60)
+            SetWindowLongPtrW(hwnd, GWL_STYLE, style | WS_THICKFRAME);
+    }
+
     SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex);
 
     /* Transition to managed + restore position in one call.          */
