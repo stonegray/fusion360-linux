@@ -35,6 +35,18 @@ check "Config file exists"      test -f "$CONFIG_FILE"
 check "GE-Proton available"     test -n "$(find_proton "$COMPAT_DIR")"
 check "Callback handler"        test -f "$HOME/.local/share/applications/fusion360-linux/fusion360-callback-handler.desktop"
 
+# Opt-in upload fix (./install.sh --upload-fix): flag it if a Proton reinstall
+# or update has replaced the patched wineserver.
+upload_fix_intact() {
+  local proton ws
+  proton="$(find_proton "$COMPAT_DIR")" || return 1
+  ws="$(dirname "$proton")/files/bin/wineserver"
+  grep -qs "^$(sha256sum "$ws" 2>/dev/null | awk '{print $1}')  " "$FUSION_DATA_DIR/upload-fix/patched.sha256"
+}
+if [[ -f "$FUSION_DATA_DIR/upload-fix/patched.sha256" ]]; then
+  check "Upload fix (run ./install.sh --upload-fix)" upload_fix_intact
+fi
+
 if (( all_ok )); then
   echo "All checks passed."
   exit 0

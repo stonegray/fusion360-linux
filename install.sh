@@ -11,6 +11,8 @@
 #   ./install.sh --uninstall                            # interactive selective uninstall
 #   ./install.sh --kill                                  # kill all Fusion/Wine/Proton processes
 #   ./install.sh --installer-path /path/to/downloader.exe  # step 5 with local file
+#   ./install.sh --upload-fix                            # opt-in: patched wineserver for fast cloud uploads
+#   ./install.sh --upload-fix-revert                     # restore the original wineserver
 
 set -euo pipefail 2>/dev/null || set -euo
 
@@ -99,6 +101,12 @@ case "$MODE" in
     run_step 40-fusion-installer.sh
     exit 0
     ;;
+  --upload-fix|--upload-fix-revert)
+    log_step "Cloud upload fix (patched wineserver)"
+    [[ "$MODE" == --upload-fix-revert ]] && UPLOAD_FIX_ACTION=revert
+    run_step 43-upload-fix.sh || exit 1
+    exit 0
+    ;;
 esac
 
 log_step "Step 1/14: Preflight checks"
@@ -167,3 +175,4 @@ kill_fusion_processes || log_warn " Some processes may still be running. Use ./i
 echo ""
 
 log_pass "Fusion 360 installation complete."
+log_detail "   Cloud saves slow (~100 KB/s)? Optional fix: ./install.sh --upload-fix  (see docs/troubleshooting.md)"
