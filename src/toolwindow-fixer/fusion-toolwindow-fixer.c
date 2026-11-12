@@ -109,6 +109,13 @@ static BOOL needs_fix(HWND hwnd)
     /* Already done — skip so we don't keep calling SetWindowLong.      */
     if (ex & WS_EX_APPWINDOW) return FALSE;
 
+    /* Skip layered windows. Wine's grey modal overlay is a layered
+     * toolwindow popup; adding WS_EX_APPWINDOW changes its ex-style and
+     * X11 hints, so fusion-gray-overlay-event-killer.sh (which matches
+     * ex-style 0x80080 and WM_TRANSIENT_FOR) can no longer find and
+     * close it, and dialogs stop taking mouse input.                   */
+    if (ex & WS_EX_LAYERED) return FALSE;
+
     /* ── Accept if it's a recognized "panel" style ──────────────────
      * Toolwindow style (WS_EX_TOOLWINDOW) — the original fix target.
      * Also catch plain popups that are NOT dialogs: no caption bar,
