@@ -130,9 +130,30 @@ start_overlay_killer() {
 # Background daemon that adds WS_EX_APPWINDOW to Fusion's docked
 # toolwindow popups so Wine's X11 driver makes them "managed" instead
 # of override-redirect.  Fixes the "always on top" z-order bug.
+# Wine starts the .exe via start.exe in a reparented process, so $! of the
+# launch command exits at once. Find the real fixer process by its Windows
+# command line (e.g. "C:\fusion-toolwindow-fixer.exe") instead.
+_find_toolwindow_fixer_pid() {
+  local exe_name
+  exe_name="$(basename "$FUSION_TOOLWINDOW_FIXER")"
+  exe_name="${exe_name//./\\.}"
+  pgrep -u "$(id -u)" -f "^[A-Za-z]:\\\\.*\\\\${exe_name}" 2>/dev/null | head -n 1 || true
+}
+
 start_toolwindow_fixer() {
   _is_enabled "$FUSION_ENABLE_TOOLWINDOW_FIXER" || return 0
   daemon_check_running "toolwindow-fixer" && { log_info "Toolwindow fixer already running"; return 0; }
+
+  # Adopt an untracked copy (e.g. from an earlier launcher) instead of
+  # starting a second one.
+  local existing_pid
+  existing_pid="$(_find_toolwindow_fixer_pid)"
+  if [[ -n "$existing_pid" ]]; then
+    TOOLWINDOW_FIXER_PID="$existing_pid"
+    daemon_write_pid "toolwindow-fixer" "$TOOLWINDOW_FIXER_PID"
+    log_info "Toolwindow fixer already running (PID $TOOLWINDOW_FIXER_PID)"
+    return 0
+  fi
 
   if [[ ! -x "$FUSION_TOOLWINDOW_FIXER" ]]; then
     log_warn "Toolwindow fixer is enabled but not executable: $FUSION_TOOLWINDOW_FIXER"
@@ -151,12 +172,25 @@ start_toolwindow_fixer() {
     return 0
   fi
 
-  nohup "$wine_bin" "$FUSION_TOOLWINDOW_FIXER" &>/dev/null &
   nohup setsid env WINEPREFIX="${STEAM_COMPAT_DATA_PATH:-${PFX_DIR:-$HOME/.fusion360-proton2}}/pfx" \
     "$wine_bin" "$FUSION_TOOLWINDOW_FIXER" &>/dev/null &
-  TOOLWINDOW_FIXER_PID=$!
   disown 2>/dev/null || true
-  log_info "Toolwindow fixer started (PID $TOOLWINDOW_FIXER_PID)"
+
+  # Wait up to ~5 s for the real fixer process to appear, then track it.
+  local i
+  TOOLWINDOW_FIXER_PID=""
+  for i in {1..50}; do
+    TOOLWINDOW_FIXER_PID="$(_find_toolwindow_fixer_pid)"
+    [[ -n "$TOOLWINDOW_FIXER_PID" ]] && break
+    sleep 0.1
+  done
+
+  if [[ -n "$TOOLWINDOW_FIXER_PID" ]]; then
+    daemon_write_pid "toolwindow-fixer" "$TOOLWINDOW_FIXER_PID"
+    log_info "Toolwindow fixer started (PID $TOOLWINDOW_FIXER_PID)"
+  else
+    log_warn "Toolwindow fixer launched but its process was not found"
+  fi
 }
 
 # ── Stop all tracked daemons ───────────────────────────────────────────
