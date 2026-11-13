@@ -178,7 +178,9 @@ close_gray_overlays() {
     if is_overlay_window "$window_id"; then
       remember_parent_from_overlay "$window_id"
       echo "$(date -Is) closing grey overlay window_id=$window_id parent_window_id=$PARENT_WINDOW_ID" >> "$LOG_FILE"
-      xdotool windowclose "$window_id" 2>/dev/null || true
+      # Unmap, never destroy: XDestroyWindow on a Wine-owned window races Wine's own
+      # XGetProperty calls -> fatal BadWindow and Fusion exits (status 1).
+      xdotool windowunmap "$window_id" 2>/dev/null || true
     fi
   done < <(xdotool search --onlyvisible --class steam_proton 2>/dev/null || true)
 
