@@ -122,6 +122,7 @@ start_overlay_killer() {
   nohup env FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT="$FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT" \
     "$FUSION_OVERLAY_KILLER" &>/dev/null &
   OVERLAY_KILLER_PID=$!
+  daemon_write_pid "overlay-killer" "$OVERLAY_KILLER_PID"
   disown 2>/dev/null || true
   log_info "Overlay killer started (PID $OVERLAY_KILLER_PID)"
 }

@@ -44,6 +44,13 @@ if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
   exit 0
 fi
 
+for _tool in xdotool xprop xwininfo; do
+  if ! command -v "$_tool" >/dev/null 2>&1; then
+    echo "$(date -Is) WARNING: $_tool not found - grey overlays will not be closed and dialogs will not accept mouse clicks. Install it (e.g. sudo apt install xdotool x11-utils)." >> "$LOG_FILE"
+  fi
+done
+unset _tool
+
 window_exists() {
   xprop -id "$1" WM_NAME >/dev/null 2>&1
 }
@@ -171,14 +178,75 @@ close_gray_overlays() {
     if is_overlay_window "$window_id"; then
       remember_parent_from_overlay "$window_id"
       echo "$(date -Is) closing grey overlay window_id=$window_id parent_window_id=$PARENT_WINDOW_ID" >> "$LOG_FILE"
-      xdotool windowclose "$window_id" 2>/dev/null || true
+      # Unmap, never destroy: XDestroyWindow on a Wine-owned window races Wine's own
+      # XGetProperty calls -> fatal BadWindow and Fusion exits (status 1).
+      xdotool windowunmap "$window_id" 2>/dev/null || true
     fi
-  done < <(xdotool search --class steam_proton 2>/dev/null || true)
+  done < <(xdotool search --onlyvisible --class steam_proton 2>/dev/null || true)
 
   check_parent_still_exists
 }
 
+# Fusion's modal dialogs (e.g. "Move to") are mapped as top-level NORMAL windows
+# with skip-taskbar and no WM_TRANSIENT_FOR, so the WM can stack them *below* the
+# main Fusion window. The main window is disabled while the modal is open, which
+# looks like a hang. Raise any such dialog that sits below *its own* main window.
+#
+# Every Proton app shares the steam_proton class, so ownership is established
+# with _NET_WM_PID (Wine sets it to the owning process): a dialog is only
+# considered if a main Fusion window from the same process exists, and it is
+# only compared with that process's main windows. Windows without the property
+# are ignored.
+raise_buried_dialogs() {
+  local stacking window_id props pid pos main_pos i
+  local -a stack dialogs=()
+  local -A main_top=() dialog_pid=()
+
+  stacking="$(xprop -root _NET_CLIENT_LIST_STACKING 2>/dev/null)" || return 0
+  read -r -a stack <<< "$(grep -o '0x[0-9a-fA-F]\+' <<< "$stacking" | tr '\n' ' ')"
+
+  # Position in stacking order (bottom -> top); xdotool gives decimal ids.
+  stack_pos() {
+    local want; want="$(printf '0x%x' "$1")"
+    for i in "${!stack[@]}"; do
+      [[ "$(printf '0x%x' "${stack[$i]}")" == "$want" ]] && { echo "$i"; return; }
+    done
+    echo -1
+  }
+
+  while read -r window_id; do
+    [[ -n "$window_id" ]] || continue
+    props="$(xprop -id "$window_id" WM_NAME _NET_WM_WINDOW_TYPE _NET_WM_STATE WM_TRANSIENT_FOR _NET_WM_PID 2>/dev/null)" || continue
+    grep -q '_NET_WM_WINDOW_TYPE_NORMAL' <<< "$props" || continue
+    pid="$(sed -n 's/^_NET_WM_PID(CARDINAL) = \([0-9][0-9]*\)$/\1/p' <<< "$props")"
+    [[ -n "$pid" ]] || continue
+    if grep -q '^WM_NAME([^)]*) = ".* - Autodesk Fusion' <<< "$props"; then
+      pos="$(stack_pos "$window_id")"
+      if (( pos > ${main_top[$pid]:--1} )); then main_top[$pid]=$pos; fi
+    elif grep -q '_NET_WM_STATE_SKIP_TASKBAR' <<< "$props" \
+         && grep -q 'WM_TRANSIENT_FOR:  not found' <<< "$props"; then
+      dialogs+=("$window_id")
+      dialog_pid[$window_id]=$pid
+    fi
+  done < <(xdotool search --onlyvisible --class steam_proton 2>/dev/null || true)
+
+  (( ${#main_top[@]} && ${#dialogs[@]} )) || return 0
+
+  for window_id in "${dialogs[@]}"; do
+    pid="${dialog_pid[$window_id]}"
+    main_pos="${main_top[$pid]:-}"
+    [[ -n "$main_pos" ]] || continue          # not a Fusion process's dialog
+    pos="$(stack_pos "$window_id")"
+    (( pos >= 0 && pos < main_pos )) || continue
+    echo "$(date -Is) raising buried dialog window_id=$window_id pid=$pid name=$(xdotool getwindowname "$window_id" 2>/dev/null)" >> "$LOG_FILE"
+    xdotool windowraise "$window_id" 2>/dev/null || true
+    xdotool windowactivate "$window_id" 2>/dev/null || true
+  done
+  return 0
+}
+
 close_gray_overlays
+raise_buried_dialogs
 
 if command -v stdbuf >/dev/null 2>&1; then
   XPROP_COMMAND=(stdbuf -oL xprop -root -spy _NET_CLIENT_LIST)
@@ -186,7 +254,13 @@ else
   XPROP_COMMAND=(xprop -root -spy _NET_CLIENT_LIST)
 fi
 
-"${XPROP_COMMAND[@]}" 2>/dev/null | while IFS= read -r _event_line; do
-  sleep "$OVERLAY_KILLER_POLL_INTERVAL"
+# React to client-list changes, but also re-check every second: Wine can map the
+# overlay before it sets opacity/size, so the single event-triggered check races.
+"${XPROP_COMMAND[@]}" 2>/dev/null | while true; do
+  _rc=0
+  IFS= read -r -t 1 _event_line || _rc=$?
+  (( _rc == 0 || _rc > 128 )) || break   # 1 = EOF (xprop died)
+  (( _rc == 0 )) && sleep "$OVERLAY_KILLER_POLL_INTERVAL"
   close_gray_overlays
+  raise_buried_dialogs
 done

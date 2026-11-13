@@ -35,12 +35,30 @@ declare -a CONFIG_VALS=(
   "$F360_DATA_DIR/runtime-scripts/kill-wine-proton-fusion-nuclear.sh"
   "$PFX_DIR/pfx/drive_c/fusion-toolwindow-fixer.exe"
   "auto" "auto" "144" "150"
-  "0" "0" "1" "1" "1" "1" "0" "1" "1" "1" "1" "1" "1" "25"
+  "0" "0" "1" "1" "1" "1" "0" "1" "1" "1" "1" "1" "25"
 )
+
+# Keys and values are matched by position; a mismatch silently shifts every
+# later value (it once wrote FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT=1).
+if (( ${#CONFIG_KEYS[@]} != ${#CONFIG_VALS[@]} )); then
+  log_error "  internal error: ${#CONFIG_KEYS[@]} config keys but ${#CONFIG_VALS[@]} values"
+  return 1
+fi
 
 
 if [[ -f "$CONFIG_FILE" ]]; then
   local wrote=0
+  # Repair the value the key/value shift above used to write. At 1% the overlay
+  # killer rejects Wine's grey overlay (it is ~30 px taller than the parent), so
+  # dialogs never take mouse input.
+  if grep -q '^FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT=1$' "$CONFIG_FILE" 2>/dev/null; then
+    local tmp_cfg
+    tmp_cfg="$(mktemp "$CONFIG_FILE.XXXXXX")"
+    sed 's/^FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT=1$/FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT=25/' \
+      "$CONFIG_FILE" > "$tmp_cfg" && mv "$tmp_cfg" "$CONFIG_FILE"
+    log_info "  fixed FUSION_OVERLAY_SIZE_TOLERANCE_PERCENT=1 (installer bug) -> 25"
+    wrote=1
+  fi
   for ((i = 0; i < ${#CONFIG_KEYS[@]}; i++)); do
     if ! grep -q "^${CONFIG_KEYS[$i]}=" "$CONFIG_FILE" 2>/dev/null; then
       printf '%s=%s\n' "${CONFIG_KEYS[$i]}" "$(config_quote "${CONFIG_VALS[$i]}")" >> "$CONFIG_FILE"
